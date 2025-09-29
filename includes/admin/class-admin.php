@@ -164,7 +164,7 @@ class Tomatillo_Media_Admin {
         $this->handle_tools_form_submissions($plugin, $current_tab);
         
         // Include the tools template
-        include TOMATILLO_MEDIA_STUDIO_DIR . 'templates/test-page.php';
+        include TOMATILLO_MEDIA_STUDIO_DIR . 'templates/tools-page.php';
     }
     
     /**
@@ -195,6 +195,25 @@ class Tomatillo_Media_Admin {
                 $plugin->core->start_bulk_optimization();
             }
             echo '<div class="notice notice-success"><p>' . __('Bulk optimization started! Check the progress below.', 'tomatillo-media-studio') . '</p></div>';
+        }
+        
+        // Handle calculator updates
+        if (isset($_POST['update_calculator']) && wp_verify_nonce($_POST['_wpnonce'], 'tomatillo_update_calculator')) {
+            $monthly_pageviews = intval($_POST['monthly_pageviews']);
+            $cost_per_gb = floatval($_POST['cost_per_gb']);
+            
+            // Handle custom cost input
+            if (isset($_POST['custom_cost']) && $_POST['cost_per_gb'] === 'custom') {
+                $cost_per_gb = floatval($_POST['custom_cost']);
+            }
+            
+            if ($monthly_pageviews > 0 && $cost_per_gb >= 0) {
+                update_option('tomatillo_monthly_pageviews', $monthly_pageviews);
+                update_option('tomatillo_cost_per_gb', $cost_per_gb);
+                echo '<div class="notice notice-success"><p>' . __('Calculator settings updated successfully!', 'tomatillo-media-studio') . '</p></div>';
+            } else {
+                echo '<div class="notice notice-error"><p>' . __('Please enter valid values for page views and cost per GB.', 'tomatillo-media-studio') . '</p></div>';
+            }
         }
     }
     

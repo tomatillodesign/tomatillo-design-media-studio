@@ -11,6 +11,8 @@ if (!defined('ABSPATH')) {
 
 class Tomatillo_Media_Core {
     
+    private $initialized = false;
+    
     /**
      * Constructor
      */
@@ -32,8 +34,11 @@ class Tomatillo_Media_Core {
      * Initialize core functionality
      */
     public function init() {
-        // Log initialization
-        $this->log('Tomatillo Media Studio Core initialized', 'info');
+        // Only log initialization once
+        if (!$this->initialized) {
+            $this->log('info', 'Media Studio Core initialized');
+            $this->initialized = true;
+        }
         
         // Check system requirements
         $this->check_requirements();
@@ -208,11 +213,22 @@ class Tomatillo_Media_Core {
             AND post_mime_type NOT LIKE 'image/%'
         ");
         
-        // Total file size
-        $stats['total_size'] = $wpdb->get_var("
-            SELECT SUM(meta_value) FROM {$wpdb->postmeta} 
-            WHERE meta_key = '_wp_attachment_metadata'
+        // Total file size (calculate by checking actual files)
+        $total_size = 0;
+        $images = $wpdb->get_results("
+            SELECT ID FROM {$wpdb->posts} 
+            WHERE post_type = 'attachment' 
+            AND post_mime_type LIKE 'image/%'
         ");
+        
+        foreach ($images as $image) {
+            $file_path = get_attached_file($image->ID);
+            if ($file_path && file_exists($file_path)) {
+                $total_size += filesize($file_path);
+            }
+        }
+        
+        $stats['total_size'] = $total_size;
         
         // Recent uploads (last 30 days)
         $stats['recent_uploads'] = $wpdb->get_var("
@@ -237,6 +253,8 @@ class Tomatillo_Media_Core {
             'total_conversions' => 0,
             'avif_conversions' => 0,
             'webp_conversions' => 0,
+            'avif_space_saved' => 0,
+            'webp_space_saved' => 0,
             'total_space_saved' => 0,
             'average_savings' => 0,
             'pending_optimizations' => 0
@@ -244,10 +262,6 @@ class Tomatillo_Media_Core {
         
         // Check if table exists
         $table_exists = $wpdb->get_var("SHOW TABLES LIKE '{$table_name}'") == $table_name;
-        
-        if (!$table_exists) {
-            return $stats;
-        }
         
         // Total optimized (count by checking actual files)
         $total_images = $wpdb->get_var("
@@ -273,11 +287,51 @@ class Tomatillo_Media_Core {
         
         $stats['total_conversions'] = $optimized_count;
         
-        // AVIF conversions
-        $stats['avif_conversions'] = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table_name} WHERE avif_path IS NOT NULL");
+        // AVIF and WebP conversions (count by checking actual files)
+        $avif_count = 0;
+        $webp_count = 0;
+        $avif_space_saved = 0;
+        $webp_space_saved = 0;
         
-        // WebP conversions
-        $stats['webp_conversions'] = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table_name} WHERE webp_path IS NOT NULL");
+        if ($total_images > 0) {
+            $images = $wpdb->get_results("
+                SELECT ID FROM {$wpdb->posts} 
+                WHERE post_type = 'attachment' 
+                AND post_mime_type IN ('image/jpeg', 'image/png')
+            ");
+            
+            foreach ($images as $image) {
+                $file_path = get_attached_file($image->ID);
+                if ($file_path) {
+                    $avif_path = str_replace(array('.jpg', '.jpeg', '.png'), '.avif', $file_path);
+                    $webp_path = str_replace(array('.jpg', '.jpeg', '.png'), '.webp', $file_path);
+                    
+                    if (file_exists($avif_path)) {
+                        $avif_count++;
+                        // Calculate space saved for AVIF
+                        $original_size = file_exists($file_path) ? filesize($file_path) : 0;
+                        $avif_size = filesize($avif_path);
+                        if ($original_size > $avif_size) {
+                            $avif_space_saved += ($original_size - $avif_size);
+                        }
+                    }
+                    if (file_exists($webp_path)) {
+                        $webp_count++;
+                        // Calculate space saved for WebP
+                        $original_size = file_exists($file_path) ? filesize($file_path) : 0;
+                        $webp_size = filesize($webp_path);
+                        if ($original_size > $webp_size) {
+                            $webp_space_saved += ($original_size - $webp_size);
+                        }
+                    }
+                }
+            }
+        }
+        
+        $stats['avif_conversions'] = $avif_count;
+        $stats['webp_conversions'] = $webp_count;
+        $stats['avif_space_saved'] = $avif_space_saved;
+        $stats['webp_space_saved'] = $webp_space_saved;
         
         // Calculate space saved by checking actual file sizes
         $total_space_saved = 0;
@@ -342,6 +396,24 @@ class Tomatillo_Media_Core {
      * Log debug information
      */
     public function log($message, $level = 'info') {
+        // Only log important events, not routine operations
+        $important_levels = array('error', 'warning');
+        $important_messages = array('optimization', 'conversion', 'error', 'failed', 'success');
+        
+        // Skip routine info messages unless they contain important keywords
+        if ($level === 'info' && !in_array($level, $important_levels)) {
+            $is_important = false;
+            foreach ($important_messages as $keyword) {
+                if (stripos($message, $keyword) !== false) {
+                    $is_important = true;
+                    break;
+                }
+            }
+            if (!$is_important) {
+                return; // Skip routine info messages
+            }
+        }
+        
         if (!function_exists('tomatillo_media_studio')) {
             return;
         }
@@ -371,15 +443,27 @@ class Tomatillo_Media_Core {
     private function write_to_log_file($message) {
         $log_file = WP_CONTENT_DIR . '/tomatillo-media-studio.log';
         
-        // Ensure log file doesn't get too large (max 1MB)
-        if (file_exists($log_file) && filesize($log_file) > 1048576) {
-            // Keep only last 500 lines
-            $lines = file($log_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-            $lines = array_slice($lines, -500);
-            file_put_contents($log_file, implode("\n", $lines) . "\n");
+        try {
+            // Ensure log file doesn't get too large (max 1MB)
+            if (file_exists($log_file) && filesize($log_file) > 1048576) {
+                // Keep only last 500 lines
+                $lines = file($log_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                if ($lines !== false) {
+                    $lines = array_slice($lines, -500);
+                    file_put_contents($log_file, implode("\n", $lines) . "\n");
+                }
+            }
+            
+            // Write the log entry
+            $result = file_put_contents($log_file, $message . "\n", FILE_APPEND | LOCK_EX);
+            
+            if ($result === false) {
+                error_log('Tomatillo Media Studio: Failed to write to log file');
+            }
+            
+        } catch (Exception $e) {
+            error_log('Tomatillo Media Studio: Log file error - ' . $e->getMessage());
         }
-        
-        file_put_contents($log_file, $message . "\n", FILE_APPEND | LOCK_EX);
     }
     
     /**
@@ -389,13 +473,45 @@ class Tomatillo_Media_Core {
         $log_file = WP_CONTENT_DIR . '/tomatillo-media-studio.log';
         
         if (!file_exists($log_file)) {
+            // Create a test log entry if no log file exists
+            $this->log('info', 'Plugin logs initialized - no existing log file found');
             return array();
         }
         
-        $logs = file($log_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        
-        // Return last 100 log entries
-        return array_slice($logs, -100);
+        try {
+            $logs = file($log_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            
+            if ($logs === false) {
+                return array();
+            }
+            
+            $logs = array_slice($logs, -100); // Get last 100 entries
+            $parsed_logs = array();
+            
+            foreach ($logs as $log_line) {
+                // Parse log format: [timestamp] LEVEL message
+                if (preg_match('/^\[([^\]]+)\]\s+(\w+)\s+(.+)$/', $log_line, $matches)) {
+                    $parsed_logs[] = array(
+                        'timestamp' => $matches[1],
+                        'level' => strtolower($matches[2]),
+                        'message' => $matches[3]
+                    );
+                } else {
+                    // Fallback for malformed log entries
+                    $parsed_logs[] = array(
+                        'timestamp' => date('Y-m-d H:i:s'),
+                        'level' => 'info',
+                        'message' => $log_line
+                    );
+                }
+            }
+            
+            return $parsed_logs;
+            
+        } catch (Exception $e) {
+            error_log('Tomatillo Media Studio: Error reading log file - ' . $e->getMessage());
+            return array();
+        }
     }
     
     /**
@@ -404,8 +520,15 @@ class Tomatillo_Media_Core {
     public function clear_plugin_logs() {
         $log_file = WP_CONTENT_DIR . '/tomatillo-media-studio.log';
         
-        if (file_exists($log_file)) {
-            file_put_contents($log_file, '');
+        try {
+            if (file_exists($log_file)) {
+                $result = file_put_contents($log_file, '');
+                if ($result === false) {
+                    error_log('Tomatillo Media Studio: Failed to clear log file');
+                }
+            }
+        } catch (Exception $e) {
+            error_log('Tomatillo Media Studio: Error clearing log file - ' . $e->getMessage());
         }
     }
     
