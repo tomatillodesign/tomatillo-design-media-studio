@@ -30,6 +30,13 @@ class Tomatillo_Media_Settings {
         'auto_convert' => true,
         'batch_size' => 10,
         'preserve_originals' => true,
+        'min_savings_threshold' => 25,  // Minimum % savings required to convert
+        'skip_small_images' => true,    // Skip images smaller than threshold
+        'min_image_size' => 50000,      // 50KB minimum size to process
+        'max_image_dimensions' => 4000, // Max width/height to process
+        'enable_avif' => true,          // Enable AVIF conversion
+        'enable_webp' => true,          // Enable WebP conversion
+        'conversion_timeout' => 30,     // Max seconds per conversion
         
         // Media Library Settings
         'thumbnail_size' => 'large',
@@ -207,6 +214,55 @@ class Tomatillo_Media_Settings {
     }
     
     /**
+     * Get minimum savings threshold percentage
+     */
+    public function get_min_savings_threshold() {
+        return (int) $this->get('min_savings_threshold');
+    }
+    
+    /**
+     * Check if small images should be skipped
+     */
+    public function should_skip_small_images() {
+        return (bool) $this->get('skip_small_images');
+    }
+    
+    /**
+     * Get minimum image size to process
+     */
+    public function get_min_image_size() {
+        return (int) $this->get('min_image_size');
+    }
+    
+    /**
+     * Get maximum image dimensions to process
+     */
+    public function get_max_image_dimensions() {
+        return (int) $this->get('max_image_dimensions');
+    }
+    
+    /**
+     * Check if AVIF conversion is enabled
+     */
+    public function is_avif_enabled() {
+        return (bool) $this->get('enable_avif');
+    }
+    
+    /**
+     * Check if WebP conversion is enabled
+     */
+    public function is_webp_enabled() {
+        return (bool) $this->get('enable_webp');
+    }
+    
+    /**
+     * Get conversion timeout in seconds
+     */
+    public function get_conversion_timeout() {
+        return (int) $this->get('conversion_timeout');
+    }
+    
+    /**
      * Sanitize settings before saving
      */
     public function sanitize_settings($input) {
@@ -222,6 +278,13 @@ class Tomatillo_Media_Settings {
         $sanitized['auto_convert'] = isset($input['auto_convert']) ? (bool) $input['auto_convert'] : false;
         $sanitized['batch_size'] = isset($input['batch_size']) ? max(1, min(50, (int) $input['batch_size'])) : 10;
         $sanitized['preserve_originals'] = isset($input['preserve_originals']) ? (bool) $input['preserve_originals'] : true;
+        $sanitized['min_savings_threshold'] = isset($input['min_savings_threshold']) ? max(1, min(90, (int) $input['min_savings_threshold'])) : 25;
+        $sanitized['skip_small_images'] = isset($input['skip_small_images']) ? (bool) $input['skip_small_images'] : true;
+        $sanitized['min_image_size'] = isset($input['min_image_size']) ? max(1000, min(1000000, (int) $input['min_image_size'])) : 50000;
+        $sanitized['max_image_dimensions'] = isset($input['max_image_dimensions']) ? max(1000, min(8000, (int) $input['max_image_dimensions'])) : 4000;
+        $sanitized['enable_avif'] = isset($input['enable_avif']) ? (bool) $input['enable_avif'] : true;
+        $sanitized['enable_webp'] = isset($input['enable_webp']) ? (bool) $input['enable_webp'] : true;
+        $sanitized['conversion_timeout'] = isset($input['conversion_timeout']) ? max(5, min(300, (int) $input['conversion_timeout'])) : 30;
         
         // Media Library Settings
         $allowed_sizes = array('thumbnail', 'medium', 'large', 'full');

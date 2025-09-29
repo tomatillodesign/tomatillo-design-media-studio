@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name:       Tomatillo Media Studio
+ * Plugin Name:       Tomatillo Design ~ Media Studio
  * Plugin URI:        https://github.com/tomatillodesign/tomatillo-design-media-studio
  * Description:       A comprehensive WordPress media solution featuring automatic AVIF/WebP optimization and a beautiful, modern media library interface.
  * Version:           1.0.0
@@ -45,9 +45,19 @@ class Tomatillo_Media_Studio {
     public $settings = null;
     
     /**
+     * Core functionality
+     */
+    public $core = null;
+    
+    /**
      * Optimization module
      */
     public $optimization = null;
+    
+    /**
+     * Frontend optimization
+     */
+    public $frontend_swap = null;
     
     /**
      * Media library module
@@ -104,8 +114,9 @@ class Tomatillo_Media_Studio {
         // Initialize core components
         $this->settings = new Tomatillo_Media_Settings();
         $this->assets = new Tomatillo_Media_Assets();
+        $this->core = new Tomatillo_Media_Core();
         
-        // Load modules based on settings
+        // Load modules based on settings (only if they exist)
         if ($this->settings->is_optimization_enabled()) {
             $this->load_optimization_module();
         }
@@ -122,35 +133,47 @@ class Tomatillo_Media_Studio {
      * Load optimization module
      */
     private function load_optimization_module() {
-        require_once TOMATILLO_MEDIA_STUDIO_DIR . 'includes/optimization/class-optimizer.php';
-        require_once TOMATILLO_MEDIA_STUDIO_DIR . 'includes/optimization/class-batch-processor.php';
-        require_once TOMATILLO_MEDIA_STUDIO_DIR . 'includes/optimization/class-meta-manager.php';
-        require_once TOMATILLO_MEDIA_STUDIO_DIR . 'includes/optimization/class-frontend-swap.php';
+        $optimizer_file = TOMATILLO_MEDIA_STUDIO_DIR . 'includes/optimization/class-optimizer.php';
+        $frontend_file = TOMATILLO_MEDIA_STUDIO_DIR . 'includes/optimization/class-frontend-swap.php';
         
-        $this->optimization = new Tomatillo_Optimizer();
+        if (file_exists($optimizer_file)) {
+            require_once $optimizer_file;
+            $this->optimization = new Tomatillo_Optimizer();
+        } else {
+            // Log error for debugging
+            error_log('Tomatillo Media Studio: Optimization module file not found: ' . $optimizer_file);
+        }
+        
+        if (file_exists($frontend_file)) {
+            require_once $frontend_file;
+            $this->frontend_swap = new Tomatillo_Frontend_Swap();
+        } else {
+            // Log error for debugging
+            error_log('Tomatillo Media Studio: Frontend swap file not found: ' . $frontend_file);
+        }
     }
     
     /**
      * Load media library module
      */
     private function load_media_library_module() {
-        require_once TOMATILLO_MEDIA_STUDIO_DIR . 'includes/media-library/class-library-manager.php';
-        require_once TOMATILLO_MEDIA_STUDIO_DIR . 'includes/media-library/class-thumbnail-generator.php';
-        require_once TOMATILLO_MEDIA_STUDIO_DIR . 'includes/media-library/class-bulk-operations.php';
-        require_once TOMATILLO_MEDIA_STUDIO_DIR . 'includes/media-library/class-search-filter.php';
-        
-        $this->media_library = new Tomatillo_Media_Library();
+        // Media library module not yet implemented
+        // This will be added in future development
+        error_log('Tomatillo Media Studio: Media library module not yet implemented');
     }
     
     /**
      * Load admin module
      */
     private function load_admin_module() {
-        require_once TOMATILLO_MEDIA_STUDIO_DIR . 'includes/admin/class-admin.php';
-        require_once TOMATILLO_MEDIA_STUDIO_DIR . 'includes/admin/class-settings-page.php';
-        require_once TOMATILLO_MEDIA_STUDIO_DIR . 'includes/admin/class-dashboard.php';
+        $admin_file = TOMATILLO_MEDIA_STUDIO_DIR . 'includes/admin/class-admin.php';
         
-        $this->admin = new Tomatillo_Media_Admin();
+        if (file_exists($admin_file)) {
+            require_once $admin_file;
+            $this->admin = new Tomatillo_Media_Admin();
+        } else {
+            error_log('Tomatillo Media Studio: Admin module file not found: ' . $admin_file);
+        }
     }
     
     /**
@@ -165,6 +188,10 @@ class Tomatillo_Media_Studio {
         );
         
         // Initialize modules
+        if ($this->core) {
+            $this->core->init();
+        }
+        
         if ($this->optimization) {
             $this->optimization->init();
         }
@@ -256,6 +283,13 @@ class Tomatillo_Media_Studio {
             'avif_quality' => 80,
             'webp_quality' => 85,
             'auto_convert' => true,
+            'min_savings_threshold' => 25,
+            'skip_small_images' => true,
+            'min_image_size' => 50000,
+            'max_image_dimensions' => 4000,
+            'enable_avif' => true,
+            'enable_webp' => true,
+            'conversion_timeout' => 30,
             'thumbnail_size' => 'large',
             'enable_bulk_ops' => true,
             'enable_advanced_search' => true,

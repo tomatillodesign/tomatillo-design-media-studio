@@ -32,6 +32,9 @@ class Tomatillo_Media_Core {
      * Initialize core functionality
      */
     public function init() {
+        // Log initialization
+        $this->log('Tomatillo Media Studio Core initialized', 'info');
+        
         // Check system requirements
         $this->check_requirements();
         
@@ -61,15 +64,18 @@ class Tomatillo_Media_Core {
         }
         
         // Check for AVIF support
-        if (tomatillo_media_studio()->settings->is_optimization_enabled()) {
-            if (!function_exists('imageavif') && !class_exists('Imagick')) {
-                $requirements[] = __('AVIF support requires GD with AVIF support or Imagick', 'tomatillo-media-studio');
+        if (function_exists('tomatillo_media_studio')) {
+            $plugin = tomatillo_media_studio();
+            if ($plugin && isset($plugin->settings) && $plugin->settings->is_optimization_enabled()) {
+                if (!function_exists('imageavif') && !class_exists('Imagick')) {
+                    $requirements[] = __('AVIF support requires GD with AVIF support or Imagick', 'tomatillo-media-studio');
+                }
             }
         }
         
         if (!empty($requirements)) {
             add_action('admin_notices', function() use ($requirements) {
-                echo '<div class="notice notice-error"><p><strong>' . __('Tomatillo Media Studio:', 'tomatillo-media-studio') . '</strong> ' . implode(', ', $requirements) . '</p></div>';
+                echo '<div class="notice notice-error"><p><strong>' . __('Media Studio:', 'tomatillo-media-studio') . '</strong> ' . implode(', ', $requirements) . '</p></div>';
             });
         }
     }
@@ -78,20 +84,25 @@ class Tomatillo_Media_Core {
      * Initialize modules
      */
     private function init_modules() {
+        // Only initialize if plugin is fully loaded
+        if (!function_exists('tomatillo_media_studio')) {
+            return;
+        }
+        
         $plugin = tomatillo_media_studio();
         
         // Initialize optimization module
-        if ($plugin->optimization) {
+        if ($plugin && isset($plugin->optimization) && $plugin->optimization) {
             $plugin->optimization->init();
         }
         
         // Initialize media library module
-        if ($plugin->media_library) {
+        if ($plugin && isset($plugin->media_library) && $plugin->media_library) {
             $plugin->media_library->init();
         }
         
         // Initialize admin module
-        if ($plugin->admin) {
+        if ($plugin && isset($plugin->admin) && $plugin->admin) {
             $plugin->admin->init();
         }
     }
@@ -104,8 +115,8 @@ class Tomatillo_Media_Core {
         if (get_transient('tomatillo_media_studio_activated')) {
             delete_transient('tomatillo_media_studio_activated');
             echo '<div class="notice notice-success is-dismissible">';
-            echo '<p><strong>' . __('Tomatillo Media Studio', 'tomatillo-media-studio') . '</strong> ' . __('has been activated successfully!', 'tomatillo-media-studio') . '</p>';
-            echo '<p><a href="' . admin_url('admin.php?page=tomatillo-media-studio') . '" class="button button-primary">' . __('Go to Settings', 'tomatillo-media-studio') . '</a></p>';
+            echo '<p><strong>' . __('Media Studio', 'tomatillo-media-studio') . '</strong> ' . __('has been activated successfully!', 'tomatillo-media-studio') . '</p>';
+            echo '<p><a href="' . admin_url('admin.php?page=tomatillo-media-studio-settings') . '" class="button button-primary">' . __('Go to Settings', 'tomatillo-media-studio') . '</a></p>';
             echo '</div>';
         }
         
@@ -117,12 +128,21 @@ class Tomatillo_Media_Core {
      * Show module status notices
      */
     private function show_module_notices() {
-        $settings = tomatillo_media_studio()->settings;
+        if (!function_exists('tomatillo_media_studio')) {
+            return;
+        }
+        
+        $plugin = tomatillo_media_studio();
+        if (!$plugin || !isset($plugin->settings)) {
+            return;
+        }
+        
+        $settings = $plugin->settings;
         
         if (!$settings->is_optimization_enabled() && !$settings->is_media_library_enabled()) {
             echo '<div class="notice notice-warning">';
-            echo '<p><strong>' . __('Tomatillo Media Studio:', 'tomatillo-media-studio') . '</strong> ' . __('Both modules are disabled. Please enable at least one module in the settings.', 'tomatillo-media-studio') . '</p>';
-            echo '<p><a href="' . admin_url('admin.php?page=tomatillo-media-studio') . '" class="button button-secondary">' . __('Go to Settings', 'tomatillo-media-studio') . '</a></p>';
+            echo '<p><strong>' . __('Media Studio:', 'tomatillo-media-studio') . '</strong> ' . __('Both modules are disabled. Please enable at least one module in the settings.', 'tomatillo-media-studio') . '</p>';
+            echo '<p><a href="' . admin_url('admin.php?page=tomatillo-media-studio-settings') . '" class="button button-secondary">' . __('Go to Settings', 'tomatillo-media-studio') . '</a></p>';
             echo '</div>';
         }
     }
@@ -252,7 +272,12 @@ class Tomatillo_Media_Core {
      * Log debug information
      */
     public function log($message, $level = 'info') {
-        if (!tomatillo_media_studio()->settings->is_debug_mode()) {
+        if (!function_exists('tomatillo_media_studio')) {
+            return;
+        }
+        
+        $plugin = tomatillo_media_studio();
+        if (!$plugin || !isset($plugin->settings) || !$plugin->settings->is_debug_mode()) {
             return;
         }
         
@@ -263,6 +288,135 @@ class Tomatillo_Media_Core {
             $message
         );
         
+        // Log to WordPress error log
         error_log($log_entry);
+        
+        // Also log to our custom log file
+        $this->write_to_log_file($log_entry);
+    }
+    
+    /**
+     * Write to custom log file
+     */
+    private function write_to_log_file($message) {
+        $log_file = WP_CONTENT_DIR . '/tomatillo-media-studio.log';
+        
+        // Ensure log file doesn't get too large (max 1MB)
+        if (file_exists($log_file) && filesize($log_file) > 1048576) {
+            // Keep only last 500 lines
+            $lines = file($log_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            $lines = array_slice($lines, -500);
+            file_put_contents($log_file, implode("\n", $lines) . "\n");
+        }
+        
+        file_put_contents($log_file, $message . "\n", FILE_APPEND | LOCK_EX);
+    }
+    
+    /**
+     * Get plugin logs
+     */
+    public function get_plugin_logs() {
+        $log_file = WP_CONTENT_DIR . '/tomatillo-media-studio.log';
+        
+        if (!file_exists($log_file)) {
+            return array();
+        }
+        
+        $logs = file($log_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        
+        // Return last 100 log entries
+        return array_slice($logs, -100);
+    }
+    
+    /**
+     * Clear plugin logs
+     */
+    public function clear_plugin_logs() {
+        $log_file = WP_CONTENT_DIR . '/tomatillo-media-studio.log';
+        
+        if (file_exists($log_file)) {
+            file_put_contents($log_file, '');
+        }
+    }
+    
+    /**
+     * Get system information
+     */
+    public function get_system_info() {
+        return array(
+            'wordpress_version' => get_bloginfo('version'),
+            'php_version' => PHP_VERSION,
+            'memory_limit' => ini_get('memory_limit'),
+            'max_execution_time' => ini_get('max_execution_time'),
+            'upload_max_filesize' => ini_get('upload_max_filesize'),
+            'post_max_size' => ini_get('post_max_size'),
+            'gd_loaded' => extension_loaded('gd'),
+            'gd_avif' => function_exists('imageavif'),
+            'gd_webp' => function_exists('imagewebp'),
+            'imagick_loaded' => class_exists('Imagick'),
+            'plugin_version' => TOMATILLO_MEDIA_STUDIO_VERSION,
+            'plugin_dir' => TOMATILLO_MEDIA_STUDIO_DIR,
+        );
+    }
+    
+    /**
+     * Get count of unoptimized images
+     */
+    public function get_unoptimized_images_count() {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'tomatillo_media_optimization';
+        
+        // Get total image count
+        $total_images = $wpdb->get_var("
+            SELECT COUNT(*) FROM {$wpdb->posts} 
+            WHERE post_type = 'attachment' 
+            AND post_mime_type IN ('image/jpeg', 'image/png')
+        ");
+        
+        // Get optimized count
+        $optimized_count = $wpdb->get_var("SELECT COUNT(DISTINCT attachment_id) FROM {$table_name}");
+        
+        return max(0, $total_images - $optimized_count);
+    }
+    
+    /**
+     * Estimate optimization time
+     */
+    public function estimate_optimization_time($image_count) {
+        $time_per_image = 2; // seconds per image (conservative estimate)
+        $total_seconds = $image_count * $time_per_image;
+        
+        if ($total_seconds < 60) {
+            return sprintf(__('%d seconds', 'tomatillo-media-studio'), $total_seconds);
+        } elseif ($total_seconds < 3600) {
+            return sprintf(__('%d minutes', 'tomatillo-media-studio'), round($total_seconds / 60));
+        } else {
+            return sprintf(__('%d hours', 'tomatillo-media-studio'), round($total_seconds / 3600));
+        }
+    }
+    
+    /**
+     * Get recent optimizations
+     */
+    public function get_recent_optimizations($limit = 10) {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'tomatillo_media_optimization';
+        
+        return $wpdb->get_results($wpdb->prepare("
+            SELECT * FROM {$table_name} 
+            ORDER BY optimization_date DESC 
+            LIMIT %d
+        ", $limit));
+    }
+    
+    /**
+     * Start bulk optimization
+     */
+    public function start_bulk_optimization() {
+        // This will be implemented with background processing
+        // For now, just log the action
+        $this->log('Bulk optimization started', 'info');
     }
 }
