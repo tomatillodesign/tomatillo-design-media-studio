@@ -232,25 +232,95 @@ class Tomatillo_Media_Core {
         
         $table_name = $wpdb->prefix . 'tomatillo_media_optimization';
         
-        $stats = array();
+        // Initialize with default values
+        $stats = array(
+            'total_conversions' => 0,
+            'avif_conversions' => 0,
+            'webp_conversions' => 0,
+            'total_space_saved' => 0,
+            'average_savings' => 0,
+            'pending_optimizations' => 0
+        );
         
-        // Total optimized
-        $stats['total_optimized'] = $wpdb->get_var("SELECT COUNT(*) FROM {$table_name}");
+        // Check if table exists
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '{$table_name}'") == $table_name;
         
-        // AVIF conversions
-        $stats['avif_conversions'] = $wpdb->get_var("SELECT COUNT(*) FROM {$table_name} WHERE avif_path IS NOT NULL");
+        if (!$table_exists) {
+            return $stats;
+        }
         
-        // WebP conversions
-        $stats['webp_conversions'] = $wpdb->get_var("SELECT COUNT(*) FROM {$table_name} WHERE webp_path IS NOT NULL");
-        
-        // Space saved
-        $stats['space_saved'] = $wpdb->get_var("
-            SELECT SUM(original_size - LEAST(COALESCE(avif_size, original_size), COALESCE(webp_size, original_size))) 
-            FROM {$table_name}
+        // Total optimized (count by checking actual files)
+        $total_images = $wpdb->get_var("
+            SELECT COUNT(*) FROM {$wpdb->posts} 
+            WHERE post_type = 'attachment' 
+            AND post_mime_type IN ('image/jpeg', 'image/png')
         ");
         
+        $optimized_count = 0;
+        if ($total_images > 0) {
+            $images = $wpdb->get_results("
+                SELECT ID FROM {$wpdb->posts} 
+                WHERE post_type = 'attachment' 
+                AND post_mime_type IN ('image/jpeg', 'image/png')
+            ");
+            
+            foreach ($images as $image) {
+                if ($this->is_image_optimized($image->ID)) {
+                    $optimized_count++;
+                }
+            }
+        }
+        
+        $stats['total_conversions'] = $optimized_count;
+        
+        // AVIF conversions
+        $stats['avif_conversions'] = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table_name} WHERE avif_path IS NOT NULL");
+        
+        // WebP conversions
+        $stats['webp_conversions'] = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table_name} WHERE webp_path IS NOT NULL");
+        
+        // Calculate space saved by checking actual file sizes
+        $total_space_saved = 0;
+        if ($total_images > 0) {
+            $images = $wpdb->get_results("
+                SELECT ID FROM {$wpdb->posts} 
+                WHERE post_type = 'attachment' 
+                AND post_mime_type IN ('image/jpeg', 'image/png')
+            ");
+            
+            foreach ($images as $image) {
+                $savings = $this->calculate_image_savings($image->ID);
+                if ($savings > 0) {
+                    $total_space_saved += $savings;
+                }
+            }
+        }
+        
+        $stats['total_space_saved'] = $total_space_saved;
+        
+        // Calculate average savings
+        if ($stats['total_conversions'] > 0) {
+            $total_original_size = 0;
+            $images = $wpdb->get_results("
+                SELECT ID FROM {$wpdb->posts} 
+                WHERE post_type = 'attachment' 
+                AND post_mime_type IN ('image/jpeg', 'image/png')
+            ");
+            
+            foreach ($images as $image) {
+                $file_path = get_attached_file($image->ID);
+                if ($file_path && file_exists($file_path)) {
+                    $total_original_size += filesize($file_path);
+                }
+            }
+            
+            if ($total_original_size > 0) {
+                $stats['average_savings'] = ($stats['total_space_saved'] / $total_original_size) * 100;
+            }
+        }
+        
         // Pending optimizations
-        $stats['pending_optimizations'] = $wpdb->get_var("SELECT COUNT(*) FROM {$table_name} WHERE status = 'pending'");
+        $stats['pending_optimizations'] = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table_name} WHERE status = 'pending'");
         
         return $stats;
     }
@@ -365,19 +435,121 @@ class Tomatillo_Media_Core {
     public function get_unoptimized_images_count() {
         global $wpdb;
         
-        $table_name = $wpdb->prefix . 'tomatillo_media_optimization';
-        
-        // Get total image count
-        $total_images = $wpdb->get_var("
-            SELECT COUNT(*) FROM {$wpdb->posts} 
+        // Get all image attachments
+        $images = $wpdb->get_results("
+            SELECT ID, post_title, post_mime_type 
+            FROM {$wpdb->posts} 
             WHERE post_type = 'attachment' 
             AND post_mime_type IN ('image/jpeg', 'image/png')
         ");
         
-        // Get optimized count
-        $optimized_count = $wpdb->get_var("SELECT COUNT(DISTINCT attachment_id) FROM {$table_name}");
+        if (empty($images)) {
+            return 0;
+        }
         
-        return max(0, $total_images - $optimized_count);
+        $unoptimized_count = 0;
+        
+        foreach ($images as $image) {
+            if (!$this->is_image_optimized($image->ID)) {
+                $unoptimized_count++;
+            }
+        }
+        
+        return $unoptimized_count;
+    }
+    
+    /**
+     * Check if an image is already optimized by looking for AVIF/WebP files
+     */
+    public function is_image_optimized($attachment_id) {
+        $file_path = get_attached_file($attachment_id);
+        
+        if (!$file_path || !file_exists($file_path)) {
+            return false;
+        }
+        
+        $path_info = pathinfo($file_path);
+        $dir = $path_info['dirname'];
+        $filename = $path_info['filename'];
+        
+        // Check for AVIF file
+        $avif_path = $dir . '/' . $filename . '.avif';
+        if (file_exists($avif_path)) {
+            return true;
+        }
+        
+        // Check for WebP file
+        $webp_path = $dir . '/' . $filename . '.webp';
+        if (file_exists($webp_path)) {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Calculate space saved for a specific image
+     */
+    public function calculate_image_savings($attachment_id) {
+        $file_path = get_attached_file($attachment_id);
+        
+        if (!$file_path || !file_exists($file_path)) {
+            return 0;
+        }
+        
+        $original_size = filesize($file_path);
+        $path_info = pathinfo($file_path);
+        $dir = $path_info['dirname'];
+        $filename = $path_info['filename'];
+        
+        $smallest_size = $original_size;
+        
+        // Check AVIF file
+        $avif_path = $dir . '/' . $filename . '.avif';
+        if (file_exists($avif_path)) {
+            $avif_size = filesize($avif_path);
+            $smallest_size = min($smallest_size, $avif_size);
+        }
+        
+        // Check WebP file
+        $webp_path = $dir . '/' . $filename . '.webp';
+        if (file_exists($webp_path)) {
+            $webp_size = filesize($webp_path);
+            $smallest_size = min($smallest_size, $webp_size);
+        }
+        
+        return max(0, $original_size - $smallest_size);
+    }
+    
+    /**
+     * Get list of unoptimized images
+     */
+    public function get_unoptimized_images($limit = 100) {
+        global $wpdb;
+        
+        // Get all image attachments
+        $images = $wpdb->get_results($wpdb->prepare("
+            SELECT ID, post_title, post_mime_type 
+            FROM {$wpdb->posts} 
+            WHERE post_type = 'attachment' 
+            AND post_mime_type IN ('image/jpeg', 'image/png')
+            ORDER BY post_date DESC
+            LIMIT %d
+        ", $limit));
+        
+        if (empty($images)) {
+            return array();
+        }
+        
+        $unoptimized_images = array();
+        
+        foreach ($images as $image) {
+            if (!$this->is_image_optimized($image->ID)) {
+                $unoptimized_images[] = $image;
+            }
+        }
+        
+        return $unoptimized_images;
     }
     
     /**

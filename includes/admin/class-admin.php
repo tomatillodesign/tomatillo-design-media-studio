@@ -50,81 +50,36 @@ class Tomatillo_Media_Admin {
      * Add admin menu
      */
     public function add_admin_menu() {
-        // Main plugin page
+        // Main Media Studio page (first position)
         add_menu_page(
             __('Media Studio', 'tomatillo-media-studio'),
             __('Media Studio', 'tomatillo-media-studio'),
-            'manage_options',
-            'tomatillo-media-studio-settings',
-            array($this, 'settings_page'),
+            'upload_files', // Allow editors to access media studio
+            'tomatillo-media-studio-library',
+            array($this, 'media_library_page'),
             'dashicons-images-alt2',
             30
         );
         
-        // Settings submenu
+        // Settings page (admin only, second position)
         add_submenu_page(
-            'tomatillo-media-studio-settings',
+            'tomatillo-media-studio-library',
             __('Settings', 'tomatillo-media-studio'),
             __('Settings', 'tomatillo-media-studio'),
-            'manage_options',
+            'manage_options', // Admin only
             'tomatillo-media-studio-settings',
             array($this, 'settings_page')
         );
         
-        // Media Library submenu (if enabled)
-        if (tomatillo_media_studio()->settings->is_media_library_enabled()) {
-            add_submenu_page(
-                'tomatillo-media-studio-settings',
-                __('Media Library', 'tomatillo-media-studio'),
-                __('Media Library', 'tomatillo-media-studio'),
-                'upload_files',
-                'tomatillo-media-studio-library',
-                array($this, 'media_library_page')
-            );
-        }
-        
-        // Optimization Dashboard submenu (if enabled)
-        if (tomatillo_media_studio()->settings->is_optimization_enabled()) {
-            add_submenu_page(
-                'tomatillo-media-studio-settings',
-                __('Optimization', 'tomatillo-media-studio'),
-                __('Optimization', 'tomatillo-media-studio'),
-                'manage_options',
-                'tomatillo-media-studio-optimization',
-                array($this, 'optimization_page')
-            );
-        }
-        
-        // Tools submenu
+        // Tools page (admin only, consolidated functionality)
         add_submenu_page(
-            'tomatillo-media-studio-settings',
+            'tomatillo-media-studio-library',
             __('Tools', 'tomatillo-media-studio'),
             __('Tools', 'tomatillo-media-studio'),
-            'manage_options',
+            'manage_options', // Admin only
             'tomatillo-media-studio-tools',
             array($this, 'tools_page')
         );
-        
-        // Test Optimization submenu (if optimization enabled)
-        if (tomatillo_media_studio()->settings->is_optimization_enabled()) {
-            add_submenu_page(
-                'tomatillo-media-studio-settings',
-                __('Test Optimization', 'tomatillo-media-studio'),
-                __('Test Optimization', 'tomatillo-media-studio'),
-                'manage_options',
-                'tomatillo-media-studio-test',
-                array($this, 'test_optimization_page')
-            );
-            
-            add_submenu_page(
-                'tomatillo-media-studio-settings',
-                __('Frontend Test', 'tomatillo-media-studio'),
-                __('Frontend Test', 'tomatillo-media-studio'),
-                'manage_options',
-                'tomatillo-media-studio-frontend',
-                array($this, 'frontend_test_page')
-            );
-        }
     }
     
     /**
@@ -168,6 +123,11 @@ class Tomatillo_Media_Admin {
      * Settings page
      */
     public function settings_page() {
+        // Check admin capabilities
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.', 'tomatillo-media-studio'));
+        }
+        
         $plugin = tomatillo_media_studio();
         $settings = $plugin->settings;
         $stats = ($plugin->core) ? $plugin->core->get_media_stats() : array();
@@ -187,25 +147,30 @@ class Tomatillo_Media_Admin {
     }
     
     /**
-     * Optimization page
-     */
-    public function optimization_page() {
-        $plugin = tomatillo_media_studio();
-        if (!$plugin->settings->is_optimization_enabled()) {
-            wp_die(__('Optimization module is disabled.', 'tomatillo-media-studio'));
-        }
-        
-        $stats = ($plugin->core) ? $plugin->core->get_optimization_stats() : array();
-        
-        include TOMATILLO_MEDIA_STUDIO_DIR . 'templates/optimization-dashboard.php';
-    }
-    
-    /**
      * Tools page
      */
     public function tools_page() {
         $plugin = tomatillo_media_studio();
         
+        // Check admin capabilities
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.', 'tomatillo-media-studio'));
+        }
+        
+        // Get current tab
+        $current_tab = isset($_GET['tab']) ? sanitize_text_field($_GET['tab']) : 'optimization';
+        
+        // Handle form submissions
+        $this->handle_tools_form_submissions($plugin, $current_tab);
+        
+        // Include the tools template
+        include TOMATILLO_MEDIA_STUDIO_DIR . 'templates/test-page.php';
+    }
+    
+    /**
+     * Handle form submissions for tools page
+     */
+    private function handle_tools_form_submissions($plugin, $current_tab) {
         // Handle log clearing
         if (isset($_POST['clear_logs']) && wp_verify_nonce($_POST['_wpnonce'], 'tomatillo_clear_logs')) {
             if ($plugin->core) {
@@ -224,31 +189,13 @@ class Tomatillo_Media_Admin {
             echo '<div class="notice notice-success"><p>' . $message . '</p></div>';
         }
         
-        include TOMATILLO_MEDIA_STUDIO_DIR . 'templates/tools-page.php';
-    }
-    
-    /**
-     * Test optimization page
-     */
-    public function test_optimization_page() {
-        $plugin = tomatillo_media_studio();
-        if (!$plugin->settings->is_optimization_enabled()) {
-            wp_die(__('Optimization module is disabled.', 'tomatillo-media-studio'));
+        // Handle bulk optimization
+        if (isset($_POST['start_bulk_optimization']) && wp_verify_nonce($_POST['_wpnonce'], 'tomatillo_bulk_optimize')) {
+            if ($plugin->core) {
+                $plugin->core->start_bulk_optimization();
+            }
+            echo '<div class="notice notice-success"><p>' . __('Bulk optimization started! Check the progress below.', 'tomatillo-media-studio') . '</p></div>';
         }
-        
-        include TOMATILLO_MEDIA_STUDIO_DIR . 'templates/test-optimization.php';
-    }
-    
-    /**
-     * Frontend test page
-     */
-    public function frontend_test_page() {
-        $plugin = tomatillo_media_studio();
-        if (!$plugin->settings->is_optimization_enabled()) {
-            wp_die(__('Optimization module is disabled.', 'tomatillo-media-studio'));
-        }
-        
-        include TOMATILLO_MEDIA_STUDIO_DIR . 'templates/frontend-test.php';
     }
     
     /**

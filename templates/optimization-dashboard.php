@@ -34,11 +34,11 @@ $unoptimized_count = ($plugin->core) ? $plugin->core->get_unoptimized_images_cou
         <h2><?php _e('Optimization Overview', 'tomatillo-media-studio'); ?></h2>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 20px 0;">
             <div style="text-align: center; padding: 20px; background: #f9f9f9; border-radius: 8px;">
-                <h3 style="margin: 0; font-size: 2em; color: #0073aa;"><?php echo number_format($stats['total_conversions']); ?></h3>
+                <h3 style="margin: 0; font-size: 2em; color: #0073aa;"><?php echo number_format(isset($stats['total_conversions']) ? $stats['total_conversions'] : 0); ?></h3>
                 <p style="margin: 5px 0 0 0;"><?php _e('Images Optimized', 'tomatillo-media-studio'); ?></p>
             </div>
             <div style="text-align: center; padding: 20px; background: #f9f9f9; border-radius: 8px;">
-                <h3 style="margin: 0; font-size: 2em; color: #00a32a;"><?php echo size_format($stats['total_space_saved']); ?></h3>
+                <h3 style="margin: 0; font-size: 2em; color: #00a32a;"><?php echo size_format(isset($stats['total_space_saved']) ? $stats['total_space_saved'] : 0); ?></h3>
                 <p style="margin: 5px 0 0 0;"><?php _e('Space Saved', 'tomatillo-media-studio'); ?></p>
             </div>
             <div style="text-align: center; padding: 20px; background: #f9f9f9; border-radius: 8px;">
@@ -46,7 +46,7 @@ $unoptimized_count = ($plugin->core) ? $plugin->core->get_unoptimized_images_cou
                 <p style="margin: 5px 0 0 0;"><?php _e('Pending Optimization', 'tomatillo-media-studio'); ?></p>
             </div>
             <div style="text-align: center; padding: 20px; background: #f9f9f9; border-radius: 8px;">
-                <h3 style="margin: 0; font-size: 2em; color: #8c8f94;"><?php echo round($stats['average_savings'], 1); ?>%</h3>
+                <h3 style="margin: 0; font-size: 2em; color: #8c8f94;"><?php echo round(isset($stats['average_savings']) ? $stats['average_savings'] : 0, 1); ?>%</h3>
                 <p style="margin: 5px 0 0 0;"><?php _e('Average Savings', 'tomatillo-media-studio'); ?></p>
             </div>
         </div>
