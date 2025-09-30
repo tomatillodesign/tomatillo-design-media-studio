@@ -848,6 +848,9 @@ class Tomatillo_Media_Core {
         
         error_log("DEBUG: Final original_url being sent to frontend: " . $original_url);
         
+        // Get thumbnail URL for PDFs and other files that might have thumbnails
+        $thumbnail_url = wp_get_attachment_image_url($image_id, 'full');
+        
         $data = array(
             'id' => $image_id,
             'title' => $image->post_title,
@@ -861,6 +864,7 @@ class Tomatillo_Media_Core {
             'date' => date('M j, Y', strtotime($image->post_date)),
             'uploader' => $uploader_name,
             'url' => $original_url,
+            'thumbnail_url' => $thumbnail_url, // Thumbnail URL for PDFs and other files
             'best_image_url' => $best_image_url, // Smallest optimized image for display
             'avif_url' => $avif_url,
             'webp_url' => $webp_url,

@@ -17,7 +17,7 @@ $total_images = isset($media_stats['total_images']) ? $media_stats['total_images
 $total_files = isset($media_stats['total_documents']) ? $media_stats['total_documents'] : 0;
 
 // Pagination settings
-$images_per_page = 20;
+$images_per_page = 30;
 $current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
 $offset = ($current_page - 1) * $images_per_page;
 
@@ -42,6 +42,7 @@ $images = get_posts(array(
 $files = get_posts(array(
     'post_type' => 'attachment',
     'post_mime_type' => array(
+        // Documents
         'application/pdf',
         'application/msword',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -49,23 +50,67 @@ $files = get_posts(array(
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'application/vnd.ms-powerpoint',
         'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'application/vnd.apple.pages',
+        'application/vnd.apple.numbers',
+        'application/vnd.apple.keynote',
+        'application/vnd.oasis.opendocument.text',
+        'application/vnd.oasis.opendocument.spreadsheet',
+        'application/vnd.oasis.opendocument.presentation',
         'text/plain',
         'text/csv',
         'application/rtf',
+        'text/html',
+        'text/css',
+        'text/javascript',
+        'application/javascript',
+        'application/json',
+        'application/xml',
+        'text/xml',
+        
+        // Archives
         'application/zip',
         'application/x-rar-compressed',
         'application/x-7z-compressed',
+        'application/x-tar',
+        'application/gzip',
+        
+        // Audio
         'audio/mpeg',
         'audio/wav',
         'audio/ogg',
         'audio/mp4',
         'audio/aac',
+        'audio/m4a',
+        'audio/x-m4a',
+        'audio/flac',
+        'audio/x-flac',
+        
+        // Video
         'video/mp4',
         'video/avi',
         'video/mov',
         'video/wmv',
         'video/webm',
-        'video/ogg'
+        'video/ogg',
+        'video/quicktime',
+        'video/x-msvideo',
+        'video/3gpp',
+        'video/3gpp2',
+        'video/x-ms-wmv',
+        'video/x-flv',
+        
+        // Images (non-standard formats that might be uploaded)
+        'image/svg+xml',
+        'image/tiff',
+        'image/bmp',
+        'image/x-icon',
+        'image/vnd.microsoft.icon',
+        
+        // Other common formats
+        'application/epub+zip',
+        'application/x-msdownload',
+        'application/x-executable',
+        'application/x-shockwave-flash'
     ),
     'post_status' => 'inherit',
     'posts_per_page' => $images_per_page,
@@ -416,8 +461,8 @@ $has_more = count($images) === $images_per_page;
                     $file_icon_class = 'file-icon-default';
                     
                     if (strpos($file_type, 'pdf') !== false) {
-                        // Try to get PDF thumbnail first
-                        $pdf_thumbnail = wp_get_attachment_image_url($file->ID, 'medium');
+                        // Try to get PDF thumbnail first - use full size for best quality
+                        $pdf_thumbnail = wp_get_attachment_image_url($file->ID, 'full');
                         if ($pdf_thumbnail) {
                             $file_thumbnail = $pdf_thumbnail;
                             $file_icon_class = 'file-icon-pdf-thumbnail'; // Special class for PDFs with thumbnails
@@ -448,40 +493,49 @@ $has_more = count($images) === $images_per_page;
                          data-caption="<?php echo esc_attr($file->post_excerpt); ?>"
                          data-description="<?php echo esc_attr($file->post_content); ?>"
                          data-filename="<?php echo esc_attr(basename(get_attached_file($file->ID))); ?>">
-                        <div class="file-container">
-                            <div class="file-icon <?php echo $file_icon_class; ?>">
-                                <?php if ($file_thumbnail): ?>
-                                    <img src="<?php echo esc_url($file_thumbnail); ?>" alt="<?php echo esc_attr($file_title); ?>" class="file-thumbnail">
-                                <?php endif; ?>
+                        
+                        <!-- File Preview Area -->
+                        <div class="file-preview">
+                            <?php if ($file_thumbnail): ?>
+                                <img src="<?php echo esc_url($file_thumbnail); ?>" alt="<?php echo esc_attr($file_title); ?>" class="file-thumbnail">
+                            <?php else: ?>
+                                <div class="file-icon-large <?php echo $file_icon_class; ?>">
+                                    <span class="dashicons file-type-icon file-type-<?php echo strtolower(pathinfo(get_attached_file($file->ID), PATHINFO_EXTENSION)); ?>"></span>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <!-- File Info -->
+                        <div class="file-info">
+                            <h4 class="file-title"><?php echo esc_html($file_title); ?></h4>
+                            <p class="file-meta">
+                                <?php 
+                                echo date('M j, Y', strtotime($file_date)) . ' • ' . $file_size_formatted;
+                                ?>
+                            </p>
+                            <p class="file-uploader">
+                                <?php 
+                                $uploader = get_userdata($file->post_author);
+                                $uploader_name = $uploader ? $uploader->display_name : 'Unknown';
+                                echo 'Uploaded by: ' . esc_html($uploader_name); 
+                                ?>
+                            </p>
+                            <div class="file-type-pill">
+                                <span class="dashicons file-type-icon file-type-<?php echo strtolower(pathinfo(get_attached_file($file->ID), PATHINFO_EXTENSION)); ?>"></span>
+                                <?php echo strtoupper(pathinfo(get_attached_file($file->ID), PATHINFO_EXTENSION)); ?>
                             </div>
-                            
-                            <!-- File Info -->
-                            <div class="file-info">
-                                <h4 class="file-title"><?php echo esc_html($file_title); ?></h4>
-                                <p class="file-meta">
-                                    <?php 
-                                    $uploader = get_userdata($file->post_author);
-                                    $uploader_name = $uploader ? $uploader->display_name : 'Unknown';
-                                    echo date('M j, Y', strtotime($file_date)) . ' • ' . $file_size_formatted . ' • Uploaded by: ' . esc_html($uploader_name); 
-                                    ?>
-                                </p>
-                                <p class="file-type">
-                                    <span class="file-type-pill">
-                                        <span class="dashicons file-type-icon file-type-<?php echo strtolower(pathinfo(get_attached_file($file->ID), PATHINFO_EXTENSION)); ?>"></span>
-                                        <?php echo strtoupper(pathinfo(get_attached_file($file->ID), PATHINFO_EXTENSION)); ?>
-                                    </span>
-                                </p>
-                            </div>
-                            
-                            <!-- File Actions -->
-                            <div class="file-actions">
-                                <button class="action-btn copy-url-btn" title="Copy File URL" onclick="copyFileUrl(<?php echo $file->ID; ?>, '<?php echo esc_url($file_url); ?>')">
-                                    <span class="dashicons dashicons-admin-links"></span>
-                                </button>
-                                <button class="action-btn open-file-btn" title="Open File" onclick="window.open('<?php echo esc_url($file_url); ?>', '_blank')">
-                                    <span class="dashicons dashicons-external"></span>
-                                </button>
-                            </div>
+                        </div>
+                        
+                        <!-- File Actions -->
+                        <div class="file-actions">
+                            <button class="action-btn copy-url-btn" title="Copy File URL" onclick="event.stopPropagation(); copyFileUrl(<?php echo $file->ID; ?>, '<?php echo esc_url($file_url); ?>')">
+                                <span class="dashicons dashicons-admin-links"></span>
+                                Copy Link
+                            </button>
+                            <button class="action-btn download-btn" title="Download File" onclick="event.stopPropagation(); downloadFile('<?php echo esc_url($file_url); ?>', '<?php echo esc_attr(basename(get_attached_file($file->ID))); ?>')">
+                                <span class="dashicons dashicons-download"></span>
+                                Download
+                            </button>
                         </div>
                     </div>
                 <?php endforeach; ?>
@@ -607,6 +661,91 @@ $has_more = count($images) === $images_per_page;
             <div class="modal-buttons">
                 <button type="button" class="btn btn-primary" onclick="saveImageMetadata()">Save Metadata</button>
                 <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- File Modal -->
+<div class="file-modal" id="file-modal">
+    <div class="modal-backdrop" onclick="closeFileModal()"></div>
+    
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title" id="modal-file-title">File Details</h2>
+            <button class="modal-close" onclick="closeFileModal()">&times;</button>
+        </div>
+        
+        <div class="modal-body">
+            <div class="modal-image-section">
+                <div id="modal-file-cover" class="modal-file-cover" onclick="copyFileUrlFromModal()">
+                    <!-- File cover will be inserted here -->
+                </div>
+            </div>
+            
+            <div class="modal-details-section">
+                <form id="file-form" class="image-form">
+                    <div class="form-group">
+                        <label for="file-title">Title</label>
+                        <input type="text" id="file-title" name="title" class="form-input">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="file-alt">Alt Text</label>
+                        <input type="text" id="file-alt" name="alt_text" class="form-input" placeholder="Describe this file for accessibility">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="file-description">Description</label>
+                        <textarea id="file-description" name="description" class="form-textarea" rows="4"></textarea>
+                    </div>
+                    
+                    <div class="image-metadata">
+                        <h4>File Information</h4>
+                        <div class="metadata-badges">
+                            <div class="badge-group">
+                                <span class="dashicons dashicons-admin-post badge-icon"></span>
+                                <span class="badge-label">ID:</span>
+                                <span class="badge-text" id="modal-file-id">-</span>
+                            </div>
+                            <div class="badge-group">
+                                <span class="dashicons dashicons-media-document badge-icon"></span>
+                                <span class="badge-label">Type:</span>
+                                <span class="badge-text" id="modal-file-type">-</span>
+                            </div>
+                            <div class="badge-group">
+                                <span class="dashicons dashicons-database badge-icon"></span>
+                                <span class="badge-label">File Size:</span>
+                                <span class="badge-text" id="modal-file-size">-</span>
+                            </div>
+                            <div class="badge-group">
+                                <span class="dashicons dashicons-calendar-alt badge-icon"></span>
+                                <span class="badge-label">Uploaded:</span>
+                                <span class="badge-text" id="modal-file-date-user">-</span>
+                            </div>
+                            <div class="badge-group url-copy" onclick="copyToClipboard(document.getElementById('modal-file-url').textContent)">
+                                <span class="dashicons dashicons-admin-links badge-icon"></span>
+                                <span class="badge-label">URL:</span>
+                                <span class="badge-text url-preview" id="modal-file-url-preview">Click to copy</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Hidden URL for copying -->
+                        <span id="modal-file-url" style="display: none;">-</span>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="modal-footer">
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="copyFileUrlFromModal()">Copy URL</button>
+                <button type="button" class="btn btn-secondary" onclick="downloadFileFromModal()">Download</button>
+                <button type="button" class="btn btn-danger" onclick="deleteFileFromModal()">Delete</button>
+            </div>
+            <div class="modal-buttons">
+                <button type="button" class="btn btn-primary" onclick="saveFileMetadata()">Save Metadata</button>
+                <button type="button" class="btn btn-secondary" onclick="closeFileModal()">Close</button>
             </div>
         </div>
     </div>
@@ -924,6 +1063,62 @@ $has_more = count($images) === $images_per_page;
 .upload-file-status.error {
     background: #fee2e2;
     color: #991b1b;
+}
+
+/* File Modal Styles */
+.file-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10000;
+    display: none;
+}
+
+.file-modal.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-file-cover {
+    width: 100%;
+    height: 100%;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: box-shadow 0.2s ease;
+    overflow: hidden;
+}
+
+.modal-file-cover:hover {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.modal-file-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.modal-file-cover .file-icon-large {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8f9fa;
+    color: #6b7280;
+}
+
+.modal-file-cover .file-icon-large .dashicons {
+    font-size: 96px;
+    color: #6b7280;
 }
 
 /* Gallery Container - Contained Width with Padding */
@@ -1686,12 +1881,16 @@ $has_more = count($images) === $images_per_page;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     transition: all 0.3s ease;
     cursor: pointer;
-    overflow: visible; /* Changed from hidden to visible */
-    height: auto; /* Ensure height is auto */
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 400px; /* Taller cards */
+    padding: 1rem; /* Bring back card padding */
 }
 
 .file-item:hover {
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08); /* More subtle shadow */
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    background: #fefbf3; /* Very subtle yellow/orange highlight */
 }
 
 .file-item.selected {
@@ -1699,33 +1898,39 @@ $has_more = count($images) === $images_per_page;
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
-.file-container {
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    height: auto; /* Changed from 100% to auto */
-    min-height: 320px; /* Reduced from 380px to minimize whitespace */
-}
-
-.file-icon {
-    text-align: center;
-    margin-bottom: 1rem;
+/* File Preview Area - Taller with high-res thumbnails */
+.file-preview {
+    height: 200px; /* Adjusted for padding */
+    background: #f8f9fa;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 120px; /* Increased from 80px */
-    background: #f8f9fa;
-    border-radius: 8px;
-    border: 2px dashed #e5e7eb;
-    position: relative;
     overflow: hidden;
+    position: relative;
+    margin-bottom: 1rem;
 }
 
 .file-thumbnail {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    border-radius: 6px;
+    object-position: center;
+}
+
+.file-icon-large {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8f9fa;
+    color: #6b7280;
+}
+
+.file-icon-large .dashicons {
+    font-size: 48px;
+    color: #6b7280;
 }
 
 /* File Type Icons - Using Dashicons */
@@ -1797,17 +2002,18 @@ $has_more = count($images) === $images_per_page;
 }
 
 .file-info {
-    flex: 1;
+    padding: 0 0 1rem 0; /* Reduced padding since card has padding */
+    flex-grow: 1;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    justify-content: space-between;
 }
 
 .file-title {
     font-size: 1rem;
     font-weight: 600;
     color: #1f2937;
-    margin: 0;
+    margin: 0 0 0.25rem 0; /* Reduced margin */
     line-height: 1.4;
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -1818,139 +2024,99 @@ $has_more = count($images) === $images_per_page;
 .file-meta {
     font-size: 0.875rem;
     color: #6b7280;
-    margin: 0;
+    margin: 0 0 0.25rem 0;
     line-height: 1.4;
 }
 
-.file-type {
-    font-size: 0.75rem;
-    color: #9ca3af;
-    margin: 0;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+.file-uploader {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin: 0 0 0.5rem 0;
+    line-height: 1.4;
 }
 
 .file-actions {
+    padding: 1rem 0 0 0; /* Reduced padding since card has padding */
+    border-top: 1px solid #f3f4f6;
     display: flex;
     gap: 0.5rem;
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid #f3f4f6;
 }
 
-.file-actions .action-btn {
-    flex: 1;
-    padding: 0.5rem;
-    background: #f8f9fa;
+.action-btn {
+    flex: 1; /* Each button takes 50% width */
+    background: #f3f4f6;
+    color: #374151;
     border: 1px solid #e5e7eb;
     border-radius: 6px;
+    padding: 8px 12px;
     cursor: pointer;
     transition: all 0.2s ease;
-    font-size: 0.875rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.25rem;
-    box-shadow: none; /* Remove shadows */
+    font-size: 14px;
+    gap: 0.25rem; /* Space between icon and text */
 }
 
-.file-actions .action-btn:hover {
-    background: #f1f3f4; /* More subtle background change */
-    border-color: #d1d5db;
+.action-btn:hover {
+    background: #e5e7eb;
+    color: #1f2937;
 }
 
-.file-actions .copy-url-btn:hover {
-    background: #f0f4ff; /* Subtle blue tint */
-    color: #3b82f6;
-}
-
-.file-actions .open-file-btn:hover {
-    background: #f0fdf4; /* Subtle green tint */
-    color: #22c55e;
-}
-
-.file-actions .dashicons {
+.action-btn .dashicons {
     font-size: 16px;
-    width: 16px;
-    height: 16px;
+    vertical-align: middle; /* Center align with text */
 }
 
 /* File Type Pills */
 .file-type-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
+    display: inline-block; /* Changed from inline-flex to inline-block */
     background: #f3f4f6;
-    color: #6b7280;
+    color: #374151;
     padding: 0.25rem 0.5rem;
-    border-radius: 12px;
+    border-radius: 4px;
     font-size: 0.75rem;
     font-weight: 500;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.05em;
+    margin-top: 0.5rem;
+    width: fit-content; /* Only as wide as needed */
 }
 
-.file-type-icon {
+.file-type-pill .dashicons {
     font-size: 12px;
-    width: 12px;
-    height: 12px;
+    color: #6b7280; /* Neutral color for all icons */
+    margin-right: 0.25rem;
+    vertical-align: middle;
 }
 
-/* File Type Icon Colors */
-.file-type-icon.file-icon-pdf::before {
+/* Smart File Type Icons - All same neutral color */
+.file-type-pdf::before,
+.file-type-doc::before,
+.file-type-docx::before,
+.file-type-xls::before,
+.file-type-xlsx::before,
+.file-type-ppt::before,
+.file-type-pptx::before,
+.file-type-pages::before,
+.file-type-numbers::before,
+.file-type-keynote::before,
+.file-type-txt::before,
+.file-type-rtf::before,
+.file-type-zip::before,
+.file-type-rar::before,
+.file-type-7z::before,
+.file-type-mp3::before,
+.file-type-wav::before,
+.file-type-ogg::before,
+.file-type-mp4::before,
+.file-type-aac::before,
+.file-type-avi::before,
+.file-type-mov::before {
+    font-family: dashicons;
     content: "\f123"; /* dashicons-media-document */
-    color: #dc2626; /* Red for PDF */
+    color: #6b7280; /* All same neutral color */
 }
-
-.file-type-icon.file-icon-word::before {
-    content: "\f123"; /* dashicons-media-document */
-    color: #2563eb; /* Blue for Word */
-}
-
-.file-type-icon.file-icon-excel::before {
-    content: "\f123"; /* dashicons-media-document */
-    color: #16a34a; /* Green for Excel */
-}
-
-.file-type-icon.file-icon-powerpoint::before {
-    content: "\f123"; /* dashicons-media-document */
-    color: #ea580c; /* Orange for PowerPoint */
-}
-
-.file-type-icon.file-icon-text::before {
-    content: "\f123"; /* dashicons-media-document */
-    color: #6b7280; /* Gray for text */
-}
-
-.file-type-icon.file-icon-zip::before {
-    content: "\f123"; /* dashicons-media-document */
-    color: #7c3aed; /* Purple for ZIP */
-}
-
-.file-type-icon.file-icon-audio::before {
-    content: "\f127"; /* dashicons-format-audio */
-    color: #059669; /* Green for audio */
-}
-
-.file-type-icon.file-icon-video::before {
-    content: "\f126"; /* dashicons-format-video */
-    color: #dc2626; /* Red for video */
-}
-
-.file-type-icon.file-icon-default::before {
-    content: "\f123"; /* dashicons-media-document */
-    color: #6b7280; /* Gray for default */
-}
-
-/* File Type Specific Icons for Pills */
-.file-type-icon.file-type-pdf::before {
-    content: "\f123"; /* dashicons-media-document */
-    color: #dc2626; /* Red for PDF */
-}
-
-.file-type-icon.file-type-doc::before,
-.file-type-icon.file-type-docx::before {
     content: "\f123"; /* dashicons-media-document */
     color: #2563eb; /* Blue for Word */
 }
@@ -1989,6 +2155,32 @@ $has_more = count($images) === $images_per_page;
 .file-type-icon.file-type-mov::before {
     content: "\f126"; /* dashicons-format-video */
     color: #dc2626; /* Red for video */
+}
+
+/* File Modal Type Icons */
+.modal-file-cover .file-type-icon.file-type-pdf::before,
+.modal-file-cover .file-type-icon.file-type-doc::before,
+.modal-file-cover .file-type-icon.file-type-docx::before,
+.modal-file-cover .file-type-icon.file-type-xls::before,
+.modal-file-cover .file-type-icon.file-type-xlsx::before,
+.modal-file-cover .file-type-icon.file-type-ppt::before,
+.modal-file-cover .file-type-icon.file-type-pptx::before,
+.modal-file-cover .file-type-icon.file-type-pages::before,
+.modal-file-cover .file-type-icon.file-type-numbers::before,
+.modal-file-cover .file-type-icon.file-type-keynote::before,
+.modal-file-cover .file-type-icon.file-type-txt::before,
+.modal-file-cover .file-type-icon.file-type-rtf::before,
+.modal-file-cover .file-type-icon.file-type-zip::before,
+.modal-file-cover .file-type-icon.file-type-rar::before,
+.modal-file-cover .file-type-icon.file-type-7z::before,
+.modal-file-cover .file-type-icon.file-type-mp3::before,
+.modal-file-cover .file-type-icon.file-type-wav::before,
+.modal-file-cover .file-type-icon.file-type-ogg::before,
+.modal-file-cover .file-type-icon.file-type-mp4::before,
+.modal-file-cover .file-type-icon.file-type-aac::before,
+.modal-file-cover .file-type-icon.file-type-avi::before,
+.modal-file-cover .file-type-icon.file-type-mov::before {
+    color: #6b7280; /* Neutral gray for all icons in modal */
 }
 
 /* Action Bar Styles */
@@ -2710,6 +2902,199 @@ document.addEventListener('DOMContentLoaded', function() {
         observer.observe(grid, { childList: true });
     }
     
+    function initializeHashNavigation() {
+        console.log('Initializing hash navigation...');
+        
+        // Handle initial hash on page load
+        handleHashChange();
+        
+        // Listen for hash changes
+        window.addEventListener('hashchange', handleHashChange);
+        
+    }
+    
+    function handleHashChange() {
+        const hash = window.location.hash.substring(1); // Remove the #
+        console.log('Hash changed to:', hash);
+        
+        if (hash === 'files') {
+            console.log('Switching to files view...');
+            // Switch to files view using existing filterImages function
+            filterImages('files');
+        } else if (hash === 'images' || hash === '') {
+            console.log('Switching to images view...');
+            // Switch to images view using existing filterImages function
+            filterImages('images');
+        }
+    }
+    
+    // File Modal Functions
+    let currentFileId = null;
+    
+    function openFileModal(fileId) {
+        currentFileId = fileId;
+        const modal = document.getElementById('file-modal');
+        modal.classList.add('active');
+        
+        // Load file data
+        loadFileData(fileId).then(populateFileModal);
+        
+        // Add keyboard event listeners
+        document.addEventListener('keydown', handleFileKeyboard);
+    }
+    
+    function closeFileModal() {
+        const modal = document.getElementById('file-modal');
+        modal.classList.remove('active');
+        currentFileId = null;
+        
+        // Remove keyboard event listeners
+        document.removeEventListener('keydown', handleFileKeyboard);
+    }
+    
+    function loadFileData(fileId) {
+        return fetch(`<?php echo admin_url('admin-ajax.php'); ?>?action=tomatillo_get_image_data&image_id=${fileId}&nonce=<?php echo wp_create_nonce('tomatillo_get_image_data'); ?>`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    return data.data;
+                } else {
+                    throw new Error(data.data || 'Failed to load file data');
+                }
+            });
+    }
+    
+    function populateFileModal(data) {
+        // Set modal title to file title
+        document.getElementById('modal-file-title').textContent = data.title || data.filename || 'Untitled File';
+        
+        // Set file cover
+        const fileCover = document.getElementById('modal-file-cover');
+        const fileExtension = data.filename.split('.').pop().toLowerCase();
+        
+        if (data.url && (fileExtension === 'jpg' || fileExtension === 'jpeg' || fileExtension === 'png' || fileExtension === 'gif' || fileExtension === 'webp')) {
+            // Show thumbnail for actual image files
+            fileCover.innerHTML = `<img src="${data.url}" alt="${data.title || data.filename}" title="Click to copy URL">`;
+        } else if (fileExtension === 'pdf' && data.thumbnail_url) {
+            // For PDFs, use the thumbnail URL
+            fileCover.innerHTML = `<img src="${data.thumbnail_url}" alt="${data.title || data.filename}" title="Click to copy URL" onerror="this.parentNode.innerHTML='<div class=&quot;file-icon-large&quot;><span class=&quot;dashicons file-type-icon file-type-pdf&quot;></span></div>'">`;
+        } else {
+            // Show file icon for other file types
+            fileCover.innerHTML = `
+                <div class="file-icon-large">
+                    <span class="dashicons file-type-icon file-type-${fileExtension}"></span>
+                </div>
+            `;
+        }
+        
+        // Set form fields
+        document.getElementById('file-title').value = data.title || data.filename || '';
+        document.getElementById('file-alt').value = data.alt_text || '';
+        document.getElementById('file-description').value = data.description || '';
+        
+        // Set file information
+        document.getElementById('modal-file-id').textContent = data.id;
+        document.getElementById('modal-file-type').textContent = data.mime_type || 'Unknown';
+        document.getElementById('modal-file-size').textContent = data.file_size || 'Unknown';
+        document.getElementById('modal-file-date-user').textContent = `${data.date} by ${data.uploader || 'Unknown'}`;
+        document.getElementById('modal-file-url').textContent = data.url;
+        document.getElementById('modal-file-url-preview').textContent = data.url.split('/').pop() || 'Click to copy';
+    }
+    
+    function handleFileKeyboard(e) {
+        if (!currentFileId) return;
+        
+        switch(e.key) {
+            case 'Escape':
+                closeFileModal();
+                break;
+        }
+    }
+    
+    function copyFileUrlFromModal() {
+        const fileUrl = document.getElementById('modal-file-url').textContent;
+        navigator.clipboard.writeText(fileUrl).then(() => {
+            showToast('File URL copied to clipboard!');
+        });
+    }
+    
+    function downloadFileFromModal() {
+        const fileUrl = document.getElementById('modal-file-url').textContent;
+        const filename = document.getElementById('modal-file-title').textContent;
+        downloadFile(fileUrl, filename);
+    }
+    
+    function deleteFileFromModal() {
+        if (!currentFileId) return;
+        
+        if (confirm('Are you sure you want to delete this file? This action cannot be undone.')) {
+            deleteFile(currentFileId);
+            closeFileModal();
+        }
+    }
+    
+    function saveFileMetadata() {
+        if (!currentFileId) return;
+        
+        const title = document.getElementById('file-title').value;
+        const altText = document.getElementById('file-alt').value;
+        const description = document.getElementById('file-description').value;
+        
+        const formData = new FormData();
+        formData.append('action', 'tomatillo_save_image_metadata');
+        formData.append('image_id', currentFileId);
+        formData.append('title', title);
+        formData.append('alt_text', altText);
+        formData.append('description', description);
+        formData.append('nonce', '<?php echo wp_create_nonce('tomatillo_save_image_metadata'); ?>');
+        
+        fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('File metadata saved successfully!');
+            } else {
+                showToast('Failed to save file metadata: ' + (data.data || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error saving file metadata:', error);
+            showToast('Failed to save file metadata: ' + error.message);
+        });
+    }
+    
+    function deleteFile(fileId) {
+        const formData = new FormData();
+        formData.append('action', 'tomatillo_delete_image');
+        formData.append('image_id', fileId);
+        formData.append('nonce', '<?php echo wp_create_nonce('tomatillo_delete_image'); ?>');
+        
+        fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('File deleted successfully!');
+                // Remove the file from the gallery
+                const fileItem = document.querySelector(`[data-id="${fileId}"]`);
+                if (fileItem) {
+                    fileItem.remove();
+                }
+            } else {
+                showToast('Failed to delete file: ' + (data.data || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting file:', error);
+            showToast('Failed to delete file: ' + error.message);
+        });
+    }
+    
     function initializeImageHandlers() {
         document.addEventListener('click', function(e) {
             const galleryItem = e.target.closest('.gallery-item, .file-item');
@@ -2720,10 +3105,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            const imageId = galleryItem.dataset.id;
+            const itemId = galleryItem.dataset.id;
             
-            // Click on image - open modal
-            openModal(imageId);
+            // Determine if this is a file item or image item
+            if (galleryItem.classList.contains('file-item')) {
+                // Click on file - open file modal
+                openFileModal(itemId);
+            } else {
+                // Click on image - open image modal
+                openModal(itemId);
+            }
         });
     }
     
@@ -3104,6 +3495,15 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.removeChild(link);
     }
     
+    function downloadFile(url, filename) {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+    
     function optimizeImageModal() {
         if (!currentImageId) return;
         
@@ -3244,13 +3644,15 @@ document.addEventListener('DOMContentLoaded', function() {
         const filterTabs = document.querySelectorAll('.filter-tab');
         filterTabs.forEach(tab => {
             tab.addEventListener('click', function() {
-                // Remove active class from all tabs
-                filterTabs.forEach(t => t.classList.remove('active'));
-                // Add active class to clicked tab
-                this.classList.add('active');
-                
                 const filter = this.dataset.filter;
                 filterImages(filter);
+                
+                // Update hash for distinct URLs
+                if (filter === 'images') {
+                    window.location.hash = '#images';
+                } else if (filter === 'files') {
+                    window.location.hash = '#files';
+                }
             });
         });
         
@@ -3387,19 +3789,6 @@ document.addEventListener('DOMContentLoaded', function() {
             bulkDeleteBtn.disabled = count === 0;
         }
         
-        function filterImages(filter) {
-            const imagesGrid = document.getElementById('masonry-grid');
-            const filesGrid = document.getElementById('files-grid');
-            
-            if (filter === 'images') {
-                imagesGrid.style.display = 'block';
-                filesGrid.style.display = 'none';
-            } else if (filter === 'files') {
-                imagesGrid.style.display = 'none';
-                filesGrid.style.display = 'grid';
-            }
-        }
-        
         function performSearch(query) {
             if (!query.trim()) {
                 // Show all items - FAST!
@@ -3482,6 +3871,38 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    // Move filterImages to global scope so hash navigation can access it
+    function filterImages(filter) {
+        console.log('filterImages called with:', filter);
+        const imagesGrid = document.getElementById('masonry-grid');
+        const filesGrid = document.getElementById('files-grid');
+        
+        console.log('imagesGrid:', imagesGrid);
+        console.log('filesGrid:', filesGrid);
+        
+        // Update tab visual state
+        const imagesTab = document.querySelector('.filter-tab[data-filter="images"]');
+        const filesTab = document.querySelector('.filter-tab[data-filter="files"]');
+        
+        if (filter === 'images') {
+            console.log('Setting images view');
+            imagesGrid.style.display = 'block';
+            filesGrid.style.display = 'none';
+            
+            // Update tab states
+            if (imagesTab) imagesTab.classList.add('active');
+            if (filesTab) filesTab.classList.remove('active');
+        } else if (filter === 'files') {
+            console.log('Setting files view');
+            imagesGrid.style.display = 'none';
+            filesGrid.style.display = 'grid';
+            
+            // Update tab states
+            if (imagesTab) imagesTab.classList.remove('active');
+            if (filesTab) filesTab.classList.add('active');
+        }
+    }
+    
     function initializeAdminBarHeight() {
         // Set CSS custom property for WordPress admin bar height
         function updateAdminBarHeight() {
@@ -3501,7 +3922,22 @@ document.addEventListener('DOMContentLoaded', function() {
     
     window.copyImageUrl = copyImageUrl;
     window.downloadImage = downloadImage;
+    window.downloadFile = downloadFile;
     window.deleteImage = deleteImage;
     window.optimizeImageModal = optimizeImageModal;
+    
+    // File Modal Functions
+    window.openFileModal = openFileModal;
+    window.closeFileModal = closeFileModal;
+    window.copyFileUrlFromModal = copyFileUrlFromModal;
+    window.downloadFileFromModal = downloadFileFromModal;
+    window.deleteFileFromModal = deleteFileFromModal;
+    window.saveFileMetadata = saveFileMetadata;
+    
+    // Initialize hash navigation after all functions are defined and DOM is ready
+    setTimeout(() => {
+        console.log('Initializing hash navigation with timeout...');
+        initializeHashNavigation();
+    }, 100);
 });
 </script>
