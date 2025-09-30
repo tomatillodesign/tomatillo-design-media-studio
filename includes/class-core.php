@@ -34,6 +34,7 @@ class Tomatillo_Media_Core {
         add_action('wp_ajax_tomatillo_get_image_data', array($this, 'ajax_get_image_data'));
         add_action('wp_ajax_tomatillo_save_image_metadata', array($this, 'ajax_save_image_metadata'));
         add_action('wp_ajax_tomatillo_delete_image', array($this, 'ajax_delete_image'));
+        add_action('wp_ajax_tomatillo_delete_images', array($this, 'ajax_delete_images'));
     }
     
     /**
@@ -927,6 +928,66 @@ class Tomatillo_Media_Core {
         }
         
         wp_send_json_success('Image deleted successfully');
+    }
+    
+    /**
+     * AJAX handler for bulk deleting images
+     */
+    public function ajax_delete_images() {
+        // Check permissions
+        if (!current_user_can('delete_posts')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+        
+        // Verify nonce
+        if (!wp_verify_nonce($_POST['nonce'], 'tomatillo_delete_images')) {
+            wp_send_json_error('Invalid nonce');
+        }
+        
+        $image_ids = json_decode(stripslashes($_POST['image_ids']), true);
+        
+        if (!is_array($image_ids) || empty($image_ids)) {
+            wp_send_json_error('Invalid image IDs');
+        }
+        
+        $deleted_count = 0;
+        $errors = array();
+        
+        foreach ($image_ids as $image_id) {
+            $image_id = intval($image_id);
+            
+            if (!$image_id) {
+                $errors[] = "Invalid image ID: $image_id";
+                continue;
+            }
+            
+            // Check if image exists
+            $attachment = get_post($image_id);
+            if (!$attachment || $attachment->post_type !== 'attachment') {
+                $errors[] = "Image not found: $image_id";
+                continue;
+            }
+            
+            $result = wp_delete_attachment($image_id, true);
+            
+            if ($result) {
+                $deleted_count++;
+                $this->log('info', "Bulk delete: Successfully deleted image ID $image_id");
+            } else {
+                $errors[] = "Failed to delete image: $image_id";
+                $this->log('warning', "Bulk delete: Failed to delete image ID $image_id");
+            }
+        }
+        
+        if ($deleted_count > 0) {
+            $message = "Successfully deleted $deleted_count image(s)";
+            if (!empty($errors)) {
+                $message .= ". " . count($errors) . " error(s) occurred.";
+            }
+            wp_send_json_success($message);
+        } else {
+            wp_send_json_error('No images were deleted. ' . implode(', ', $errors));
+        }
     }
     
     /**

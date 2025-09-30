@@ -104,6 +104,74 @@ $has_more = count($images) === $images_per_page;
         </div>
     </div>
 
+    <!-- Action Bar -->
+    <div class="action-bar">
+        <div class="action-bar-content">
+            <!-- Tabs/Filter -->
+            <div class="filter-tabs">
+                <button class="filter-tab active" data-filter="images">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21,15 16,10 5,21"></polyline>
+                    </svg>
+                    Images
+                </button>
+                <button class="filter-tab" data-filter="files">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14,2 14,8 20,8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10,9 9,9 8,9"></polyline>
+                    </svg>
+                    Files
+                </button>
+            </div>
+
+            <!-- Search -->
+            <div class="search-container">
+                <div class="search-input-wrapper">
+                    <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                    <input type="text" id="gallery-search" placeholder="Search by title, alt text, ID, etc..." class="search-input">
+                    <button class="search-clear" id="search-clear" style="display: none;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Bulk Actions -->
+            <div class="bulk-actions">
+                <div class="bulk-actions-panel" id="bulk-actions-panel">
+                    <span class="bulk-count" id="bulk-count">0 selected</span>
+                    <button class="bulk-action-btn bulk-delete" id="bulk-delete" disabled>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3,6 5,6 21,6"></polyline>
+                            <path d="m19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"></path>
+                        </svg>
+                        Delete Selected
+                    </button>
+                    <button class="bulk-action-btn bulk-cancel" id="bulk-cancel">
+                        Cancel
+                    </button>
+                </div>
+                <button class="bulk-select-btn" id="bulk-select-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <path d="M9 9h6v6H9z"></path>
+                    </svg>
+                    Bulk Select Mode
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Gallery Grid -->
     <div class="gallery-container">
         <div class="masonry-grid" id="masonry-grid">
@@ -1492,6 +1560,317 @@ $has_more = count($images) === $images_per_page;
         max-width: none;
     }
 }
+
+/* Action Bar Styles */
+.action-bar {
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 1rem 0;
+    margin: 0 1rem 1rem 1rem;
+    border-radius: 3px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    position: sticky;
+    top: var(--wp-admin-bar-height, 32px); /* Account for WordPress admin bar height */
+    z-index: 100;
+}
+
+.action-bar-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+
+.action-bar-content > *:first-child {
+    margin-right: auto;
+}
+
+.action-bar-content > *:last-child {
+    margin-left: auto;
+}
+
+/* Filter Tabs */
+.filter-tabs {
+    display: flex;
+    gap: 0.25rem;
+    background: #f3f4f6;
+    border-radius: 8px;
+    padding: 0.25rem;
+}
+
+.filter-tab {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #6b7280;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.filter-tab:hover {
+    color: #374151;
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.filter-tab.active {
+    background: white;
+    color: #3b82f6;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.filter-tab svg {
+    flex-shrink: 0;
+}
+
+/* Search Container */
+.search-container {
+    flex: 1;
+    max-width: 400px;
+    margin: 0 1rem;
+}
+
+.search-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.search-icon {
+    position: absolute;
+    left: 0.75rem;
+    color: #9ca3af;
+    pointer-events: none;
+}
+
+.search-input {
+    width: 100%;
+    padding: 0.5rem 0.75rem 0.5rem 2.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    background: white;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.search-clear {
+    position: absolute;
+    right: 0.5rem;
+    background: none;
+    border: none;
+    color: #9ca3af;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: color 0.2s ease, background 0.2s ease;
+}
+
+.search-clear:hover {
+    color: #6b7280;
+    background: #f3f4f6;
+}
+
+/* Bulk Actions */
+.bulk-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-left: auto;
+}
+
+.bulk-select-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.bulk-select-btn:hover {
+    border-color: #9ca3af;
+    background: #f9fafb;
+}
+
+.bulk-select-btn.active {
+    background: #3b82f6;
+    border-color: #3b82f6;
+    color: white;
+}
+
+.bulk-actions-panel {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 1rem;
+    background: #f3f4f6;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    transform: translateY(-10px);
+}
+
+.bulk-actions-panel.active {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.bulk-count {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+}
+
+.bulk-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.bulk-delete {
+    background: #ef4444;
+    color: white;
+}
+
+.bulk-delete:hover:not(:disabled) {
+    background: #dc2626;
+}
+
+.bulk-delete:disabled {
+    background: #d1d5db;
+    color: #9ca3af;
+    cursor: not-allowed;
+}
+
+.bulk-cancel {
+    background: white;
+    color: #6b7280;
+    border: 1px solid #d1d5db;
+}
+
+.bulk-cancel:hover {
+    background: #f9fafb;
+    color: #374151;
+}
+
+/* Bulk Select Mode Styles */
+.bulk-mode .gallery-item {
+    cursor: pointer;
+    position: relative;
+}
+
+.bulk-mode .gallery-item:hover {
+    transform: none;
+}
+
+.bulk-mode .gallery-item:hover .gallery-image {
+    filter: brightness(0.9);
+}
+
+.bulk-mode .image-overlay {
+    display: none !important;
+}
+
+.bulk-mode .gallery-item::before {
+    content: '';
+    position: absolute;
+    top: 0.75rem;
+    left: 0.75rem;
+    width: 20px;
+    height: 20px;
+    border: 2px solid white;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 10;
+    transition: all 0.2s ease;
+    pointer-events: none;
+}
+
+.bulk-mode .gallery-item:hover::before {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.bulk-mode .gallery-item.selected::before {
+    background: #3b82f6;
+    border-color: #3b82f6;
+}
+
+.bulk-mode .gallery-item.selected::after {
+    content: '✓';
+    position: absolute;
+    top: 0.75rem;
+    left: 0.75rem;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    z-index: 11;
+    pointer-events: none;
+}
+
+.bulk-mode .gallery-item.selected {
+    box-shadow: 0 0 0 2px #3b82f6;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .action-bar-content {
+        flex-direction: column;
+        gap: 0.75rem;
+        align-items: stretch;
+    }
+    
+    .filter-tabs {
+        justify-content: center;
+    }
+    
+    .search-container {
+        max-width: none;
+        margin: 0;
+    }
+    
+    .bulk-actions {
+        justify-content: center;
+    }
+    
+    .bulk-actions-panel {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+}
 </style>
 
 <script>
@@ -1509,6 +1888,8 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeImageHandlers();
     loadAllImages();
     initializeLayoutContainment();
+    initializeActionBar();
+    initializeAdminBarHeight();
     
     function initializeDragDrop() {
         const dragDropTarget = document.getElementById('drag-drop-target');
@@ -1801,13 +2182,33 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function loadAllImages() {
-        allImages = Array.from(document.querySelectorAll('.gallery-item')).map(item => item.dataset.id);
+        allImages = Array.from(document.querySelectorAll('.gallery-item')).map(item => {
+            const imageId = item.dataset.id;
+            const imageTitle = item.querySelector('.image-title')?.textContent || '';
+            const imageMeta = item.querySelector('.image-meta')?.textContent || '';
+            const imageAlt = item.querySelector('.gallery-image')?.alt || '';
+            
+            return {
+                id: imageId,
+                title: imageTitle,
+                alt: imageAlt,
+                meta: imageMeta,
+                filename: imageTitle, // Use title as filename fallback
+                caption: '', // Will be populated via AJAX if needed
+                description: '' // Will be populated via AJAX if needed
+            };
+        });
     }
     
     function initializeImageHandlers() {
         document.addEventListener('click', function(e) {
             const galleryItem = e.target.closest('.gallery-item');
             if (!galleryItem) return;
+            
+            // Check if we're in bulk mode - if so, don't handle normal clicks
+            if (document.body.classList.contains('bulk-mode')) {
+                return;
+            }
             
             const imageId = galleryItem.dataset.id;
             const actionBtn = e.target.closest('.action-btn');
@@ -2299,6 +2700,240 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update on load and resize
         updateContainerWidth();
         window.addEventListener('resize', updateContainerWidth);
+    }
+    
+    function initializeActionBar() {
+        // Filter tabs functionality
+        const filterTabs = document.querySelectorAll('.filter-tab');
+        filterTabs.forEach(tab => {
+            tab.addEventListener('click', function() {
+                // Remove active class from all tabs
+                filterTabs.forEach(t => t.classList.remove('active'));
+                // Add active class to clicked tab
+                this.classList.add('active');
+                
+                const filter = this.dataset.filter;
+                filterImages(filter);
+            });
+        });
+        
+        // Search functionality
+        const searchInput = document.getElementById('gallery-search');
+        const searchClear = document.getElementById('search-clear');
+        let searchTimeout;
+        
+        searchInput.addEventListener('input', function() {
+            const query = this.value.trim();
+            
+            // Show/hide clear button
+            searchClear.style.display = query ? 'block' : 'none';
+            
+            // Debounce search
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                performSearch(query);
+            }, 300);
+        });
+        
+        searchClear.addEventListener('click', function() {
+            searchInput.value = '';
+            this.style.display = 'none';
+            performSearch('');
+        });
+        
+        // Bulk select functionality
+        const bulkSelectBtn = document.getElementById('bulk-select-btn');
+        const bulkActionsPanel = document.getElementById('bulk-actions-panel');
+        const bulkCount = document.getElementById('bulk-count');
+        const bulkDeleteBtn = document.getElementById('bulk-delete');
+        const bulkCancelBtn = document.getElementById('bulk-cancel');
+        
+        let bulkMode = false;
+        let selectedItems = new Set();
+        
+        bulkSelectBtn.addEventListener('click', function() {
+            bulkMode = !bulkMode;
+            
+            if (bulkMode) {
+                this.classList.add('active');
+                this.textContent = 'Exit Bulk Mode';
+                bulkActionsPanel.classList.add('active');
+                document.body.classList.add('bulk-mode');
+            } else {
+                exitBulkMode();
+            }
+        });
+        
+        bulkCancelBtn.addEventListener('click', exitBulkMode);
+        
+        bulkDeleteBtn.addEventListener('click', function() {
+            if (selectedItems.size === 0) return;
+            
+            if (confirm(`Are you sure you want to delete ${selectedItems.size} image(s)? This action cannot be undone.`)) {
+                deleteSelectedImages();
+            }
+        });
+        
+        function exitBulkMode() {
+            bulkMode = false;
+            bulkSelectBtn.classList.remove('active');
+            bulkSelectBtn.textContent = 'Bulk Select Mode';
+            bulkActionsPanel.classList.remove('active');
+            document.body.classList.remove('bulk-mode');
+            
+            // Clear all visual selections
+            selectedItems.clear();
+            document.querySelectorAll('.gallery-item.selected').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            updateBulkCount();
+        }
+        
+        // Add click handlers to gallery items for bulk selection
+        // This handler runs first and intercepts clicks when in bulk mode
+        document.addEventListener('click', function(e) {
+            if (!bulkMode) return;
+            
+            const galleryItem = e.target.closest('.gallery-item');
+            if (!galleryItem) return;
+            
+            // In bulk mode, prevent modal opening and handle selection
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const itemId = galleryItem.dataset.id;
+            
+            if (selectedItems.has(itemId)) {
+                selectedItems.delete(itemId);
+                galleryItem.classList.remove('selected');
+            } else {
+                selectedItems.add(itemId);
+                galleryItem.classList.add('selected');
+            }
+            
+            updateBulkCount();
+        }, true); // Use capture phase to run before other handlers
+        
+        function updateBulkCount() {
+            const count = selectedItems.size;
+            bulkCount.textContent = `${count} selected`;
+            bulkDeleteBtn.disabled = count === 0;
+        }
+        
+        function filterImages(filter) {
+            const galleryItems = document.querySelectorAll('.gallery-item');
+            
+            galleryItems.forEach(item => {
+                if (filter === 'images') {
+                    item.style.display = 'block';
+                } else if (filter === 'files') {
+                    // For now, hide all images when "Files" is selected
+                    // This can be expanded to show non-image files
+                    item.style.display = 'none';
+                }
+            });
+        }
+        
+        function performSearch(query) {
+            if (!query) {
+                // Show all images
+                const galleryItems = document.querySelectorAll('.gallery-item');
+                galleryItems.forEach(item => {
+                    item.style.display = 'block';
+                });
+                return;
+            }
+            
+            // Get all images data for search
+            const searchTerms = query.toLowerCase().split(' ').filter(term => term.length > 0);
+            
+            // Search through all loaded images
+            allImages.forEach(imageData => {
+                const item = document.querySelector(`[data-id="${imageData.id}"]`);
+                if (!item) return;
+                
+                const searchableText = [
+                    imageData.title,
+                    imageData.alt,
+                    imageData.id.toString(),
+                    imageData.caption || '',
+                    imageData.description || '',
+                    imageData.filename || ''
+                ].join(' ').toLowerCase();
+                
+                const matches = searchTerms.every(term => searchableText.includes(term));
+                
+                item.style.display = matches ? 'block' : 'none';
+            });
+        }
+        
+        function deleteSelectedImages() {
+            const imageIds = Array.from(selectedItems);
+            
+            // Show loading state
+            bulkDeleteBtn.disabled = true;
+            bulkDeleteBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> Deleting...';
+            
+            // Send AJAX request to delete images
+            fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    action: 'tomatillo_delete_images',
+                    image_ids: JSON.stringify(imageIds),
+                    nonce: '<?php echo wp_create_nonce('tomatillo_delete_images'); ?>'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Remove deleted items from DOM
+                    imageIds.forEach(id => {
+                        const item = document.querySelector(`[data-id="${id}"]`);
+                        if (item) {
+                            item.remove();
+                        }
+                    });
+                    
+                    // Show success message
+                    showToast('Successfully deleted ' + imageIds.length + ' image(s)', 'success');
+                    
+                    // Exit bulk mode
+                    exitBulkMode();
+                } else {
+                    showToast(data.data || 'Failed to delete images', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Delete error:', error);
+                showToast('Network error occurred while deleting images', 'error');
+            })
+            .finally(() => {
+                // Reset button state
+                bulkDeleteBtn.disabled = false;
+                bulkDeleteBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,6 5,6 21,6"></polyline><path d="m19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"></path></svg> Delete Selected';
+            });
+        }
+    }
+    
+    function initializeAdminBarHeight() {
+        // Set CSS custom property for WordPress admin bar height
+        function updateAdminBarHeight() {
+            const adminBar = document.getElementById('wpadminbar');
+            const adminBarHeight = adminBar ? adminBar.offsetHeight : 0;
+            document.documentElement.style.setProperty('--wp-admin-bar-height', adminBarHeight + 'px');
+        }
+        
+        // Update on load and resize
+        updateAdminBarHeight();
+        window.addEventListener('resize', updateAdminBarHeight);
+        
+        // Also update when admin bar might change (e.g., user login/logout)
+        const observer = new MutationObserver(updateAdminBarHeight);
+        observer.observe(document.body, { childList: true, subtree: true });
     }
     
     window.copyImageUrl = copyImageUrl;
