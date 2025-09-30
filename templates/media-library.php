@@ -272,6 +272,7 @@ $has_more = count($images) === $images_per_page;
         
         <div class="modal-footer">
             <div class="modal-actions">
+                <button type="button" class="btn btn-optimize" id="optimize-btn" onclick="optimizeImageModal()" style="display: none;">Optimize Image</button>
                 <button type="button" class="btn btn-secondary" onclick="copyImageUrl()">Copy Original URL</button>
                 <button type="button" class="btn btn-secondary" onclick="downloadImage()">Download Original</button>
                 <button type="button" class="btn btn-danger" onclick="deleteImage()">Delete File</button>
@@ -284,13 +285,7 @@ $has_more = count($images) === $images_per_page;
     </div>
 </div>
 
-<!-- Toast Notification -->
-<div class="toast-notification" id="toast-notification">
-    <div class="toast-content">
-        <span class="toast-icon">✓</span>
-        <span class="toast-message" id="toast-message">Success!</span>
-    </div>
-</div>
+<!-- Toast Notification will be created dynamically -->
 
 <style>
 /* Modern Gallery Styles */
@@ -701,7 +696,7 @@ $has_more = count($images) === $images_per_page;
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.75);
     backdrop-filter: blur(4px);
 }
 
@@ -770,20 +765,30 @@ $has_more = count($images) === $images_per_page;
     padding: 2rem;
     background: radial-gradient(circle at center, #f5f5f5 0%, #dddddd 100%); /* Radial gradient background */
     position: relative;
+    border-radius: 0 0 0 12px;
+}
+
+/* Horizontal image styles */
+.modal-image-section.horizontal {
+    flex: 1.5; /* Even wider for horizontal images */
+}
+
+.modal-details-section.horizontal {
+    flex: 0.8; /* Narrower for horizontal images */
 }
 
 .modal-image {
     max-width: 100%;
-    max-height: 600px; /* Increased height */
+    max-height: 600px;
     object-fit: contain;
     border-radius: 8px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     cursor: pointer;
-    transition: transform 0.2s ease;
+    transition: all 0.3s ease;
 }
 
 .modal-image:hover {
-    transform: scale(1.02);
+    filter: brightness(1.05);
 }
 
 /* External Navigation */
@@ -835,7 +840,7 @@ $has_more = count($images) === $images_per_page;
     padding: 0.875rem 1.25rem;
     border-radius: 8px;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-    z-index: 10002;
+    z-index: 10003;
     opacity: 0;
     transform: translateY(20px);
     transition: all 0.3s ease;
@@ -1071,6 +1076,17 @@ $has_more = count($images) === $images_per_page;
 .btn-danger:hover {
     background: #dc2626;
     border-color: #dc2626;
+}
+
+.btn-optimize {
+    background: #f59e0b;
+    color: white;
+    border-color: #f59e0b;
+}
+
+.btn-optimize:hover {
+    background: #d97706;
+    border-color: #d97706;
 }
 
 /* Responsive Modal */
@@ -1416,6 +1432,38 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             savingsBadge.style.display = 'none';
         }
+        
+        // Detect image orientation and apply appropriate styles
+        const modalImage = document.getElementById('modal-image');
+        const imageSection = document.querySelector('.modal-image-section');
+        const detailsSection = document.querySelector('.modal-details-section');
+        
+        modalImage.onload = function() {
+            const isHorizontal = this.naturalWidth > this.naturalHeight;
+            
+            if (isHorizontal) {
+                imageSection.classList.add('horizontal');
+                detailsSection.classList.add('horizontal');
+            } else {
+                imageSection.classList.remove('horizontal');
+                detailsSection.classList.remove('horizontal');
+            }
+        };
+        
+        // Show/hide optimize button based on optimization status
+        const optimizeBtn = document.getElementById('optimize-btn');
+        if (data.is_optimized) {
+            optimizeBtn.style.display = 'none';
+        } else {
+            optimizeBtn.style.display = 'inline-block';
+        }
+        
+        // Ensure button is enabled and reset to original text when populating modal
+        if (optimizeBtn) {
+            optimizeBtn.disabled = false;
+            optimizeBtn.textContent = 'Optimize Image';
+            optimizeBtn.setAttribute('onclick', 'optimizeImageModal()');
+        }
     }
     
     function copyToClipboard(text) {
@@ -1462,28 +1510,62 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function showToast(message, type = 'success') {
-        const toast = document.getElementById('toast-notification');
-        const toastMessage = document.getElementById('toast-message');
+        // Remove any existing toast first
+        const existingToast = document.getElementById('toast-notification');
+        if (existingToast) {
+            existingToast.remove();
+        }
         
-        // Update message and styling based on type
+        // Create new toast element
+        const toast = document.createElement('div');
+        toast.className = 'toast-notification';
+        toast.id = 'toast-notification';
+        
+        const toastContent = document.createElement('div');
+        toastContent.className = 'toast-content';
+        
+        const toastIcon = document.createElement('span');
+        toastIcon.className = 'toast-icon';
+        
+        const toastMessage = document.createElement('span');
+        toastMessage.className = 'toast-message';
         toastMessage.textContent = message;
         
+        toastContent.appendChild(toastIcon);
+        toastContent.appendChild(toastMessage);
+        toast.appendChild(toastContent);
+        
+        // Set styling based on type
         if (type === 'success') {
             toast.style.background = '#374151';
             toast.style.borderColor = '#4b5563';
-            toast.querySelector('.toast-icon').textContent = '✓';
+            toastIcon.textContent = '✓';
         } else if (type === 'error') {
             toast.style.background = '#dc2626';
             toast.style.borderColor = '#ef4444';
-            toast.querySelector('.toast-icon').textContent = '✕';
+            toastIcon.textContent = '✕';
+        } else if (type === 'warning') {
+            toast.style.background = '#f59e0b';
+            toast.style.borderColor = '#d97706';
+            toastIcon.textContent = '⚠';
         }
         
-        // Show toast
-        toast.classList.add('show');
+        // Add to DOM
+        document.body.appendChild(toast);
         
-        // Hide after 3 seconds
+        // Trigger animation
+        setTimeout(() => {
+            toast.classList.add('show');
+        }, 10);
+        
+        // Remove from DOM after 3 seconds
         setTimeout(() => {
             toast.classList.remove('show');
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 300); // Wait for fade-out animation
         }, 3000);
     }
     
@@ -1593,6 +1675,51 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.removeChild(link);
     }
     
+    function optimizeImageModal() {
+        if (!currentImageId) return;
+        
+        const optimizeBtn = document.getElementById('optimize-btn');
+        const originalText = optimizeBtn.textContent;
+        
+        // Show loading state
+        optimizeBtn.textContent = 'Optimizing...';
+        optimizeBtn.disabled = true;
+        
+        fetch(`<?php echo admin_url('admin-ajax.php'); ?>?action=tomatillo_optimize_image&image_id=${currentImageId}&nonce=<?php echo wp_create_nonce('tomatillo_optimize_image'); ?>`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Image optimized successfully!');
+                    // Hide the optimize button since image is now optimized
+                    optimizeBtn.style.display = 'none';
+                    // Reload the image data to update the modal with new optimization info
+                    loadImageData(currentImageId).then(populateModal);
+                } else {
+                    // Check if it's a savings threshold issue
+                    if (data.data && data.data.includes('well-optimized') && data.data.includes('additional savings')) {
+                        // Extract savings percentage from the message
+                        const savingsMatch = data.data.match(/(\d+)%/);
+                        const savings = savingsMatch ? savingsMatch[1] : 'unknown';
+                        
+                        showToast(`This image is already well-optimized! Only ${savings}% additional savings possible, which is below the minimum threshold. No optimization needed.`, 'warning');
+                    } else {
+                        showToast('Failed to optimize image: ' + (data.data || 'Unknown error'), 'error');
+                    }
+                }
+            })
+            .catch(error => {
+                showToast('Error optimizing image: ' + error.message, 'error');
+            })
+            .finally(() => {
+                // Restore button state - get fresh reference to ensure we're updating the right button
+                const currentOptimizeBtn = document.getElementById('optimize-btn');
+                if (currentOptimizeBtn) {
+                    currentOptimizeBtn.textContent = 'Optimize Image';
+                    currentOptimizeBtn.disabled = false;
+                }
+            });
+    }
+    
     function deleteImage() {
         if (!currentImageId) return;
         
@@ -1671,5 +1798,6 @@ document.addEventListener('DOMContentLoaded', function() {
     window.copyImageUrl = copyImageUrl;
     window.downloadImage = downloadImage;
     window.deleteImage = deleteImage;
+    window.optimizeImageModal = optimizeImageModal;
 });
 </script>

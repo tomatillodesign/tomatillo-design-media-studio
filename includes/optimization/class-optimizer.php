@@ -150,7 +150,20 @@ class Tomatillo_Optimizer {
      * Convert image to AVIF/WebP formats
      */
     public function convert_image($attachment_id) {
+        // Get plugin instance for logging
+        $plugin = tomatillo_media_studio();
+        if (!$plugin) {
+            return array(
+                'success' => false,
+                'message' => 'Plugin not available',
+                'attachment_id' => $attachment_id
+            );
+        }
+        
+        $plugin->core->log('info', "convert_image called for attachment ID: {$attachment_id}");
+        
         if (!$this->should_process_image($attachment_id)) {
+            $plugin->core->log('warning', "Image does not meet processing criteria for ID: {$attachment_id}");
             return array(
                 'success' => false,
                 'message' => 'Image does not meet processing criteria',
@@ -159,7 +172,17 @@ class Tomatillo_Optimizer {
         }
         
         $file_path = get_attached_file($attachment_id);
+        if (!$file_path || !file_exists($file_path)) {
+            $plugin->core->log('error', "File path not found or file does not exist for ID: {$attachment_id} - Path: {$file_path}");
+            return array(
+                'success' => false,
+                'message' => 'Image file not found',
+                'attachment_id' => $attachment_id
+            );
+        }
+        
         $original_size = filesize($file_path);
+        $plugin->core->log('info', "Original file size: {$original_size} bytes for ID: {$attachment_id}");
         
         $results = array(
             'attachment_id' => $attachment_id,
@@ -177,9 +200,14 @@ class Tomatillo_Optimizer {
         
         $settings = $this->get_settings();
         if (!$settings) {
+            $plugin->core->log('error', 'Settings not available for optimization');
             $results['message'] = 'Settings not available';
             return $results;
         }
+        
+        $avif_enabled = $settings->is_avif_enabled() ? 'yes' : 'no';
+        $webp_enabled = $settings->is_webp_enabled() ? 'yes' : 'no';
+        $plugin->core->log('info', "Settings loaded - AVIF enabled: {$avif_enabled}, WebP enabled: {$webp_enabled}");
         
         try {
             // Set timeout for conversion
@@ -187,21 +215,29 @@ class Tomatillo_Optimizer {
             
             // Convert to AVIF if enabled
             if ($settings->is_avif_enabled()) {
+                $plugin->core->log('info', "🔄 Converting to AVIF for ID: {$attachment_id}");
                 $avif_result = $this->convert_to_avif($file_path, $attachment_id);
                 if ($avif_result['success']) {
+                    $plugin->core->log('info', "✅ AVIF conversion successful: " . round($this->calculate_savings_percentage($original_size, $avif_result['size'])) . "% savings");
                     $results['avif_path'] = $avif_result['path'];
                     $results['avif_size'] = $avif_result['size'];
                     $results['avif_savings'] = $this->calculate_savings_percentage($original_size, $avif_result['size']);
+                } else {
+                    $plugin->core->log('warning', "❌ AVIF conversion failed");
                 }
             }
             
             // Convert to WebP if enabled
             if ($settings->is_webp_enabled()) {
+                $plugin->core->log('info', "🔄 Converting to WebP for ID: {$attachment_id}");
                 $webp_result = $this->convert_to_webp($file_path, $attachment_id);
                 if ($webp_result['success']) {
+                    $plugin->core->log('info', "✅ WebP conversion successful: " . round($this->calculate_savings_percentage($original_size, $webp_result['size'])) . "% savings");
                     $results['webp_path'] = $webp_result['path'];
                     $results['webp_size'] = $webp_result['size'];
                     $results['webp_savings'] = $this->calculate_savings_percentage($original_size, $webp_result['size']);
+                } else {
+                    $plugin->core->log('warning', "❌ WebP conversion failed");
                 }
             }
             
@@ -209,7 +245,10 @@ class Tomatillo_Optimizer {
             $best_savings = max($results['avif_savings'], $results['webp_savings']);
             $min_threshold = $settings->get_min_savings_threshold();
             
+            $plugin->core->log('info', "Best savings: {$best_savings}%, Min threshold: {$min_threshold}%");
+            
             if ($best_savings < $min_threshold) {
+                $plugin->core->log('info', "⚠️ Savings below threshold ({$best_savings}% < {$min_threshold}%), cleaning up converted files");
                 // Clean up converted files if they don't meet threshold
                 if ($results['avif_path'] && file_exists($results['avif_path'])) {
                     unlink($results['avif_path']);
@@ -219,10 +258,11 @@ class Tomatillo_Optimizer {
                 }
                 
                 $results['message'] = sprintf(
-                    'Conversion skipped: Only %d%% savings (minimum %d%% required)',
+                    'Image is already well-optimized. Only %d%% additional savings possible (minimum %d%% required)',
                     round($best_savings),
                     $min_threshold
                 );
+                $plugin->core->log('info', "📊 Threshold decision: {$results['message']}");
             } else {
                 $results['success'] = true;
                 $results['message'] = sprintf(
@@ -230,9 +270,11 @@ class Tomatillo_Optimizer {
                     round($results['avif_savings']),
                     round($results['webp_savings'])
                 );
+                $plugin->core->log('info', "✅ {$results['message']}");
             }
             
         } catch (Exception $e) {
+            $plugin->core->log('error', "Exception during conversion: {$e->getMessage()}");
             $results['message'] = 'Conversion failed: ' . $e->getMessage();
             
             // Clean up any partial files
@@ -242,12 +284,6 @@ class Tomatillo_Optimizer {
             if ($results['webp_path'] && file_exists($results['webp_path'])) {
                 unlink($results['webp_path']);
             }
-        }
-        
-        // Log result for debugging
-        $settings = $this->get_settings();
-        if ($settings && $settings->is_debug_mode()) {
-            error_log('Tomatillo Conversion Result: ' . print_r($results, true));
         }
         
         return $results;

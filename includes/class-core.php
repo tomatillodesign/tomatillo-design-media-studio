@@ -512,7 +512,8 @@ class Tomatillo_Media_Core {
                 }
             }
             
-            return $parsed_logs;
+            // Reverse array to show newest first
+            return array_reverse($parsed_logs);
             
         } catch (Exception $e) {
             error_log('Tomatillo Media Studio: Error reading log file - ' . $e->getMessage());
@@ -630,25 +631,50 @@ class Tomatillo_Media_Core {
      * AJAX handler for optimizing a single image
      */
     public function ajax_optimize_image() {
+        // Get the plugin instance for logging
+        $plugin = tomatillo_media_studio();
+        if (!$plugin) {
+            wp_send_json_error('Plugin not available');
+        }
+        
+        // Log optimization attempt
+        $plugin->core->log('info', 'Image optimization attempt started');
+        
         // Verify nonce
         if (!wp_verify_nonce($_GET['nonce'], 'tomatillo_optimize_image')) {
+            $plugin->core->log('warning', 'Invalid nonce for optimization request');
             wp_send_json_error('Invalid nonce');
         }
         
         // Check permissions
         if (!current_user_can('upload_files')) {
+            $plugin->core->log('warning', 'Insufficient permissions for optimization request');
             wp_send_json_error('Insufficient permissions');
         }
         
         $image_id = intval($_GET['image_id']);
+        $plugin->core->log('info', "Starting optimization for image ID: {$image_id}");
         
         if (!$image_id) {
+            $plugin->core->log('warning', 'Invalid image ID provided for optimization');
             wp_send_json_error('Invalid image ID');
         }
         
+        // Check if image exists
+        $image = get_post($image_id);
+        if (!$image || $image->post_type !== 'attachment') {
+            $plugin->core->log('warning', "Image not found or not an attachment: {$image_id}");
+            wp_send_json_error('Image not found');
+        }
+        
+        // Get image filename for logging
+        $file_path = get_attached_file($image_id);
+        $filename = $file_path ? basename($file_path) : 'Unknown';
+        $plugin->core->log('info', "Optimizing image: {$filename} (ID: {$image_id})");
+        
         // Get the optimizer
-        $plugin = tomatillo_media_studio();
         if (!$plugin->optimization) {
+            $plugin->core->log('error', 'Optimization module not available');
             wp_send_json_error('Optimization module not available');
         }
         
@@ -656,12 +682,23 @@ class Tomatillo_Media_Core {
         $result = $plugin->optimization->convert_image($image_id);
         
         if ($result && $result['success']) {
+            $savings = isset($result['savings']) ? $result['savings'] : 0;
+            $plugin->core->log('info', "✅ Image optimization successful: {$filename} (ID: {$image_id}) - Savings: {$savings}%");
             wp_send_json_success(array(
                 'message' => 'Image optimized successfully',
-                'savings' => isset($result['savings']) ? $result['savings'] : 0
+                'savings' => $savings
             ));
         } else {
-            wp_send_json_error($result['error'] ?? 'Failed to optimize image');
+            $error_message = $result['error'] ?? $result['message'] ?? 'Failed to optimize image';
+            
+            // Check if it's a threshold issue (not a real failure)
+            if (strpos($error_message, 'well-optimized') !== false || strpos($error_message, 'additional savings') !== false) {
+                $plugin->core->log('info', "⚠️ Image optimization skipped (threshold): {$filename} (ID: {$image_id}) - {$error_message}");
+            } else {
+                $plugin->core->log('warning', "❌ Image optimization failed: {$filename} (ID: {$image_id}) - {$error_message}");
+            }
+            
+            wp_send_json_error($error_message);
         }
     }
     
