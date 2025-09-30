@@ -28,6 +28,12 @@ class Tomatillo_Media_Core {
         add_action('admin_notices', array($this, 'admin_notices'));
         add_action('wp_ajax_tomatillo_get_media_stats', array($this, 'ajax_get_media_stats'));
         add_action('wp_ajax_tomatillo_get_optimization_stats', array($this, 'ajax_get_optimization_stats'));
+        add_action('wp_ajax_tomatillo_load_more_images', array($this, 'ajax_load_more_images'));
+        add_action('wp_ajax_tomatillo_optimize_image', array($this, 'ajax_optimize_image'));
+        add_action('wp_ajax_tomatillo_upload_images', array($this, 'ajax_upload_images'));
+        add_action('wp_ajax_tomatillo_get_image_data', array($this, 'ajax_get_image_data'));
+        add_action('wp_ajax_tomatillo_save_image_metadata', array($this, 'ajax_save_image_metadata'));
+        add_action('wp_ajax_tomatillo_delete_image', array($this, 'ajax_delete_image'));
     }
     
     /**
@@ -530,6 +536,360 @@ class Tomatillo_Media_Core {
         } catch (Exception $e) {
             error_log('Tomatillo Media Studio: Error clearing log file - ' . $e->getMessage());
         }
+    }
+    
+    /**
+     * AJAX handler for loading more images
+     */
+    public function ajax_load_more_images() {
+        // Verify nonce
+        if (!wp_verify_nonce($_GET['nonce'], 'tomatillo_load_more_images')) {
+            wp_send_json_error('Invalid nonce');
+        }
+        
+        // Check permissions
+        if (!current_user_can('upload_files')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+        
+        $page = intval($_GET['page']);
+        $images_per_page = 20;
+        $offset = ($page - 1) * $images_per_page;
+        
+        // Get images
+        $images = get_posts(array(
+            'post_type' => 'attachment',
+            'post_mime_type' => 'image',
+            'post_status' => 'inherit',
+            'posts_per_page' => $images_per_page,
+            'offset' => $offset,
+            'orderby' => 'date',
+            'order' => 'DESC',
+            'meta_query' => array(
+                array(
+                    'key' => '_wp_attachment_metadata',
+                    'compare' => 'EXISTS'
+                )
+            )
+        ));
+        
+        $has_more = count($images) === $images_per_page;
+        $html = '';
+        
+        if (!empty($images)) {
+            $plugin = tomatillo_media_studio();
+            $settings = $plugin->settings;
+            
+            foreach ($images as $image) {
+                $image_url = wp_get_attachment_image_url($image->ID, 'large');
+                $image_alt = get_post_meta($image->ID, '_wp_attachment_image_alt', true);
+                $image_title = $image->post_title ?: $image->post_name;
+                $image_date = $image->post_date;
+                $file_size = filesize(get_attached_file($image->ID));
+                $file_size_formatted = size_format($file_size);
+                
+                // Check if optimized
+                $is_optimized = $this->is_image_optimized($image->ID);
+                
+                $html .= '<div class="gallery-item" data-id="' . $image->ID . '">';
+                $html .= '<div class="image-container">';
+                $html .= '<img src="' . esc_url($image_url) . '" alt="' . esc_attr($image_alt) . '" loading="lazy" class="gallery-image">';
+                $html .= '<div class="image-overlay">';
+                $html .= '<div class="overlay-content">';
+                $html .= '<div class="image-info">';
+                $html .= '<h4 class="image-title">' . esc_html($image_title) . '</h4>';
+                $html .= '<p class="image-meta">' . date('M j, Y', strtotime($image_date)) . ' • ' . $file_size_formatted . '</p>';
+                $html .= '</div>';
+                $html .= '<div class="image-actions">';
+                $html .= '<button class="action-btn view-btn" title="View"><span>👁️</span></button>';
+                $html .= '<button class="action-btn edit-btn" title="Edit"><span>✏️</span></button>';
+                $html .= '<button class="action-btn download-btn" title="Download"><span>⬇️</span></button>';
+                if (!$is_optimized && $settings->is_optimization_enabled()) {
+                    $html .= '<button class="action-btn optimize-btn" title="Optimize"><span>⚡</span></button>';
+                }
+                $html .= '</div>';
+                $html .= '</div>';
+                if ($is_optimized) {
+                    $html .= '<div class="optimization-badge"><span class="badge optimized">✓ Optimized</span></div>';
+                } elseif ($settings->is_optimization_enabled()) {
+                    $html .= '<div class="optimization-badge"><span class="badge pending">⚡ Optimize</span></div>';
+                }
+                $html .= '</div>';
+                $html .= '</div>';
+                $html .= '</div>';
+            }
+        }
+        
+        wp_send_json_success(array(
+            'html' => $html,
+            'has_more' => $has_more
+        ));
+    }
+    
+    /**
+     * AJAX handler for optimizing a single image
+     */
+    public function ajax_optimize_image() {
+        // Verify nonce
+        if (!wp_verify_nonce($_GET['nonce'], 'tomatillo_optimize_image')) {
+            wp_send_json_error('Invalid nonce');
+        }
+        
+        // Check permissions
+        if (!current_user_can('upload_files')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+        
+        $image_id = intval($_GET['image_id']);
+        
+        if (!$image_id) {
+            wp_send_json_error('Invalid image ID');
+        }
+        
+        // Get the optimizer
+        $plugin = tomatillo_media_studio();
+        if (!$plugin->optimization) {
+            wp_send_json_error('Optimization module not available');
+        }
+        
+        // Optimize the image
+        $result = $plugin->optimization->convert_image($image_id);
+        
+        if ($result && $result['success']) {
+            wp_send_json_success(array(
+                'message' => 'Image optimized successfully',
+                'savings' => isset($result['savings']) ? $result['savings'] : 0
+            ));
+        } else {
+            wp_send_json_error($result['error'] ?? 'Failed to optimize image');
+        }
+    }
+    
+    /**
+     * AJAX handler for uploading images
+     */
+    public function ajax_upload_images() {
+        // Check permissions
+        if (!current_user_can('upload_files')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+        
+        if (!isset($_FILES['files'])) {
+            wp_send_json_error('No files uploaded');
+        }
+        
+        $uploaded_files = array();
+        $files = $_FILES['files'];
+        
+        // Handle multiple files
+        if (is_array($files['name'])) {
+            for ($i = 0; $i < count($files['name']); $i++) {
+                $file = array(
+                    'name' => $files['name'][$i],
+                    'type' => $files['type'][$i],
+                    'tmp_name' => $files['tmp_name'][$i],
+                    'error' => $files['error'][$i],
+                    'size' => $files['size'][$i]
+                );
+                
+                $upload_result = wp_handle_upload($file, array('test_form' => false));
+                
+                if ($upload_result && !isset($upload_result['error'])) {
+                    $attachment = array(
+                        'post_mime_type' => $upload_result['type'],
+                        'post_title' => sanitize_file_name(pathinfo($upload_result['file'], PATHINFO_FILENAME)),
+                        'post_content' => '',
+                        'post_status' => 'inherit'
+                    );
+                    
+                    $attachment_id = wp_insert_attachment($attachment, $upload_result['file']);
+                    
+                    if (!is_wp_error($attachment_id)) {
+                        require_once(ABSPATH . 'wp-admin/includes/image.php');
+                        $attachment_data = wp_generate_attachment_metadata($attachment_id, $upload_result['file']);
+                        wp_update_attachment_metadata($attachment_id, $attachment_data);
+                        
+                        $uploaded_files[] = $attachment_id;
+                    }
+                }
+            }
+        }
+        
+        wp_send_json_success(array(
+            'message' => count($uploaded_files) . ' images uploaded successfully',
+            'uploaded_count' => count($uploaded_files)
+        ));
+    }
+    
+    /**
+     * AJAX handler for getting image data
+     */
+    public function ajax_get_image_data() {
+        // Verify nonce
+        if (!wp_verify_nonce($_GET['nonce'], 'tomatillo_get_image_data')) {
+            wp_send_json_error('Invalid nonce');
+        }
+        
+        // Check permissions
+        if (!current_user_can('upload_files')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+        
+        $image_id = intval($_GET['image_id']);
+        
+        if (!$image_id) {
+            wp_send_json_error('Invalid image ID');
+        }
+        
+        $image = get_post($image_id);
+        if (!$image || $image->post_type !== 'attachment') {
+            wp_send_json_error('Image not found');
+        }
+        
+        $metadata = wp_get_attachment_metadata($image_id);
+        $file_path = get_attached_file($image_id);
+        $file_size = $file_path ? size_format(filesize($file_path)) : 'Unknown';
+        $filename = $file_path ? basename($file_path) : 'Unknown';
+        
+        // Check for optimized versions
+        $avif_url = null;
+        $webp_url = null;
+        $space_saved = 0;
+        $is_optimized = false;
+        
+        if ($file_path) {
+            $avif_path = str_replace(array('.jpg', '.jpeg', '.png'), '.avif', $file_path);
+            $webp_path = str_replace(array('.jpg', '.jpeg', '.png'), '.webp', $file_path);
+            
+            if (file_exists($avif_path)) {
+                $avif_url = str_replace(WP_CONTENT_DIR, content_url(), $avif_path);
+                $is_optimized = true;
+            }
+            
+            if (file_exists($webp_path)) {
+                $webp_url = str_replace(WP_CONTENT_DIR, content_url(), $webp_path);
+                $is_optimized = true;
+            }
+            
+            // Calculate space saved
+            if ($is_optimized) {
+                $original_size = filesize($file_path);
+                $optimized_size = $original_size;
+                
+                if (file_exists($avif_path)) {
+                    $optimized_size = min($optimized_size, filesize($avif_path));
+                }
+                if (file_exists($webp_path)) {
+                    $optimized_size = min($optimized_size, filesize($webp_path));
+                }
+                
+                $space_saved = max(0, $original_size - $optimized_size);
+            }
+        }
+        
+        // Get uploader info
+        $uploader = get_userdata($image->post_author);
+        $uploader_name = $uploader ? $uploader->display_name : 'Unknown';
+        
+        // Get the true original URL using WordPress function
+        $original_url = wp_get_original_image_url($image_id);
+        
+        // Debug: Log what we're getting
+        error_log("DEBUG: wp_get_original_image_url($image_id) returned: " . ($original_url ?: 'false'));
+        
+        if (!$original_url) {
+            // Fallback to regular URL if original not available
+            $original_url = wp_get_attachment_url($image_id);
+            error_log("DEBUG: Fallback wp_get_attachment_url($image_id) returned: " . $original_url);
+        }
+        
+        // Ensure we have the true original by removing any -scaled suffix
+        if (strpos($original_url, '-scaled.') !== false) {
+            $original_url = str_replace('-scaled.', '.', $original_url);
+            error_log("DEBUG: Removed -scaled suffix, final URL: " . $original_url);
+        }
+        
+        error_log("DEBUG: Final original_url being sent to frontend: " . $original_url);
+        
+        $data = array(
+            'id' => $image_id,
+            'title' => $image->post_title,
+            'filename' => $filename,
+            'alt_text' => get_post_meta($image_id, '_wp_attachment_image_alt', true),
+            'caption' => $image->post_excerpt,
+            'description' => $image->post_content,
+            'mime_type' => $image->post_mime_type,
+            'dimensions' => isset($metadata['width'], $metadata['height']) ? $metadata['width'] . 'x' . $metadata['height'] : 'Unknown',
+            'file_size' => $file_size,
+            'date' => date('M j, Y', strtotime($image->post_date)),
+            'uploader' => $uploader_name,
+            'url' => $original_url,
+            'avif_url' => $avif_url,
+            'webp_url' => $webp_url,
+            'space_saved' => size_format($space_saved),
+            'is_optimized' => $is_optimized
+        );
+        
+        wp_send_json_success($data);
+    }
+    
+    /**
+     * AJAX handler for saving image metadata
+     */
+    public function ajax_save_image_metadata() {
+        // Check permissions
+        if (!current_user_can('upload_files')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+        
+        $image_id = intval($_POST['image_id']);
+        
+        if (!$image_id) {
+            wp_send_json_error('Invalid image ID');
+        }
+        
+        // Update post data
+        $post_data = array(
+            'ID' => $image_id,
+            'post_title' => sanitize_text_field($_POST['title']),
+            'post_excerpt' => sanitize_textarea_field($_POST['caption']),
+            'post_content' => sanitize_textarea_field($_POST['description'])
+        );
+        
+        $result = wp_update_post($post_data);
+        
+        if (is_wp_error($result)) {
+            wp_send_json_error('Failed to update post data');
+        }
+        
+        // Update alt text
+        update_post_meta($image_id, '_wp_attachment_image_alt', sanitize_text_field($_POST['alt_text']));
+        
+        wp_send_json_success('Metadata saved successfully');
+    }
+    
+    /**
+     * AJAX handler for deleting image
+     */
+    public function ajax_delete_image() {
+        // Check permissions
+        if (!current_user_can('delete_posts')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+        
+        $image_id = intval($_POST['image_id']);
+        
+        if (!$image_id) {
+            wp_send_json_error('Invalid image ID');
+        }
+        
+        $result = wp_delete_attachment($image_id, true);
+        
+        if (!$result) {
+            wp_send_json_error('Failed to delete image');
+        }
+        
+        wp_send_json_success('Image deleted successfully');
     }
     
     /**
