@@ -56,22 +56,51 @@ $has_more = count($images) === $images_per_page;
         <!-- Drag & Drop Target -->
         <div class="drag-drop-target" id="drag-drop-target">
             <div class="drag-drop-content">
-                <div class="drag-drop-icon">📤</div>
+                <div class="drag-drop-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7,10 12,15 17,10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                </div>
                 <div class="drag-drop-text">
                     <strong>Drop images here</strong>
                     <span>or click to browse</span>
                 </div>
             </div>
-            <input type="file" id="media-upload" multiple accept="image/*" style="display: none;">
+            <input type="file" id="media-upload" multiple accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/avif,image/svg+xml,image/bmp,image/tiff,image/tif,image/ico" style="display: none;">
         </div>
     </div>
     
     <!-- Drag & Drop Overlay -->
     <div class="drag-drop-overlay" id="drag-drop-overlay">
         <div class="drag-drop-message">
-            <div class="drag-drop-icon-large">📤</div>
+            <div class="drag-drop-icon-large">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7,10 12,15 17,10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+            </div>
             <h3>Drop images to upload</h3>
             <p>Release to add <?php echo '<span id="file-count">0</span>'; ?> images to your library</p>
+        </div>
+    </div>
+
+    <!-- Upload Progress Overlay -->
+    <div class="upload-progress-overlay" id="upload-progress-overlay">
+        <div class="upload-progress-modal">
+            <div class="upload-header">
+                <h3>Uploading Images</h3>
+                <button class="upload-cancel-btn" id="upload-cancel-btn">Cancel</button>
+            </div>
+            <div class="upload-progress-container">
+                <div class="upload-progress-bar">
+                    <div class="upload-progress-fill" id="upload-progress-fill"></div>
+                </div>
+                <div class="upload-status" id="upload-status">Preparing upload...</div>
+            </div>
+            <div class="upload-files-list" id="upload-files-list"></div>
         </div>
     </div>
 
@@ -113,8 +142,11 @@ $has_more = count($images) === $images_per_page;
                                     <div class="image-info">
                                         <h4 class="image-title"><?php echo esc_html($image_title); ?></h4>
                                         <p class="image-meta">
-                                            <?php echo date('M j, Y', strtotime($image_date)); ?> • 
-                                            <?php echo $file_size_formatted; ?>
+                                            <?php 
+                                            $uploader = get_userdata($image->post_author);
+                                            $uploader_name = $uploader ? $uploader->display_name : 'Unknown';
+                                            echo date('M j, Y', strtotime($image_date)) . ' • ' . $file_size_formatted . ' • Uploaded by: ' . esc_html($uploader_name); 
+                                            ?>
                                         </p>
                                     </div>
                                     
@@ -128,23 +160,92 @@ $has_more = count($images) === $images_per_page;
                                         <button class="action-btn download-btn" title="Download">
                                             <span>⬇️</span>
                                         </button>
-                                        <?php if (!$is_optimized && $settings->is_optimization_enabled()): ?>
-                                            <button class="action-btn optimize-btn" title="Optimize">
-                                                <span>⚡</span>
-                                            </button>
-                                        <?php endif; ?>
                                     </div>
                                 </div>
                                 
-                                <!-- Optimization Status -->
-                                <?php if ($is_optimized): ?>
-                                    <div class="optimization-badge">
-                                        <span class="badge optimized">✓ Optimized</span>
+                                <!-- Hover Info Overlay - Only show if there's content -->
+                                <?php
+                                // Get optimized file info
+                                $optimized_info = '';
+                                if ($is_optimized && $plugin->core) {
+                                    $avif_url = $plugin->core->get_optimized_image_url($image->ID, 'avif');
+                                    $webp_url = $plugin->core->get_optimized_image_url($image->ID, 'webp');
+                                    $scaled_url = wp_get_attachment_image_url($image->ID, 'medium');
+                                    
+                                    // Find smallest optimized size
+                                    $smallest_size = '';
+                                    $smallest_url = '';
+                                    
+                                    if ($avif_url) {
+                                        $avif_size = filesize(str_replace(home_url('/'), ABSPATH, $avif_url));
+                                        if (!$smallest_size || $avif_size < $smallest_size) {
+                                            $smallest_size = $avif_size;
+                                            $smallest_url = $avif_url;
+                                            $format = 'AVIF';
+                                        }
+                                    }
+                                    
+                                    if ($webp_url) {
+                                        $webp_size = filesize(str_replace(home_url('/'), ABSPATH, $webp_url));
+                                        if (!$smallest_size || $webp_size < $smallest_size) {
+                                            $smallest_size = $webp_size;
+                                            $smallest_url = $webp_url;
+                                            $format = 'WebP';
+                                        }
+                                    }
+                                    
+                                    if ($scaled_url) {
+                                        $scaled_size = filesize(str_replace(home_url('/'), ABSPATH, $scaled_url));
+                                        if (!$smallest_size || $scaled_size < $smallest_size) {
+                                            $smallest_size = $scaled_size;
+                                            $smallest_url = $scaled_url;
+                                            $format = 'Scaled';
+                                        }
+                                    }
+                                    
+                                    if ($smallest_size) {
+                                        $optimized_info = $format . ' • ' . size_format($smallest_size);
+                                    }
+                                }
+                                
+                                // Get attachment info
+                                $attachments = get_posts(array(
+                                    'post_type' => 'any',
+                                    'meta_query' => array(
+                                        array(
+                                            'key' => '_thumbnail_id',
+                                            'value' => $image->ID,
+                                            'compare' => '='
+                                        )
+                                    ),
+                                    'posts_per_page' => 1
+                                ));
+                                
+                                $attachment_info = '';
+                                if (!empty($attachments)) {
+                                    $attached_post = $attachments[0];
+                                    $attachment_info = 'Attached to: ' . $attached_post->post_title;
+                                }
+                                
+                                // Only show hover overlay if there's actual content
+                                if ($optimized_info || $attachment_info):
+                                ?>
+                                <div class="hover-info-overlay">
+                                    <div class="hover-info-content">
+                                        <?php if ($optimized_info): ?>
+                                            <div class="hover-info-item">
+                                                <span class="hover-info-label">Optimized:</span>
+                                                <span class="hover-info-value"><?php echo esc_html($optimized_info); ?></span>
+                                            </div>
+                                        <?php endif; ?>
+                                        
+                                        <?php if ($attachment_info): ?>
+                                            <div class="hover-info-item">
+                                                <span class="hover-info-label"><?php echo esc_html($attachment_info); ?></span>
+                                            </div>
+                                        <?php endif; ?>
                                     </div>
-                                <?php elseif ($settings->is_optimization_enabled()): ?>
-                                    <div class="optimization-badge">
-                                        <span class="badge pending">⚡ Optimize</span>
-                                    </div>
+                                </div>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -293,6 +394,9 @@ $has_more = count($images) === $images_per_page;
     background: #f8f9fa;
     min-height: 100vh;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    margin: 0;
+    padding: 0;
+    margin-left: -20px;
 }
 
 /* Header */
@@ -304,12 +408,13 @@ $has_more = count($images) === $images_per_page;
 }
 
 .header-content {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 2rem;
+    max-width: 100%;
+    margin: 0;
+    padding: 0 1rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    margin-bottom: 1rem;
 }
 
 .gallery-title {
@@ -345,10 +450,11 @@ $has_more = count($images) === $images_per_page;
     background: #f8fafc;
     border: 2px dashed #cbd5e1;
     border-radius: 12px;
-    padding: 1.5rem 2rem;
+    padding: 1.5rem 1rem;
     cursor: pointer;
     transition: all 0.3s ease;
     min-width: 200px;
+    margin: 0 1rem;
 }
 
 .drag-drop-target:hover {
@@ -369,7 +475,12 @@ $has_more = count($images) === $images_per_page;
 }
 
 .drag-drop-icon {
-    font-size: 1.5rem;
+    color: #6b7280;
+    transition: color 0.3s ease;
+}
+
+.drag-drop-target:hover .drag-drop-icon {
+    color: #3b82f6;
 }
 
 .drag-drop-text {
@@ -399,13 +510,17 @@ $has_more = count($images) === $images_per_page;
     background: rgba(59, 130, 246, 0.1);
     backdrop-filter: blur(4px);
     z-index: 9999;
-    display: none;
+    display: flex;
     align-items: center;
     justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
 }
 
 .drag-drop-overlay.active {
-    display: flex;
+    opacity: 1;
+    visibility: visible;
 }
 
 .drag-drop-message {
@@ -418,7 +533,7 @@ $has_more = count($images) === $images_per_page;
 }
 
 .drag-drop-icon-large {
-    font-size: 4rem;
+    color: #3b82f6;
     margin-bottom: 1rem;
 }
 
@@ -435,11 +550,163 @@ $has_more = count($images) === $images_per_page;
     margin: 0;
 }
 
-/* Gallery Container - WordPress Admin Style */
-.gallery-container {
-    max-width: none;
+/* Upload Progress Overlay */
+.upload-progress-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    z-index: 10002;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.upload-progress-overlay.active {
+    display: flex;
+}
+
+.upload-progress-modal {
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
+    min-width: 400px;
+    max-width: 600px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+.upload-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.upload-header h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
     margin: 0;
-    padding: 0 20px;
+}
+
+.upload-cancel-btn {
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.upload-cancel-btn:hover {
+    background: #dc2626;
+}
+
+.upload-progress-container {
+    margin-bottom: 1.5rem;
+}
+
+.upload-progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #e5e7eb;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.75rem;
+}
+
+.upload-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+.upload-progress-fill.processing {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.upload-status {
+    font-size: 0.875rem;
+    color: #6b7280;
+    text-align: center;
+}
+
+.upload-files-list {
+    max-height: 200px;
+    overflow-y: auto;
+    border-top: 1px solid #e5e7eb;
+    padding-top: 1rem;
+}
+
+.upload-file-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.upload-file-item:last-child {
+    border-bottom: none;
+}
+
+.upload-file-name {
+    font-size: 0.875rem;
+    color: #374151;
+    flex: 1;
+    margin-right: 1rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.upload-file-status {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.upload-file-status.pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.upload-file-status.uploading {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.upload-file-status.success {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.upload-file-status.error {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+/* Gallery Container - Contained Width with Padding */
+.gallery-container {
+    max-width: calc(100vw - 2rem);
+    margin: 0 auto;
+    padding: 0 1rem;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 /* Google Photos Style Masonry */
@@ -480,7 +747,7 @@ $has_more = count($images) === $images_per_page;
     cursor: pointer;
     position: relative;
     break-inside: avoid;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.25rem;
     display: inline-block;
     width: 100%;
 }
@@ -527,6 +794,59 @@ $has_more = count($images) === $images_per_page;
 
 .gallery-item:hover .image-overlay {
     opacity: 1;
+    background: rgba(0, 0, 0, 0.8);
+}
+
+/* Hide action buttons on hover */
+.gallery-item:hover .image-actions {
+    display: none;
+}
+
+/* Hover Info Overlay */
+.hover-info-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    padding: 1rem;
+}
+
+.gallery-item:hover .hover-info-overlay {
+    opacity: 1;
+}
+
+.hover-info-content {
+    background: rgba(0, 0, 0, 0.9);
+    border-radius: 8px;
+    padding: 1rem;
+    color: white;
+    text-align: center;
+    max-width: 90%;
+}
+
+.hover-info-item {
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.hover-info-item:last-child {
+    margin-bottom: 0;
+}
+
+.hover-info-label {
+    font-weight: 600;
+    color: #e5e7eb;
+}
+
+.hover-info-value {
+    color: white;
+    margin-left: 0.5rem;
 }
 
 .overlay-content {
@@ -667,6 +987,10 @@ $has_more = count($images) === $images_per_page;
         flex-direction: column;
         gap: 1.5rem;
         text-align: center;
+        padding: 0 1rem;
+        max-width: 100%;
+        margin: 0;
+        margin-bottom: 1rem;
     }
     
     .gallery-title {
@@ -679,7 +1003,11 @@ $has_more = count($images) === $images_per_page;
     
     
     .gallery-container {
-        padding: 0 15px;
+        max-width: calc(100vw - 2rem);
+        margin: 0 auto;
+        padding: 0 1rem;
+        width: 100%;
+        box-sizing: border-box;
     }
 }
 
@@ -1180,11 +1508,13 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeInfiniteScroll();
     initializeImageHandlers();
     loadAllImages();
+    initializeLayoutContainment();
     
     function initializeDragDrop() {
         const dragDropTarget = document.getElementById('drag-drop-target');
         const dragDropOverlay = document.getElementById('drag-drop-overlay');
         const fileInput = document.getElementById('media-upload');
+        let dragCounter = 0;
         
         // Click to browse
         dragDropTarget.addEventListener('click', () => {
@@ -1194,7 +1524,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // File input change
         fileInput.addEventListener('change', handleFileUpload);
         
-        // Drag and drop events
+        // Prevent default drag behaviors
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             document.addEventListener(eventName, preventDefaults, false);
         });
@@ -1204,20 +1534,34 @@ document.addEventListener('DOMContentLoaded', function() {
             e.stopPropagation();
         }
         
-        ['dragenter', 'dragover'].forEach(eventName => {
-            document.addEventListener(eventName, () => {
+        // Handle drag enter - only show overlay once
+        document.addEventListener('dragenter', (e) => {
+            dragCounter++;
+            if (dragCounter === 1) {
                 dragDropOverlay.classList.add('active');
                 document.getElementById('file-count').textContent = '0';
-            }, false);
+            }
         });
         
-        ['dragleave', 'drop'].forEach(eventName => {
-            document.addEventListener(eventName, () => {
+        // Handle drag over - keep overlay visible
+        document.addEventListener('dragover', (e) => {
+            // Keep overlay visible, don't toggle
+        });
+        
+        // Handle drag leave - only hide overlay when completely leaving
+        document.addEventListener('dragleave', (e) => {
+            dragCounter--;
+            if (dragCounter === 0) {
                 dragDropOverlay.classList.remove('active');
-            }, false);
+            }
         });
         
-        document.addEventListener('drop', handleDrop, false);
+        // Handle drop - hide overlay and process files
+        document.addEventListener('drop', (e) => {
+            dragCounter = 0;
+            dragDropOverlay.classList.remove('active');
+            handleDrop(e);
+        });
         
         function handleDrop(e) {
             const files = e.dataTransfer.files;
@@ -1233,14 +1577,35 @@ document.addEventListener('DOMContentLoaded', function() {
         function handleFiles(files) {
             const formData = new FormData();
             
+            // WordPress supported image types
+            const validImageTypes = [
+                'image/jpeg',
+                'image/jpg', 
+                'image/png',
+                'image/gif',
+                'image/webp',
+                'image/avif',
+                'image/svg+xml',
+                'image/bmp',
+                'image/tiff',
+                'image/tif',
+                'image/ico',
+                'image/x-icon'
+            ];
+            
             Array.from(files).forEach(file => {
-                if (file.type.startsWith('image/')) {
+                // Check both MIME type and file extension
+                const isValidType = validImageTypes.includes(file.type.toLowerCase()) || 
+                                  file.type.startsWith('image/') ||
+                                  /\.(jpg|jpeg|png|gif|webp|avif|svg|bmp|tiff|tif|ico)$/i.test(file.name);
+                
+                if (isValidType) {
                     formData.append('files[]', file);
                 }
             });
             
             if (formData.getAll('files[]').length === 0) {
-                alert('Please select only image files.');
+                alert('Please select only image files (JPG, PNG, GIF, WebP, AVIF, SVG, BMP, TIFF, ICO).');
                 return;
             }
             
@@ -1249,30 +1614,131 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         function uploadFiles(formData) {
-            const overlay = document.getElementById('drag-drop-overlay');
-            overlay.querySelector('h3').textContent = 'Uploading images...';
-            overlay.querySelector('p').textContent = 'Please wait while your images are uploaded';
+            const dragOverlay = document.getElementById('drag-drop-overlay');
+            const progressOverlay = document.getElementById('upload-progress-overlay');
+            const progressFill = document.getElementById('upload-progress-fill');
+            const uploadStatus = document.getElementById('upload-status');
+            const filesList = document.getElementById('upload-files-list');
             
-            fetch('<?php echo admin_url('admin-ajax.php'); ?>?action=tomatillo_upload_images', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Reload the page to show new images
-                    window.location.reload();
-                } else {
-                    alert('Upload failed: ' + (data.data || 'Unknown error'));
-                }
-            })
-            .catch(error => {
-                console.error('Upload error:', error);
-                alert('Upload failed. Please try again.');
-            })
-            .finally(() => {
-                overlay.classList.remove('active');
+            // Hide drag overlay, show progress overlay
+            dragOverlay.classList.remove('active');
+            progressOverlay.classList.add('active');
+            
+            // Get file list for progress tracking
+            const files = Array.from(formData.getAll('files[]'));
+            let uploadedCount = 0;
+            let totalFiles = files.length;
+            
+            // Initialize file list
+            filesList.innerHTML = '';
+            files.forEach((file, index) => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'upload-file-item';
+                fileItem.innerHTML = `
+                    <div class="upload-file-name">${file.name}</div>
+                    <div class="upload-file-status pending">Pending</div>
+                `;
+                filesList.appendChild(fileItem);
             });
+            
+            // Update status
+            uploadStatus.textContent = `Uploading 0 of ${totalFiles} images...`;
+            
+            // Create XMLHttpRequest for progress tracking
+            const xhr = new XMLHttpRequest();
+            
+            // Track upload progress
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const percentComplete = (e.loaded / e.total) * 100;
+                    progressFill.style.width = percentComplete + '%';
+                    
+                    // Update status during upload
+                    if (percentComplete < 100) {
+                        uploadStatus.textContent = `Uploading files... ${Math.round(percentComplete)}%`;
+                    } else {
+                        uploadStatus.textContent = `Processing images on server...`;
+                        progressFill.classList.add('processing');
+                    }
+                }
+            });
+            
+            // Handle response
+            xhr.addEventListener('load', () => {
+                if (xhr.status === 200) {
+                    try {
+                        const data = JSON.parse(xhr.responseText);
+                        if (data.success) {
+                            // Update all files as successful
+                            const fileItems = filesList.querySelectorAll('.upload-file-item');
+                            fileItems.forEach(item => {
+                                const status = item.querySelector('.upload-file-status');
+                                status.textContent = 'Success';
+                                status.className = 'upload-file-status success';
+                            });
+                            
+                            uploadStatus.textContent = `Successfully uploaded ${totalFiles} images!`;
+                            progressFill.style.width = '100%';
+                            progressFill.classList.remove('processing');
+                            
+                            // Reload after a short delay
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1500);
+                        } else {
+                            throw new Error(data.data || 'Upload failed');
+                        }
+                    } catch (error) {
+                        console.error('Upload error:', error);
+                        uploadStatus.textContent = 'Upload failed: ' + error.message;
+                        progressFill.classList.remove('processing');
+                        
+                        // Mark all files as failed
+                        const fileItems = filesList.querySelectorAll('.upload-file-item');
+                        fileItems.forEach(item => {
+                            const status = item.querySelector('.upload-file-status');
+                            status.textContent = 'Failed';
+                            status.className = 'upload-file-status error';
+                        });
+                    }
+                } else {
+                    uploadStatus.textContent = 'Upload failed: Server error';
+                    progressFill.classList.remove('processing');
+                    
+                    // Mark all files as failed
+                    const fileItems = filesList.querySelectorAll('.upload-file-item');
+                    fileItems.forEach(item => {
+                        const status = item.querySelector('.upload-file-status');
+                        status.textContent = 'Failed';
+                        status.className = 'upload-file-status error';
+                    });
+                }
+            });
+            
+            // Handle errors
+            xhr.addEventListener('error', () => {
+                uploadStatus.textContent = 'Upload failed: Network error';
+                progressFill.classList.remove('processing');
+                
+                // Mark all files as failed
+                const fileItems = filesList.querySelectorAll('.upload-file-item');
+                fileItems.forEach(item => {
+                    const status = item.querySelector('.upload-file-status');
+                    status.textContent = 'Failed';
+                    status.className = 'upload-file-status error';
+                });
+            });
+            
+            // Set up cancel functionality
+            const cancelBtn = document.getElementById('upload-cancel-btn');
+            cancelBtn.addEventListener('click', () => {
+                xhr.abort();
+                progressOverlay.classList.remove('active');
+            });
+            
+            // Start upload
+            xhr.open('POST', '<?php echo admin_url('admin-ajax.php'); ?>?action=tomatillo_upload_images');
+            xhr.send(formData);
         }
     }
     
@@ -1815,6 +2281,26 @@ document.addEventListener('DOMContentLoaded', function() {
     window.closeModal = closeModal;
     window.navigateImage = navigateImage;
     window.saveImageMetadata = saveImageMetadata;
+    // Layout containment function
+    function initializeLayoutContainment() {
+        const galleryContainer = document.querySelector('.gallery-container');
+        if (!galleryContainer) return;
+        
+        function updateContainerWidth() {
+            const viewportWidth = window.innerWidth;
+            const availableWidth = viewportWidth - 40; // Account for WordPress admin sidebar and margins
+            
+            // Set max-width to prevent bleeding
+            galleryContainer.style.maxWidth = Math.min(availableWidth, viewportWidth - 40) + 'px';
+            galleryContainer.style.marginLeft = 'auto';
+            galleryContainer.style.marginRight = 'auto';
+        }
+        
+        // Update on load and resize
+        updateContainerWidth();
+        window.addEventListener('resize', updateContainerWidth);
+    }
+    
     window.copyImageUrl = copyImageUrl;
     window.downloadImage = downloadImage;
     window.deleteImage = deleteImage;
