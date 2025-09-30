@@ -132,10 +132,6 @@ $has_more = count($images) === $images_per_page;
             <!-- Search -->
             <div class="search-container">
                 <div class="search-input-wrapper">
-                    <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <path d="m21 21-4.35-4.35"></path>
-                    </svg>
                     <input type="text" id="gallery-search" placeholder="Search by title, alt text, ID, etc..." class="search-input">
                     <button class="search-clear" id="search-clear" style="display: none;">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -195,7 +191,13 @@ $has_more = count($images) === $images_per_page;
                     $is_optimized = ($plugin->core) ? $plugin->core->is_image_optimized($image->ID) : false;
                     ?>
                     
-                    <div class="gallery-item" data-id="<?php echo $image->ID; ?>">
+                    <div class="gallery-item" 
+                         data-id="<?php echo $image->ID; ?>"
+                         data-title="<?php echo esc_attr($image_title); ?>"
+                         data-alt="<?php echo esc_attr($image_alt); ?>"
+                         data-caption="<?php echo esc_attr($image->post_excerpt); ?>"
+                         data-description="<?php echo esc_attr($image->post_content); ?>"
+                         data-filename="<?php echo esc_attr(basename(get_attached_file($image->ID))); ?>">
                         <div class="image-container">
                             <img 
                                 src="<?php echo esc_url($image_url); ?>" 
@@ -1633,7 +1635,7 @@ $has_more = count($images) === $images_per_page;
 /* Search Container */
 .search-container {
     flex: 1;
-    max-width: 400px;
+    max-width: none;
     margin: 0 1rem;
 }
 
@@ -1643,16 +1645,9 @@ $has_more = count($images) === $images_per_page;
     align-items: center;
 }
 
-.search-icon {
-    position: absolute;
-    left: 0.75rem;
-    color: #9ca3af;
-    pointer-events: none;
-}
-
 .search-input {
     width: 100%;
-    padding: 0.5rem 0.75rem 0.5rem 2.5rem;
+    padding: 0.5rem 0.75rem;
     border: 1px solid #d1d5db;
     border-radius: 8px;
     font-size: 0.875rem;
@@ -1886,7 +1881,6 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeDragDrop();
     initializeInfiniteScroll();
     initializeImageHandlers();
-    loadAllImages();
     initializeLayoutContainment();
     initializeActionBar();
     initializeAdminBarHeight();
@@ -2181,24 +2175,8 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
     
-    function loadAllImages() {
-        allImages = Array.from(document.querySelectorAll('.gallery-item')).map(item => {
-            const imageId = item.dataset.id;
-            const imageTitle = item.querySelector('.image-title')?.textContent || '';
-            const imageMeta = item.querySelector('.image-meta')?.textContent || '';
-            const imageAlt = item.querySelector('.gallery-image')?.alt || '';
-            
-            return {
-                id: imageId,
-                title: imageTitle,
-                alt: imageAlt,
-                meta: imageMeta,
-                filename: imageTitle, // Use title as filename fallback
-                caption: '', // Will be populated via AJAX if needed
-                description: '' // Will be populated via AJAX if needed
-            };
-        });
-    }
+    // No need for loadAllImages() - we read directly from DOM data attributes!
+    
     
     function initializeImageHandlers() {
         document.addEventListener('click', function(e) {
@@ -2836,34 +2814,31 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         function performSearch(query) {
-            if (!query) {
-                // Show all images
-                const galleryItems = document.querySelectorAll('.gallery-item');
-                galleryItems.forEach(item => {
+            if (!query.trim()) {
+                // Show all images - FAST!
+                document.querySelectorAll('.gallery-item').forEach(item => {
                     item.style.display = 'block';
                 });
                 return;
             }
             
-            // Get all images data for search
+            // Pure JS search - no arrays, no loops, just direct DOM manipulation
             const searchTerms = query.toLowerCase().split(' ').filter(term => term.length > 0);
             
-            // Search through all loaded images
-            allImages.forEach(imageData => {
-                const item = document.querySelector(`[data-id="${imageData.id}"]`);
-                if (!item) return;
-                
+            document.querySelectorAll('.gallery-item').forEach(item => {
+                // Build searchable text directly from data attributes - BLAZING FAST!
                 const searchableText = [
-                    imageData.title,
-                    imageData.alt,
-                    imageData.id.toString(),
-                    imageData.caption || '',
-                    imageData.description || '',
-                    imageData.filename || ''
+                    item.dataset.title || '',
+                    item.dataset.alt || '',
+                    item.dataset.id || '',
+                    item.dataset.caption || '',
+                    item.dataset.description || '',
+                    item.dataset.filename || '',
+                    item.querySelector('.image-meta')?.textContent || ''
                 ].join(' ').toLowerCase();
                 
+                // Check if all search terms match
                 const matches = searchTerms.every(term => searchableText.includes(term));
-                
                 item.style.display = matches ? 'block' : 'none';
             });
         }
