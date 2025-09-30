@@ -1331,4 +1331,39 @@ class Tomatillo_Media_Core {
         // Schedule conversion
         wp_schedule_single_event(time() + 2, 'tomatillo_auto_convert_image', array($attachment_id));
     }
+    
+    /**
+     * Get optimization data for an image
+     */
+    public function get_optimization_data($attachment_id) {
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'tomatillo_media_optimization';
+        
+        $data = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM {$table_name} WHERE attachment_id = %d AND status = 'completed'",
+            $attachment_id
+        ));
+        
+        if (!$data) {
+            return null;
+        }
+        
+        // Convert to array and add URLs
+        $result = (array) $data;
+        
+        // Add URLs if files exist
+        if (isset($data->avif_size) && $data->avif_size > 0) {
+            $result['avif_url'] = $this->get_optimized_image_url($attachment_id, 'avif');
+        }
+        
+        if (isset($data->webp_size) && $data->webp_size > 0) {
+            $result['webp_url'] = $this->get_optimized_image_url($attachment_id, 'webp');
+        }
+        
+        if (isset($data->scaled_size) && $data->scaled_size > 0) {
+            $result['scaled_url'] = $this->get_optimized_image_url($attachment_id, 'scaled');
+        }
+        
+        return $result;
+    }
 }

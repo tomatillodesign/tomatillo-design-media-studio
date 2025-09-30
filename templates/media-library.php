@@ -229,8 +229,42 @@ $has_more = count($images) === $images_per_page;
                     $image_alt = get_post_meta($image->ID, '_wp_attachment_image_alt', true);
                     $image_title = $image->post_title ?: $image->post_name;
                     $image_date = $image->post_date;
-                    $file_size = filesize(get_attached_file($image->ID));
-                    $file_size_formatted = size_format($file_size);
+                    
+                    // Get optimization data to find smallest file size
+                    $optimization_data = ($plugin->core) ? $plugin->core->get_optimization_data($image->ID) : null;
+                    $smallest_size = filesize(get_attached_file($image->ID)); // Default to original
+                    $smallest_format = 'Original';
+                    
+                    if ($optimization_data) {
+                        // Check AVIF
+                        if (!empty($optimization_data['avif_url']) && file_exists(str_replace(home_url('/'), ABSPATH, $optimization_data['avif_url']))) {
+                            $avif_size = filesize(str_replace(home_url('/'), ABSPATH, $optimization_data['avif_url']));
+                            if ($avif_size < $smallest_size) {
+                                $smallest_size = $avif_size;
+                                $smallest_format = 'AVIF';
+                            }
+                        }
+                        
+                        // Check WebP
+                        if (!empty($optimization_data['webp_url']) && file_exists(str_replace(home_url('/'), ABSPATH, $optimization_data['webp_url']))) {
+                            $webp_size = filesize(str_replace(home_url('/'), ABSPATH, $optimization_data['webp_url']));
+                            if ($webp_size < $smallest_size) {
+                                $smallest_size = $webp_size;
+                                $smallest_format = 'WebP';
+                            }
+                        }
+                        
+                        // Check scaled original
+                        if (!empty($optimization_data['scaled_url']) && file_exists(str_replace(home_url('/'), ABSPATH, $optimization_data['scaled_url']))) {
+                            $scaled_size = filesize(str_replace(home_url('/'), ABSPATH, $optimization_data['scaled_url']));
+                            if ($scaled_size < $smallest_size) {
+                                $smallest_size = $scaled_size;
+                                $smallest_format = 'Scaled';
+                            }
+                        }
+                    }
+                    
+                    $file_size_formatted = size_format($smallest_size);
                     
                     // Check if optimized
                     $is_optimized = ($plugin->core) ? $plugin->core->is_image_optimized($image->ID) : false;
@@ -903,34 +937,13 @@ $has_more = count($images) === $images_per_page;
 
 /* Google Photos Style Masonry */
 .masonry-grid {
-    column-count: 3;
-    column-gap: 0.5rem;
+    position: relative;
     padding-bottom: 2rem;
-}
-
-@media (max-width: 1200px) {
-    .masonry-grid {
-        column-count: 3;
-        column-gap: 0.5rem;
-    }
-}
-
-@media (max-width: 768px) {
-    .masonry-grid {
-        column-count: 2;
-        column-gap: 0.5rem;
-    }
-}
-
-@media (max-width: 480px) {
-    .masonry-grid {
-        column-count: 2;
-        column-gap: 0.5rem;
-    }
 }
 
 /* Gallery Items - Google Photos Style */
 .gallery-item {
+    position: absolute;
     background: white;
     border-radius: 8px;
     overflow: hidden;
@@ -938,6 +951,7 @@ $has_more = count($images) === $images_per_page;
     transition: box-shadow 0.3s ease;
     cursor: pointer;
     position: relative;
+    max-width: 300px;
     break-inside: avoid;
     margin-bottom: 0.25rem;
     display: inline-block;
@@ -961,6 +975,7 @@ $has_more = count($images) === $images_per_page;
     display: block;
     transition: filter 0.3s ease;
     border-radius: 8px;
+    max-width: 100%;
 }
 
 .gallery-item:hover .gallery-image {
@@ -2297,6 +2312,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeLayoutContainment();
     initializeActionBar();
     initializeAdminBarHeight();
+    initializeMasonry();
     
     function initializeDragDrop() {
         const dragDropTarget = document.getElementById('drag-drop-target');
@@ -2596,6 +2612,103 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // No need for loadAllImages() - we read directly from DOM data attributes!
     
+    function initializeMasonry() {
+        const grid = document.getElementById('masonry-grid');
+        if (!grid) return;
+        
+        let resizeTimeout;
+        
+        function layoutMasonry() {
+            const items = Array.from(grid.children);
+            if (items.length === 0) return;
+            
+            // Get container width
+            const containerWidth = grid.offsetWidth;
+            const gap = 8; // 0.5rem
+            
+            // Calculate number of columns based on screen size
+            let columns = 3;
+            if (containerWidth < 768) {
+                columns = 2;
+            } else if (containerWidth < 1200) {
+                columns = 3;
+            } else {
+                columns = 3;
+            }
+            
+            // Calculate column width
+            const columnWidth = (containerWidth - (gap * (columns - 1))) / columns;
+            
+            // Initialize column heights
+            const columnHeights = new Array(columns).fill(0);
+            
+            // Position each item
+            items.forEach((item, index) => {
+                // Reset any previous positioning
+                item.style.position = 'absolute';
+                item.style.left = '0px';
+                item.style.top = '0px';
+                
+                // Set max width to column width, but let height adjust naturally
+                item.style.maxWidth = columnWidth + 'px';
+                item.style.width = 'auto';
+                
+                // Find the shortest column
+                const shortestColumnIndex = columnHeights.indexOf(Math.min(...columnHeights));
+                
+                // Position the item
+                const left = shortestColumnIndex * (columnWidth + gap);
+                const top = columnHeights[shortestColumnIndex];
+                
+                item.style.left = left + 'px';
+                item.style.top = top + 'px';
+                
+                // Update column height
+                columnHeights[shortestColumnIndex] += item.offsetHeight + gap;
+            });
+            
+            // Set container height
+            grid.style.height = Math.max(...columnHeights) + 'px';
+        }
+        
+        // Wait for images to load before layout
+        function waitForImagesAndLayout() {
+            const images = Array.from(grid.querySelectorAll('img'));
+            const loadedImages = images.filter(img => img.complete);
+            
+            if (loadedImages.length === images.length) {
+                layoutMasonry();
+            } else {
+                // Wait for remaining images
+                images.forEach(img => {
+                    if (!img.complete) {
+                        img.onload = () => {
+                            if (Array.from(grid.querySelectorAll('img')).every(i => i.complete)) {
+                                setTimeout(layoutMasonry, 50);
+                            }
+                        };
+                    }
+                });
+            }
+        }
+        
+        // Initial layout
+        setTimeout(waitForImagesAndLayout, 100);
+        
+        // Layout on resize (with debounce)
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                waitForImagesAndLayout();
+            }, 150);
+        });
+        
+        // Layout when new items are added
+        const observer = new MutationObserver(() => {
+            setTimeout(waitForImagesAndLayout, 100);
+        });
+        observer.observe(grid, { childList: true });
+    }
     
     function initializeImageHandlers() {
         document.addEventListener('click', function(e) {
