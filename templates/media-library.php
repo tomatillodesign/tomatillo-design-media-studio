@@ -435,68 +435,94 @@ $has_more = count($images) === $images_per_page;
     margin: 0;
 }
 
-/* Gallery Container */
+/* Gallery Container - WordPress Admin Style */
 .gallery-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 2rem;
+    max-width: none;
+    margin: 0;
+    padding: 0 20px;
 }
 
-/* Masonry Grid */
+/* Google Photos Style Masonry */
 .masonry-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 1.5rem;
+    column-count: 3;
+    column-gap: 0.5rem;
     padding-bottom: 2rem;
 }
 
-/* Gallery Items */
+@media (max-width: 1200px) {
+    .masonry-grid {
+        column-count: 3;
+        column-gap: 0.5rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .masonry-grid {
+        column-count: 2;
+        column-gap: 0.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .masonry-grid {
+        column-count: 2;
+        column-gap: 0.5rem;
+    }
+}
+
+/* Gallery Items - Google Photos Style */
 .gallery-item {
     background: white;
-    border-radius: 16px;
+    border-radius: 8px;
     overflow: hidden;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.3s ease;
     cursor: pointer;
     position: relative;
+    break-inside: avoid;
+    margin-bottom: 0.5rem;
+    display: inline-block;
+    width: 100%;
 }
 
 .gallery-item:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
 }
 
 .image-container {
     position: relative;
-    aspect-ratio: 4/3;
     overflow: hidden;
+    width: 100%;
 }
 
+/* Google Photos style images */
 .gallery-image {
     width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: transform 0.3s ease;
+    height: auto;
+    display: block;
+    transition: filter 0.3s ease;
+    border-radius: 8px;
 }
 
 .gallery-item:hover .gallery-image {
-    transform: scale(1.05);
+    filter: brightness(1.05);
 }
 
-/* Image Overlay */
+/* Image Overlay - Google Photos Style */
 .image-overlay {
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.7) 100%);
+    background: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.6) 100%);
     opacity: 0;
     transition: opacity 0.3s ease;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    padding: 1rem;
+    padding: 0.75rem;
+    border-radius: 8px;
 }
 
 .gallery-item:hover .image-overlay {
@@ -535,39 +561,41 @@ $has_more = count($images) === $images_per_page;
 }
 
 .action-btn {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.9);
     border: none;
-    color: white;
-    width: 40px;
-    height: 40px;
+    color: #333;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     cursor: pointer;
     transition: all 0.3s ease;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.2rem;
+    font-size: 1rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .action-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: scale(1.1);
+    background: rgba(255, 255, 255, 1);
+    transform: scale(1.05);
 }
 
 /* Optimization Badge */
 .optimization-badge {
     position: absolute;
-    top: 1rem;
-    right: 1rem;
+    top: 0.75rem;
+    right: 0.75rem;
 }
 
 .badge {
-    padding: 0.5rem 1rem;
-    border-radius: 20px;
-    font-size: 0.8rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.7rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.3px;
+    backdrop-filter: blur(10px);
 }
 
 .badge.optimized {
@@ -649,21 +677,13 @@ $has_more = count($images) === $images_per_page;
         gap: 1.5rem;
     }
     
-    .masonry-grid {
-        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-        gap: 1rem;
-    }
     
     .gallery-container {
-        padding: 0 1rem;
+        padding: 0 15px;
     }
 }
 
 @media (max-width: 480px) {
-    .masonry-grid {
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    }
-    
     .gallery-title {
         font-size: 1.5rem;
     }
