@@ -36,6 +36,9 @@ class Tomatillo_Media_Core {
         add_action('wp_ajax_tomatillo_delete_image', array($this, 'ajax_delete_image'));
         add_action('wp_ajax_tomatillo_delete_images', array($this, 'ajax_delete_images'));
         add_action('wp_ajax_tomatillo_download_file', array($this, 'ajax_download_file'));
+        
+        // Scheduled conversion hook
+        add_action('tomatillo_auto_convert_image', array($this, 'handle_scheduled_conversion'));
     }
     
     /**
@@ -748,6 +751,9 @@ class Tomatillo_Media_Core {
                         $attachment_data = wp_generate_attachment_metadata($attachment_id, $upload_result['file']);
                         wp_update_attachment_metadata($attachment_id, $attachment_data);
                         
+                        // Trigger automatic conversion for AJAX uploads
+                        $this->trigger_auto_conversion($attachment_id);
+                        
                         $uploaded_files[] = $attachment_id;
                     }
                 }
@@ -790,39 +796,31 @@ class Tomatillo_Media_Core {
         $file_size = $file_path ? size_format(filesize($file_path)) : 'Unknown';
         $filename = $file_path ? basename($file_path) : 'Unknown';
         
-        // Check for optimized versions
-        $avif_url = null;
-        $webp_url = null;
+        // Check for optimized versions using the database
+        $avif_url = $this->get_optimized_image_url($image_id, 'avif');
+        $webp_url = $this->get_optimized_image_url($image_id, 'webp');
+        $is_optimized = $this->is_image_optimized($image_id);
         $space_saved = 0;
-        $is_optimized = false;
         
-        if ($file_path) {
-            $avif_path = str_replace(array('.jpg', '.jpeg', '.png'), '.avif', $file_path);
-            $webp_path = str_replace(array('.jpg', '.jpeg', '.png'), '.webp', $file_path);
+        // Get the best optimized image URL for display
+        $best_image_url = $this->get_best_optimized_image_url($image_id, 'large');
+        
+        // Calculate space saved from database
+        if ($is_optimized) {
+            global $wpdb;
+            $table_name = $wpdb->prefix . 'tomatillo_media_optimization';
+            $optimization_data = $wpdb->get_row($wpdb->prepare(
+                "SELECT * FROM {$table_name} WHERE attachment_id = %d AND status = 'completed'",
+                $image_id
+            ));
             
-            if (file_exists($avif_path)) {
-                $avif_url = str_replace(WP_CONTENT_DIR, content_url(), $avif_path);
-                $is_optimized = true;
-            }
-            
-            if (file_exists($webp_path)) {
-                $webp_url = str_replace(WP_CONTENT_DIR, content_url(), $webp_path);
-                $is_optimized = true;
-            }
-            
-            // Calculate space saved
-            if ($is_optimized) {
-                $original_size = filesize($file_path);
-                $optimized_size = $original_size;
-                
-                if (file_exists($avif_path)) {
-                    $optimized_size = min($optimized_size, filesize($avif_path));
-                }
-                if (file_exists($webp_path)) {
-                    $optimized_size = min($optimized_size, filesize($webp_path));
-                }
-                
-                $space_saved = max(0, $original_size - $optimized_size);
+            if ($optimization_data) {
+                $original_size = $optimization_data->original_size;
+                $smallest_optimized = min(
+                    $optimization_data->avif_size ?: PHP_INT_MAX,
+                    $optimization_data->webp_size ?: PHP_INT_MAX
+                );
+                $space_saved = max(0, $original_size - $smallest_optimized);
             }
         }
         
@@ -863,6 +861,7 @@ class Tomatillo_Media_Core {
             'date' => date('M j, Y', strtotime($image->post_date)),
             'uploader' => $uploader_name,
             'url' => $original_url,
+            'best_image_url' => $best_image_url, // Smallest optimized image for display
             'avif_url' => $avif_url,
             'webp_url' => $webp_url,
             'space_saved' => size_format($space_saved),
@@ -1213,5 +1212,123 @@ class Tomatillo_Media_Core {
         // Output file
         readfile($file_path);
         exit;
+    }
+    
+    /**
+     * Handle scheduled image conversion
+     */
+    public function handle_scheduled_conversion($attachment_id) {
+        // Get plugin instance
+        $plugin = tomatillo_media_studio();
+        if (!$plugin || !$plugin->optimization) {
+            return;
+        }
+        
+        // Process the conversion
+        $plugin->optimization->process_scheduled_conversion($attachment_id);
+    }
+    
+    /**
+     * Get optimized image URL for a specific format
+     */
+    public function get_optimized_image_url($attachment_id, $format) {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'tomatillo_media_optimization';
+        
+        // Get optimization data
+        $optimization_data = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM {$table_name} WHERE attachment_id = %d AND status = 'completed'",
+            $attachment_id
+        ));
+        
+        if (!$optimization_data) {
+            return null;
+        }
+        
+        // Get the optimized file path based on format
+        $optimized_path = null;
+        if ($format === 'avif' && $optimization_data->avif_path) {
+            $optimized_path = $optimization_data->avif_path;
+        } elseif ($format === 'webp' && $optimization_data->webp_path) {
+            $optimized_path = $optimization_data->webp_path;
+        }
+        
+        if (!$optimized_path || !file_exists($optimized_path)) {
+            return null;
+        }
+        
+        // Convert file path to URL
+        $upload_dir = wp_upload_dir();
+        $optimized_url = str_replace($upload_dir['basedir'], $upload_dir['baseurl'], $optimized_path);
+        
+        return $optimized_url;
+    }
+    
+    /**
+     * Get the smallest optimized image URL available (AVIF → WebP → scaled original)
+     */
+    public function get_best_optimized_image_url($attachment_id, $size = 'large') {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'tomatillo_media_optimization';
+        
+        // Get optimization data
+        $optimization_data = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM {$table_name} WHERE attachment_id = %d AND status = 'completed'",
+            $attachment_id
+        ));
+        
+        if (!$optimization_data) {
+            // No optimization data, return WordPress scaled image
+            return wp_get_attachment_image_url($attachment_id, $size);
+        }
+        
+        $upload_dir = wp_upload_dir();
+        $best_url = null;
+        $smallest_size = PHP_INT_MAX;
+        
+        // Check AVIF (best compression)
+        if ($optimization_data->avif_path && file_exists($optimization_data->avif_path)) {
+            $avif_size = $optimization_data->avif_size ?: filesize($optimization_data->avif_path);
+            if ($avif_size < $smallest_size) {
+                $smallest_size = $avif_size;
+                $best_url = str_replace($upload_dir['basedir'], $upload_dir['baseurl'], $optimization_data->avif_path);
+            }
+        }
+        
+        // Check WebP (good compression)
+        if ($optimization_data->webp_path && file_exists($optimization_data->webp_path)) {
+            $webp_size = $optimization_data->webp_size ?: filesize($optimization_data->webp_path);
+            if ($webp_size < $smallest_size) {
+                $smallest_size = $webp_size;
+                $best_url = str_replace($upload_dir['basedir'], $upload_dir['baseurl'], $optimization_data->webp_path);
+            }
+        }
+        
+        // If we found an optimized version, return it
+        if ($best_url) {
+            return $best_url;
+        }
+        
+        // Fallback to WordPress scaled image
+        return wp_get_attachment_image_url($attachment_id, $size);
+    }
+    
+    /**
+     * Trigger automatic conversion for an attachment
+     */
+    public function trigger_auto_conversion($attachment_id) {
+        // Get plugin instance
+        $plugin = tomatillo_media_studio();
+        if (!$plugin || !$plugin->optimization) {
+            return;
+        }
+        
+        // Log for debugging
+        $this->log('info', "Triggering auto-conversion for attachment ID: {$attachment_id}");
+        
+        // Schedule conversion
+        wp_schedule_single_event(time() + 2, 'tomatillo_auto_convert_image', array($attachment_id));
     }
 }

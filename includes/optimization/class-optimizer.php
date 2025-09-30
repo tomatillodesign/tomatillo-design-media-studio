@@ -53,6 +53,10 @@ class Tomatillo_Optimizer {
         add_action('init', array($this, 'init'));
         add_action('wp_ajax_tomatillo_test_conversion', array($this, 'ajax_test_conversion'));
         add_action('wp_ajax_tomatillo_convert_image', array($this, 'ajax_convert_image'));
+        
+        // Automatic conversion hooks
+        add_action('add_attachment', array($this, 'auto_convert_on_upload'));
+        add_action('wp_handle_upload', array($this, 'auto_convert_on_upload_handler'), 10, 2);
     }
     
     /**
@@ -566,5 +570,127 @@ class Tomatillo_Optimizer {
         }
         
         return $stats;
+    }
+    
+    /**
+     * Automatically convert image when uploaded via WordPress media library
+     */
+    public function auto_convert_on_upload($attachment_id) {
+        $settings = $this->get_settings();
+        if (!$settings || !$settings->is_optimization_enabled()) {
+            return;
+        }
+        
+        // Check if auto-convert is enabled
+        if (!$settings->get('auto_convert', true)) {
+            return;
+        }
+        
+        // Only process images
+        $mime_type = get_post_mime_type($attachment_id);
+        if (!in_array($mime_type, $this->supported_formats)) {
+            return;
+        }
+        
+        // Log for debugging
+        $plugin = tomatillo_media_studio();
+        if ($plugin && $plugin->core) {
+            $plugin->core->log('info', "Auto-convert triggered for attachment ID: {$attachment_id}, MIME: {$mime_type}");
+        }
+        
+        // Schedule conversion to avoid blocking upload
+        wp_schedule_single_event(time() + 5, 'tomatillo_auto_convert_image', array($attachment_id));
+    }
+    
+    /**
+     * Handle upload processing for drag and drop uploads
+     */
+    public function auto_convert_on_upload_handler($upload, $context) {
+        // Log for debugging
+        $plugin = tomatillo_media_studio();
+        if ($plugin && $plugin->core) {
+            $plugin->core->log('info', "Upload handler called with context: {$context}");
+        }
+        
+        // Only process if this is a media library upload
+        if ($context !== 'upload') {
+            return $upload;
+        }
+        
+        $settings = $this->get_settings();
+        if (!$settings || !$settings->is_optimization_enabled()) {
+            return $upload;
+        }
+        
+        // Check if auto-convert is enabled
+        if (!$settings->get('auto_convert', true)) {
+            return $upload;
+        }
+        
+        // Only process images
+        if (!isset($upload['type']) || !in_array($upload['type'], $this->supported_formats)) {
+            return $upload;
+        }
+        
+        // Log for debugging
+        if ($plugin && $plugin->core) {
+            $plugin->core->log('info', "Processing upload: {$upload['type']}");
+        }
+        
+        // Store upload info for later processing
+        if (!isset($upload['error']) && isset($upload['file'])) {
+            // Schedule conversion after WordPress processes the attachment
+            add_action('wp_generate_attachment_metadata', array($this, 'schedule_upload_conversion'), 10, 2);
+        }
+        
+        return $upload;
+    }
+    
+    /**
+     * Schedule conversion for uploaded files
+     */
+    public function schedule_upload_conversion($metadata, $attachment_id) {
+        // Remove the hook to prevent multiple calls
+        remove_action('wp_generate_attachment_metadata', array($this, 'schedule_upload_conversion'));
+        
+        // Log for debugging
+        $plugin = tomatillo_media_studio();
+        if ($plugin && $plugin->core) {
+            $plugin->core->log('info', "Scheduling upload conversion for attachment ID: {$attachment_id}");
+        }
+        
+        // Schedule conversion
+        wp_schedule_single_event(time() + 2, 'tomatillo_auto_convert_image', array($attachment_id));
+        
+        return $metadata;
+    }
+    
+    /**
+     * Process scheduled conversion
+     */
+    public function process_scheduled_conversion($attachment_id) {
+        $settings = $this->get_settings();
+        if (!$settings || !$settings->is_optimization_enabled()) {
+            return;
+        }
+        
+        // Get plugin instance for logging
+        $plugin = tomatillo_media_studio();
+        if (!$plugin) {
+            return;
+        }
+        
+        $plugin->core->log('info', "Processing scheduled conversion for attachment ID: {$attachment_id}");
+        
+        // Convert the image
+        $result = $this->convert_image($attachment_id);
+        
+        if ($result['success']) {
+            // Store result in database
+            $this->store_conversion_result($result);
+            $plugin->core->log('info', "✅ Auto-conversion completed for ID: {$attachment_id}");
+        } else {
+            $plugin->core->log('warning', "❌ Auto-conversion failed for ID: {$attachment_id} - {$result['message']}");
+        }
     }
 }

@@ -224,7 +224,8 @@ $has_more = count($images) === $images_per_page;
             <?php else: ?>
                 <?php foreach ($images as $image): ?>
                     <?php
-                    $image_url = wp_get_attachment_image_url($image->ID, 'large');
+                    // Use the smallest optimized image available (AVIF → WebP → scaled original)
+                    $image_url = ($plugin->core) ? $plugin->core->get_best_optimized_image_url($image->ID, 'large') : wp_get_attachment_image_url($image->ID, 'large');
                     $image_alt = get_post_meta($image->ID, '_wp_attachment_image_alt', true);
                     $image_title = $image->post_title ?: $image->post_name;
                     $image_date = $image->post_date;
@@ -264,17 +265,6 @@ $has_more = count($images) === $images_per_page;
                                         </p>
                                     </div>
                                     
-                                    <div class="image-actions">
-                                        <button class="action-btn view-btn" title="View">
-                                            <span>👁️</span>
-                                        </button>
-                                        <button class="action-btn edit-btn" title="Edit">
-                                            <span>✏️</span>
-                                        </button>
-                                        <button class="action-btn download-btn" title="Download">
-                                            <span>⬇️</span>
-                                        </button>
-                                    </div>
                                 </div>
                                 
                                 <!-- Hover Info Overlay - Only show if there's content -->
@@ -342,17 +332,10 @@ $has_more = count($images) === $images_per_page;
                                 }
                                 
                                 // Only show hover overlay if there's actual content
-                                if ($optimized_info || $attachment_info):
+                                if ($attachment_info):
                                 ?>
                                 <div class="hover-info-overlay">
                                     <div class="hover-info-content">
-                                        <?php if ($optimized_info): ?>
-                                            <div class="hover-info-item">
-                                                <span class="hover-info-label">Optimized:</span>
-                                                <span class="hover-info-value"><?php echo esc_html($optimized_info); ?></span>
-                                            </div>
-                                        <?php endif; ?>
-                                        
                                         <?php if ($attachment_info): ?>
                                             <div class="hover-info-item">
                                                 <span class="hover-info-label"><?php echo esc_html($attachment_info); ?></span>
@@ -1007,9 +990,6 @@ $has_more = count($images) === $images_per_page;
 }
 
 /* Hide action buttons on hover */
-.gallery-item:hover .image-actions {
-    display: none;
-}
 
 /* Hover Info Overlay */
 .hover-info-overlay {
@@ -1083,32 +1063,6 @@ $has_more = count($images) === $images_per_page;
     margin: 0;
 }
 
-.image-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.action-btn {
-    background: rgba(255, 255, 255, 0.9);
-    border: none;
-    color: #333;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-
-.action-btn:hover {
-    background: rgba(255, 255, 255, 1);
-    transform: scale(1.05);
-}
 
 /* Optimization Badge */
 .optimization-badge {
@@ -2654,25 +2608,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             const imageId = galleryItem.dataset.id;
-            const actionBtn = e.target.closest('.action-btn');
             
-            if (actionBtn) {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                if (actionBtn.classList.contains('view-btn')) {
-                    openModal(imageId);
-                } else if (actionBtn.classList.contains('edit-btn')) {
-                    openModal(imageId);
-                } else if (actionBtn.classList.contains('download-btn')) {
-                    downloadImage(imageId);
-                } else if (actionBtn.classList.contains('optimize-btn')) {
-                    optimizeImage(imageId);
-                }
-            } else {
-                // Click on image - open modal
-                openModal(imageId);
-            }
+            // Click on image - open modal
+            openModal(imageId);
         });
     }
     
@@ -2706,8 +2644,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Store data globally for image click
         currentImageData = data;
         
-        // Image - use original URL for display (not optimized version)
-        document.getElementById('modal-image').src = data.url;
+        // Image - use optimized image for display
+        document.getElementById('modal-image').src = data.best_image_url || data.url;
         document.getElementById('modal-image').alt = data.alt_text || '';
         
         // Modal title (use uploaded filename or title)
@@ -3143,11 +3081,6 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    const badge = document.querySelector(`[data-id="${imageId}"] .optimization-badge`);
-                    if (badge) {
-                        badge.innerHTML = '<span class="badge optimized">✓ Optimized</span>';
-                    }
-                    
                     if (optimizeBtn) {
                         optimizeBtn.style.display = 'none';
                     }

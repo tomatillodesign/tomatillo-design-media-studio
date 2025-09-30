@@ -71,6 +71,10 @@ $recent_images = get_posts(array(
                         <td><?php echo tomatillo_media_studio()->settings->get_webp_quality(); ?>%</td>
                     </tr>
                     <tr>
+                        <td><strong><?php _e('Auto-Convert on Upload', 'tomatillo-media-studio'); ?></strong></td>
+                        <td><?php echo tomatillo_media_studio()->settings->get('auto_convert', true) ? '<span style="color: green;">✓ ' . __('Enabled', 'tomatillo-media-studio') . '</span>' : '<span style="color: red;">✗ ' . __('Disabled', 'tomatillo-media-studio') . '</span>'; ?></td>
+                    </tr>
+                    <tr>
                         <td><strong><?php _e('Minimum Savings Threshold', 'tomatillo-media-studio'); ?></strong></td>
                         <td><?php echo tomatillo_media_studio()->settings->get_min_savings_threshold(); ?>%</td>
                     </tr>
@@ -84,6 +88,32 @@ $recent_images = get_posts(array(
                     </tr>
                 </tbody>
             </table>
+        </div>
+        
+        <!-- Automatic Conversion Status -->
+        <div class="card">
+            <h2><?php _e('Automatic Conversion Status', 'tomatillo-media-studio'); ?></h2>
+            <div style="background: #f0f8ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h3 style="margin-top: 0;"><?php _e('Upload Processing', 'tomatillo-media-studio'); ?></h3>
+                <p><?php _e('Images uploaded via the WordPress media library (including drag and drop) will be automatically converted to AVIF and WebP formats if:', 'tomatillo-media-studio'); ?></p>
+                <ul>
+                    <li><?php _e('Auto-convert is enabled (currently:', 'tomatillo-media-studio'); ?> <strong><?php echo tomatillo_media_studio()->settings->get('auto_convert', true) ? __('Yes', 'tomatillo-media-studio') : __('No', 'tomatillo-media-studio'); ?></strong>)</li>
+                    <li><?php _e('The image meets size and format requirements', 'tomatillo-media-studio'); ?></li>
+                    <li><?php _e('The conversion provides sufficient space savings', 'tomatillo-media-studio'); ?></li>
+                </ul>
+                
+                <?php if (tomatillo_media_studio()->settings->get('auto_convert', true)): ?>
+                    <div style="background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 4px; margin-top: 15px;">
+                        <strong><?php _e('✓ Automatic conversion is active!', 'tomatillo-media-studio'); ?></strong><br>
+                        <?php _e('New image uploads will be automatically optimized.', 'tomatillo-media-studio'); ?>
+                    </div>
+                <?php else: ?>
+                    <div style="background: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 4px; margin-top: 15px;">
+                        <strong><?php _e('⚠ Automatic conversion is disabled', 'tomatillo-media-studio'); ?></strong><br>
+                        <?php _e('Enable auto-convert in settings to automatically optimize new uploads.', 'tomatillo-media-studio'); ?>
+                    </div>
+                <?php endif; ?>
+            </div>
         </div>
         
         <!-- Conversion Statistics -->
