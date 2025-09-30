@@ -30,11 +30,12 @@ class Tomatillo_Media_Core {
         add_action('wp_ajax_tomatillo_get_optimization_stats', array($this, 'ajax_get_optimization_stats'));
         add_action('wp_ajax_tomatillo_load_more_images', array($this, 'ajax_load_more_images'));
         add_action('wp_ajax_tomatillo_optimize_image', array($this, 'ajax_optimize_image'));
-        add_action('wp_ajax_tomatillo_upload_images', array($this, 'ajax_upload_images'));
+        add_action('wp_ajax_tomatillo_upload_files', array($this, 'ajax_upload_files'));
         add_action('wp_ajax_tomatillo_get_image_data', array($this, 'ajax_get_image_data'));
         add_action('wp_ajax_tomatillo_save_image_metadata', array($this, 'ajax_save_image_metadata'));
         add_action('wp_ajax_tomatillo_delete_image', array($this, 'ajax_delete_image'));
         add_action('wp_ajax_tomatillo_delete_images', array($this, 'ajax_delete_images'));
+        add_action('wp_ajax_tomatillo_download_file', array($this, 'ajax_download_file'));
     }
     
     /**
@@ -706,7 +707,7 @@ class Tomatillo_Media_Core {
     /**
      * AJAX handler for uploading images
      */
-    public function ajax_upload_images() {
+    public function ajax_upload_files() {
         // Check permissions
         if (!current_user_can('upload_files')) {
             wp_send_json_error('Insufficient permissions');
@@ -1171,5 +1172,46 @@ class Tomatillo_Media_Core {
         // This will be implemented with background processing
         // For now, just log the action
         $this->log('Bulk optimization started', 'info');
+    }
+    
+    /**
+     * AJAX handler for downloading files
+     */
+    public function ajax_download_file() {
+        // Verify nonce
+        if (!wp_verify_nonce($_GET['nonce'], 'tomatillo_download_file')) {
+            wp_die('Security check failed');
+        }
+        
+        // Check permissions
+        if (!current_user_can('upload_files')) {
+            wp_die('Insufficient permissions');
+        }
+        
+        $file_id = intval($_GET['file_id']);
+        if (!$file_id) {
+            wp_die('Invalid file ID');
+        }
+        
+        // Get file path
+        $file_path = get_attached_file($file_id);
+        if (!$file_path || !file_exists($file_path)) {
+            wp_die('File not found');
+        }
+        
+        // Get file info
+        $file_name = basename($file_path);
+        $file_type = get_post_mime_type($file_id);
+        
+        // Set headers for download
+        header('Content-Type: ' . $file_type);
+        header('Content-Disposition: attachment; filename="' . $file_name . '"');
+        header('Content-Length: ' . filesize($file_path));
+        header('Cache-Control: no-cache, must-revalidate');
+        header('Expires: Sat, 26 Jul 1997 05:00:00 GMT');
+        
+        // Output file
+        readfile($file_path);
+        exit;
     }
 }
