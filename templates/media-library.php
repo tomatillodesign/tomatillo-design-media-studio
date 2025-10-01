@@ -330,10 +330,10 @@ $has_more = count($images) === $images_per_page;
                                 class="gallery-image"
                             >
                             
-                            <!-- Optimized Icon -->
+                            <!-- Optimized Watermark -->
                             <?php if ($is_optimized): ?>
-                                <div class="optimized-icon">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <div class="optimized-watermark">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                                         <polygon points="13,2 3,14 12,14 11,22 21,10 12,10"></polygon>
                                     </svg>
                                 </div>
@@ -648,6 +648,12 @@ $has_more = count($images) === $images_per_page;
                                 <span class="dashicons dashicons-chart-line badge-icon"></span>
                                 <span class="badge-label">Space Saved:</span>
                                 <span class="badge-text" id="modal-space-saved">0 B</span>
+                            </div>
+                            <div class="debug-button-group">
+                                <button type="button" class="debug-image-btn" onclick="debugImage()">
+                                    <span class="dashicons dashicons-search badge-icon"></span>
+                                    <span class="badge-label">Debug Image</span>
+                                </button>
                             </div>
                         </div>
                         
@@ -3257,6 +3263,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function openModal(imageId) {
         currentImageId = imageId;
+        window.currentImageId = imageId; // Set global variable for debug function
         const modal = document.getElementById('image-modal');
         
         // Load image data
@@ -3394,6 +3401,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const modal = document.getElementById('image-modal');
         modal.classList.remove('active');
         currentImageId = null;
+        window.currentImageId = null; // Clear global variable
         
         // Remove keyboard event listeners
         document.removeEventListener('keydown', handleKeyboard);
@@ -4028,6 +4036,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Exit bulk mode
                     exitBulkMode();
+                    
+                    // Reload page after a short delay to prevent broken state
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
                 } else {
                     showToast(data.data || 'Failed to delete images', 'error');
                 }
@@ -4113,4 +4126,135 @@ document.addEventListener('DOMContentLoaded', function() {
         initializeHashNavigation();
     }, 100);
 });
+
+// Global debug function for image optimization troubleshooting
+function debugImage() {
+    if (!window.currentImageId) {
+        alert('No image selected. Please open an image modal first.');
+        return;
+    }
+    
+    console.log('Debugging image ID:', window.currentImageId);
+    
+    fetch(`<?php echo admin_url('admin-ajax.php'); ?>?action=tomatillo_debug_image&image_id=${window.currentImageId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('Debug Info:', data.data);
+                
+                // Create a debug modal
+                const debugModal = document.createElement('div');
+                debugModal.className = 'debug-modal';
+                debugModal.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0,0,0,0.8);
+                    z-index: 10000;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                `;
+                
+                const debugContent = document.createElement('div');
+                debugContent.style.cssText = `
+                    background: white;
+                    padding: 30px;
+                    border-radius: 8px;
+                    max-width: 600px;
+                    max-height: 80vh;
+                    overflow-y: auto;
+                    font-family: monospace;
+                    font-size: 12px;
+                    line-height: 1.4;
+                `;
+                
+                const debugInfo = data.data;
+                let html = '<h3>Image Debug Information</h3>';
+                html += `<p><strong>Image ID:</strong> ${debugInfo.image_id}</p>`;
+                
+                html += '<h4>Checks:</h4>';
+                html += `<p><strong>Image Exists:</strong> ${debugInfo.checks.image_exists ? '✅ Yes' : '❌ No'}</p>`;
+                html += `<p><strong>Is Optimized:</strong> ${debugInfo.checks.is_optimized ? '✅ Yes' : '❌ No'}</p>`;
+                
+                html += '<h4>Files:</h4>';
+                html += `<p><strong>Original Path:</strong> ${debugInfo.files.original_path || 'N/A'}</p>`;
+                html += `<p><strong>Original Exists:</strong> ${debugInfo.files.original_exists ? '✅ Yes' : '❌ No'}</p>`;
+                html += `<p><strong>Original Size:</strong> ${debugInfo.files.original_size ? (debugInfo.files.original_size / 1024).toFixed(1) + ' KB' : 'N/A'}</p>`;
+                html += `<p><strong>AVIF Path:</strong> ${debugInfo.files.avif_path || 'N/A'}</p>`;
+                html += `<p><strong>AVIF Exists:</strong> ${debugInfo.files.avif_exists ? '✅ Yes' : '❌ No'}</p>`;
+                html += `<p><strong>AVIF Size:</strong> ${debugInfo.files.avif_size ? (debugInfo.files.avif_size / 1024).toFixed(1) + ' KB' : 'N/A'}</p>`;
+                html += `<p><strong>WebP Path:</strong> ${debugInfo.files.webp_path || 'N/A'}</p>`;
+                html += `<p><strong>WebP Exists:</strong> ${debugInfo.files.webp_exists ? '✅ Yes' : '❌ No'}</p>`;
+                html += `<p><strong>WebP Size:</strong> ${debugInfo.files.webp_size ? (debugInfo.files.webp_size / 1024).toFixed(1) + ' KB' : 'N/A'}</p>`;
+                
+                html += '<h4>Database:</h4>';
+                html += `<p><strong>Has Record:</strong> ${debugInfo.database.has_record ? '✅ Yes' : '❌ No'}</p>`;
+                if (debugInfo.database.has_record) {
+                    html += `<p><strong>Status:</strong> ${debugInfo.database.status || 'N/A'}</p>`;
+                    html += `<p><strong>DB AVIF Path:</strong> ${debugInfo.database.avif_path || 'N/A'}</p>`;
+                    html += `<p><strong>DB WebP Path:</strong> ${debugInfo.database.webp_path || 'N/A'}</p>`;
+                }
+                
+                html += '<h4>Settings:</h4>';
+                html += `<p><strong>AVIF Enabled:</strong> ${debugInfo.settings.avif_enabled ? '✅ Yes' : '❌ No'}</p>`;
+                html += `<p><strong>WebP Enabled:</strong> ${debugInfo.settings.webp_enabled ? '✅ Yes' : '❌ No'}</p>`;
+                html += `<p><strong>Optimization Enabled:</strong> ${debugInfo.settings.optimization_enabled ? '✅ Yes' : '❌ No'}</p>`;
+                html += `<p><strong>AVIF Quality:</strong> ${debugInfo.settings.avif_quality || 'N/A'}</p>`;
+                html += `<p><strong>WebP Quality:</strong> ${debugInfo.settings.webp_quality || 'N/A'}</p>`;
+                
+                // Add fix button if files exist but no database record
+                if ((debugInfo.files.avif_exists || debugInfo.files.webp_exists) && !debugInfo.database.has_record) {
+                    html += '<br><button onclick="fixImageDatabase()" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">Fix Database Record</button>';
+                }
+                
+                html += '<br><button onclick="this.parentElement.parentElement.remove()" style="padding: 10px 20px; background: #007cba; color: white; border: none; border-radius: 4px; cursor: pointer;">Close Debug</button>';
+                
+                debugContent.innerHTML = html;
+                debugModal.appendChild(debugContent);
+                document.body.appendChild(debugModal);
+                
+            } else {
+                alert('Debug failed: ' + (data.data || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Debug error:', error);
+            alert('Debug error: ' + error.message);
+        });
+}
+
+// Global function to fix image database record
+function fixImageDatabase() {
+    if (!window.currentImageId) {
+        alert('No image selected.');
+        return;
+    }
+    
+    if (!confirm('This will create a database record for the existing optimized files. Continue?')) {
+        return;
+    }
+    
+    fetch(`<?php echo admin_url('admin-ajax.php'); ?>?action=tomatillo_fix_image_database&image_id=${window.currentImageId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Database record created successfully! The AVIF/WebP URLs should now appear in the modal.');
+                // Close debug modal and refresh image modal
+                document.querySelector('.debug-modal').remove();
+                // Reload the image data to show the new URLs
+                if (typeof loadImageData === 'function') {
+                    loadImageData(window.currentImageId).then(populateModal);
+                }
+            } else {
+                alert('Failed to create database record: ' + (data.data || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Fix database error:', error);
+            alert('Error: ' + error.message);
+        });
+}
 </script>

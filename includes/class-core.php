@@ -32,6 +32,9 @@ class Tomatillo_Media_Core {
         add_action('wp_ajax_tomatillo_optimize_image', array($this, 'ajax_optimize_image'));
         add_action('wp_ajax_tomatillo_upload_files', array($this, 'ajax_upload_files'));
         add_action('wp_ajax_tomatillo_upload_single_file', array($this, 'ajax_upload_single_file'));
+        add_action('wp_ajax_tomatillo_debug_image', array($this, 'ajax_debug_image'));
+        add_action('wp_ajax_tomatillo_fix_image_database', array($this, 'ajax_fix_image_database'));
+        add_action('wp_ajax_tomatillo_trigger_scheduled_conversion', array($this, 'ajax_trigger_scheduled_conversion'));
         add_action('wp_ajax_tomatillo_get_image_data', array($this, 'ajax_get_image_data'));
         add_action('wp_ajax_tomatillo_save_image_metadata', array($this, 'ajax_save_image_metadata'));
         add_action('wp_ajax_tomatillo_delete_image', array($this, 'ajax_delete_image'));
@@ -845,6 +848,196 @@ class Tomatillo_Media_Core {
     }
     
     /**
+     * AJAX handler for debugging image optimization
+     */
+    public function ajax_debug_image() {
+        // Check permissions
+        if (!current_user_can('upload_files')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+        
+        $image_id = intval($_GET['image_id']);
+        if (!$image_id) {
+            wp_send_json_error('Invalid image ID');
+        }
+        
+        $debug_info = array(
+            'image_id' => $image_id,
+            'checks' => array(),
+            'files' => array(),
+            'database' => array(),
+            'settings' => array()
+        );
+        
+        // Check if image exists
+        $image = get_post($image_id);
+        if (!$image || $image->post_type !== 'attachment') {
+            $debug_info['checks']['image_exists'] = false;
+            wp_send_json_success($debug_info);
+        }
+        $debug_info['checks']['image_exists'] = true;
+        
+        // Get file path
+        $file_path = get_attached_file($image_id);
+        $debug_info['files']['original_path'] = $file_path;
+        $debug_info['files']['original_exists'] = file_exists($file_path);
+        
+        if ($file_path) {
+            $debug_info['files']['original_size'] = file_exists($file_path) ? filesize($file_path) : 0;
+            
+            // Check for AVIF/WebP files
+            $path_info = pathinfo($file_path);
+            $dir = $path_info['dirname'];
+            $filename = $path_info['filename'];
+            
+            $avif_path = $dir . '/' . $filename . '.avif';
+            $webp_path = $dir . '/' . $filename . '.webp';
+            
+            $debug_info['files']['avif_path'] = $avif_path;
+            $debug_info['files']['avif_exists'] = file_exists($avif_path);
+            $debug_info['files']['avif_size'] = file_exists($avif_path) ? filesize($avif_path) : 0;
+            
+            $debug_info['files']['webp_path'] = $webp_path;
+            $debug_info['files']['webp_exists'] = file_exists($webp_path);
+            $debug_info['files']['webp_size'] = file_exists($webp_path) ? filesize($webp_path) : 0;
+        }
+        
+        // Check database records
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'tomatillo_media_optimization';
+        
+        $optimization_data = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM {$table_name} WHERE attachment_id = %d",
+            $image_id
+        ));
+        
+        $debug_info['database']['has_record'] = !empty($optimization_data);
+        if ($optimization_data) {
+            $debug_info['database']['status'] = $optimization_data->status;
+            $debug_info['database']['avif_path'] = $optimization_data->avif_path;
+            $debug_info['database']['webp_path'] = $optimization_data->webp_path;
+            $debug_info['database']['avif_size'] = $optimization_data->avif_size;
+            $debug_info['database']['webp_size'] = $optimization_data->webp_size;
+        }
+        
+        // Check settings
+        $plugin = tomatillo_media_studio();
+        if ($plugin && $plugin->settings) {
+            $settings = $plugin->settings;
+            $debug_info['settings']['avif_enabled'] = $settings->is_avif_enabled();
+            $debug_info['settings']['webp_enabled'] = $settings->is_webp_enabled();
+            $debug_info['settings']['optimization_enabled'] = $settings->is_optimization_enabled();
+            $debug_info['settings']['avif_quality'] = $settings->get_avif_quality();
+            $debug_info['settings']['webp_quality'] = $settings->get_webp_quality();
+        }
+        
+        // Check if image is considered optimized
+        $debug_info['checks']['is_optimized'] = $this->is_image_optimized($image_id);
+        
+        wp_send_json_success($debug_info);
+    }
+    
+    /**
+     * AJAX handler for fixing image database records
+     */
+    public function ajax_fix_image_database() {
+        // Check permissions
+        if (!current_user_can('upload_files')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+        
+        $image_id = intval($_GET['image_id']);
+        if (!$image_id) {
+            wp_send_json_error('Invalid image ID');
+        }
+        
+        // Check if image exists
+        $image = get_post($image_id);
+        if (!$image || $image->post_type !== 'attachment') {
+            wp_send_json_error('Image not found');
+        }
+        
+        // Get file path
+        $file_path = get_attached_file($image_id);
+        if (!$file_path || !file_exists($file_path)) {
+            wp_send_json_error('Original file not found');
+        }
+        
+        $original_size = filesize($file_path);
+        $path_info = pathinfo($file_path);
+        $dir = $path_info['dirname'];
+        $filename = $path_info['filename'];
+        
+        // Check for AVIF/WebP files
+        $avif_path = $dir . '/' . $filename . '.avif';
+        $webp_path = $dir . '/' . $filename . '.webp';
+        
+        $avif_exists = file_exists($avif_path);
+        $webp_exists = file_exists($webp_path);
+        
+        if (!$avif_exists && !$webp_exists) {
+            wp_send_json_error('No optimized files found');
+        }
+        
+        // Create database record
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'tomatillo_media_optimization';
+        
+        $data = array(
+            'attachment_id' => $image_id,
+            'original_format' => strtolower($path_info['extension']),
+            'original_size' => $original_size,
+            'avif_path' => $avif_exists ? $avif_path : null,
+            'webp_path' => $webp_exists ? $webp_path : null,
+            'avif_size' => $avif_exists ? filesize($avif_path) : null,
+            'webp_size' => $webp_exists ? filesize($webp_path) : null,
+            'status' => 'completed'
+        );
+        
+        $result = $wpdb->insert($table_name, $data);
+        
+        if ($result === false) {
+            wp_send_json_error('Failed to insert database record');
+        }
+        
+        wp_send_json_success(array(
+            'message' => 'Database record created successfully',
+            'avif_exists' => $avif_exists,
+            'webp_exists' => $webp_exists
+        ));
+    }
+    
+    /**
+     * AJAX handler for triggering scheduled conversion manually
+     */
+    public function ajax_trigger_scheduled_conversion() {
+        // Check permissions
+        if (!current_user_can('upload_files')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+        
+        $image_id = intval($_GET['image_id']);
+        if (!$image_id) {
+            wp_send_json_error('Invalid image ID');
+        }
+        
+        // Get plugin instance
+        $plugin = tomatillo_media_studio();
+        if (!$plugin || !$plugin->optimization) {
+            wp_send_json_error('Plugin or optimization module not available');
+        }
+        
+        // Trigger the scheduled conversion manually
+        $this->log('info', "Manually triggering scheduled conversion for image ID: {$image_id}");
+        $plugin->optimization->process_scheduled_conversion($image_id);
+        
+        wp_send_json_success(array(
+            'message' => 'Scheduled conversion triggered successfully',
+            'image_id' => $image_id
+        ));
+    }
+    
+    /**
      * AJAX handler for getting image data
      */
     public function ajax_get_image_data() {
@@ -1408,10 +1601,12 @@ class Tomatillo_Media_Core {
         }
         
         // Log for debugging
-        $this->log('info', "Triggering auto-conversion for attachment ID: {$attachment_id}");
+        $this->log('info', "Triggering immediate conversion for attachment ID: {$attachment_id}");
         
-        // Schedule conversion
-        wp_schedule_single_event(time() + 2, 'tomatillo_auto_convert_image', array($attachment_id));
+        // Process conversion immediately instead of scheduling
+        if ($plugin && $plugin->optimization) {
+            $plugin->optimization->process_immediate_conversion($attachment_id);
+        }
     }
     
     /**
