@@ -31,6 +31,7 @@ class Tomatillo_Media_Core {
         add_action('wp_ajax_tomatillo_load_more_images', array($this, 'ajax_load_more_images'));
         add_action('wp_ajax_tomatillo_optimize_image', array($this, 'ajax_optimize_image'));
         add_action('wp_ajax_tomatillo_upload_files', array($this, 'ajax_upload_files'));
+        add_action('wp_ajax_tomatillo_upload_single_file', array($this, 'ajax_upload_single_file'));
         add_action('wp_ajax_tomatillo_get_image_data', array($this, 'ajax_get_image_data'));
         add_action('wp_ajax_tomatillo_save_image_metadata', array($this, 'ajax_save_image_metadata'));
         add_action('wp_ajax_tomatillo_delete_image', array($this, 'ajax_delete_image'));
@@ -767,6 +768,83 @@ class Tomatillo_Media_Core {
     }
     
     /**
+     * AJAX handler for uploading a single file with progress tracking
+     */
+    public function ajax_upload_single_file() {
+        // Check permissions
+        if (!current_user_can('upload_files')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+        
+        if (!isset($_FILES['file'])) {
+            wp_send_json_error('No file uploaded');
+        }
+        
+        $file = $_FILES['file'];
+        
+        // Validate file
+        if ($file['error'] !== UPLOAD_ERR_OK) {
+            wp_send_json_error('File upload error: ' . $file['error']);
+        }
+        
+        // Check file type
+        $allowed_types = array('image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/avif');
+        if (!in_array($file['type'], $allowed_types)) {
+            wp_send_json_error('Invalid file type. Only images are allowed.');
+        }
+        
+        // Check file size (10MB limit)
+        if ($file['size'] > 10 * 1024 * 1024) {
+            wp_send_json_error('File too large. Maximum size is 10MB.');
+        }
+        
+        try {
+            // Handle upload
+            $upload_result = wp_handle_upload($file, array('test_form' => false));
+            
+            if ($upload_result && !isset($upload_result['error'])) {
+                // Create attachment
+                $attachment = array(
+                    'post_mime_type' => $upload_result['type'],
+                    'post_title' => sanitize_file_name(pathinfo($upload_result['file'], PATHINFO_FILENAME)),
+                    'post_content' => '',
+                    'post_status' => 'inherit'
+                );
+                
+                $attachment_id = wp_insert_attachment($attachment, $upload_result['file']);
+                
+                if (!is_wp_error($attachment_id)) {
+                    // Generate metadata
+                    require_once(ABSPATH . 'wp-admin/includes/image.php');
+                    $attachment_data = wp_generate_attachment_metadata($attachment_id, $upload_result['file']);
+                    wp_update_attachment_metadata($attachment_id, $attachment_data);
+                    
+                    // Trigger automatic conversion
+                    $this->trigger_auto_conversion($attachment_id);
+                    
+                    // Get file info for response
+                    $file_size = filesize($upload_result['file']);
+                    $file_size_formatted = size_format($file_size);
+                    
+                    wp_send_json_success(array(
+                        'attachment_id' => $attachment_id,
+                        'filename' => basename($upload_result['file']),
+                        'file_size' => $file_size,
+                        'file_size_formatted' => $file_size_formatted,
+                        'message' => 'File uploaded successfully'
+                    ));
+                } else {
+                    wp_send_json_error('Failed to create attachment: ' . $attachment_id->get_error_message());
+                }
+            } else {
+                wp_send_json_error('Upload failed: ' . ($upload_result['error'] ?? 'Unknown error'));
+            }
+        } catch (Exception $e) {
+            wp_send_json_error('Upload exception: ' . $e->getMessage());
+        }
+    }
+    
+    /**
      * AJAX handler for getting image data
      */
     public function ajax_get_image_data() {
@@ -1369,5 +1447,54 @@ class Tomatillo_Media_Core {
         }
         
         return $result;
+    }
+    
+    /**
+     * Optimize a single image (used by bulk operations)
+     */
+    public function optimize_image($attachment_id) {
+        // Get plugin instance
+        $plugin = tomatillo_media_studio();
+        if (!$plugin || !$plugin->optimization) {
+            return array(
+                'success' => false,
+                'error' => 'Optimization module not available'
+            );
+        }
+        
+        try {
+            // Use the optimization module to convert the image
+            $result = $plugin->optimization->convert_image($attachment_id);
+            
+            if ($result && isset($result['success']) && $result['success']) {
+                // Calculate space saved
+                $space_saved = $this->calculate_image_savings($attachment_id);
+                $original_size = filesize(get_attached_file($attachment_id));
+                $savings_percent = $original_size > 0 ? round(($space_saved / $original_size) * 100, 1) : 0;
+                
+                return array(
+                    'success' => true,
+                    'space_saved' => $space_saved,
+                    'savings_percent' => $savings_percent,
+                    'message' => $result['message'] ?? 'Image optimized successfully'
+                );
+            } else {
+                return array(
+                    'success' => false,
+                    'error' => $result['error'] ?? $result['message'] ?? 'Optimization failed'
+                );
+            }
+            
+        } catch (Exception $e) {
+            return array(
+                'success' => false,
+                'error' => 'Exception: ' . $e->getMessage()
+            );
+        } catch (Error $e) {
+            return array(
+                'success' => false,
+                'error' => 'Error: ' . $e->getMessage()
+            );
+        }
     }
 }

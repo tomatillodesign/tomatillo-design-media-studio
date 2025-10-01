@@ -107,6 +107,22 @@
         $('.tomatillo-refresh-stats').on('click', function() {
             refreshOptimizationStats();
         });
+        
+        // Initialize bulk optimization if on tools page
+        if ($('#bulk-progress-panel').length) {
+            initBulkOptimizationTools();
+        }
+    }
+    
+    /**
+     * Initialize bulk optimization tools functionality
+     */
+    function initBulkOptimizationTools() {
+        // This will be handled by the inline script in tools-page.php
+        // We just need to make sure ajaxurl is available
+        if (typeof ajaxurl === 'undefined') {
+            window.ajaxurl = tomatilloMediaStudio.ajaxUrl;
+        }
     }
     
     /**

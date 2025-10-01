@@ -314,6 +314,35 @@
     border-radius: 10px;
 }
 
+/* Optimized Icon Styles */
+.optimized-icon {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 10;
+    opacity: 0;
+    transform: scale(0.8);
+    transition: all 0.2s ease;
+    pointer-events: none;
+}
+
+.optimized-icon svg {
+    color: #666;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 50%;
+    padding: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    width: 14px;
+    height: 14px;
+}
+
+.gallery-item:hover .optimized-icon {
+    opacity: 1;
+    transform: scale(1);
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
     .tomatillo-stats-grid {
@@ -333,5 +362,16 @@
     .tomatillo-media-grid {
         grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
         gap: 15px;
+    }
+    
+    .optimized-icon {
+        top: 6px;
+        right: 6px;
+    }
+    
+    .optimized-icon svg {
+        width: 12px;
+        height: 12px;
+        padding: 3px;
     }
 }

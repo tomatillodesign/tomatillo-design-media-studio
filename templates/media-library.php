@@ -330,6 +330,15 @@ $has_more = count($images) === $images_per_page;
                                 class="gallery-image"
                             >
                             
+                            <!-- Optimized Icon -->
+                            <?php if ($is_optimized): ?>
+                                <div class="optimized-icon">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polygon points="13,2 3,14 12,14 11,22 21,10 12,10"></polygon>
+                                    </svg>
+                                </div>
+                            <?php endif; ?>
+                            
                             <!-- Overlay -->
                             <div class="image-overlay">
                                 <div class="overlay-content">
@@ -1018,21 +1027,39 @@ $has_more = count($images) === $images_per_page;
 
 .upload-file-item {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid #f3f4f6;
+    flex-direction: column;
+    padding: 15px;
+    border-bottom: 1px solid #e1e1e1;
+    background: #fafafa;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.upload-file-item.completed {
+    background: #f8f9fa;
+    opacity: 0.8;
+    border-left: 3px solid #28a745;
+}
+
+.upload-file-item.uploading {
+    background: #e3f2fd !important;
+    border-left: 3px solid #007cba;
+    box-shadow: 0 2px 8px rgba(0, 124, 186, 0.2);
+    transform: scale(1.02);
+    border-radius: 8px !important;
 }
 
 .upload-file-item:last-child {
     border-bottom: none;
+    margin-bottom: 0;
 }
 
 .upload-file-name {
     font-size: 0.875rem;
     color: #374151;
-    flex: 1;
-    margin-right: 1rem;
+    font-weight: 500;
+    margin-bottom: 8px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1040,29 +1067,59 @@ $has_more = count($images) === $images_per_page;
 
 .upload-file-status {
     font-size: 0.75rem;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
+    padding: 4px 8px;
+    border-radius: 12px;
     font-weight: 500;
+    min-width: 60px;
+    text-align: center;
+    margin-bottom: 8px;
+    align-self: flex-start;
 }
 
 .upload-file-status.pending {
-    background: #fef3c7;
-    color: #92400e;
+    background: #fff3cd;
+    color: #856404;
 }
 
 .upload-file-status.uploading {
-    background: #dbeafe;
-    color: #1e40af;
+    background: #cce5ff;
+    color: #004085;
+    animation: pulse 1.5s ease-in-out infinite;
 }
 
 .upload-file-status.success {
-    background: #d1fae5;
-    color: #065f46;
+    background: #d1edff;
+    color: #004085;
 }
 
 .upload-file-status.error {
-    background: #fee2e2;
-    color: #991b1b;
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.upload-file-progress {
+    width: 100%;
+}
+
+.upload-file-progress-bar {
+    width: 100%;
+    height: 4px;
+    background: #e1e1e1;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.upload-file-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #007cba 0%, #00a0d2 100%);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
 }
 
 /* File Modal Styles */
@@ -2117,9 +2174,6 @@ $has_more = count($images) === $images_per_page;
     content: "\f123"; /* dashicons-media-document */
     color: #6b7280; /* All same neutral color */
 }
-    content: "\f123"; /* dashicons-media-document */
-    color: #2563eb; /* Blue for Word */
-}
 
 .file-type-icon.file-type-xls::before,
 .file-type-icon.file-type-xlsx::before {
@@ -2630,6 +2684,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const files = Array.from(formData.getAll('files[]'));
             let uploadedCount = 0;
             let totalFiles = files.length;
+            let successfulCount = 0;
+            let failedCount = 0;
+            let currentXhr = null;
             
             // Initialize file list
             filesList.innerHTML = '';
@@ -2639,108 +2696,188 @@ document.addEventListener('DOMContentLoaded', function() {
                 fileItem.innerHTML = `
                     <div class="upload-file-name">${file.name}</div>
                     <div class="upload-file-status pending">Pending</div>
+                    <div class="upload-file-progress">
+                        <div class="upload-file-progress-bar">
+                            <div class="upload-file-progress-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
                 `;
                 filesList.appendChild(fileItem);
             });
             
             // Update status
-            uploadStatus.textContent = `Uploading 0 of ${totalFiles} files...`;
-            
-            // Create XMLHttpRequest for progress tracking
-            const xhr = new XMLHttpRequest();
-            
-            // Track upload progress
-            xhr.upload.addEventListener('progress', (e) => {
-                if (e.lengthComputable) {
-                    const percentComplete = (e.loaded / e.total) * 100;
-                    progressFill.style.width = percentComplete + '%';
-                    
-                    // Update status during upload
-                    if (percentComplete < 100) {
-                        uploadStatus.textContent = `Uploading files... ${Math.round(percentComplete)}%`;
-                    } else {
-                        uploadStatus.textContent = `Processing files on server...`;
-                        progressFill.classList.add('processing');
-                    }
-                }
-            });
-            
-            // Handle response
-            xhr.addEventListener('load', () => {
-                if (xhr.status === 200) {
-                    try {
-                        const data = JSON.parse(xhr.responseText);
-                        if (data.success) {
-                            // Update all files as successful
-                            const fileItems = filesList.querySelectorAll('.upload-file-item');
-                            fileItems.forEach(item => {
-                                const status = item.querySelector('.upload-file-status');
-                                status.textContent = 'Success';
-                                status.className = 'upload-file-status success';
-                            });
-                            
-                            uploadStatus.textContent = `Successfully uploaded ${totalFiles} files!`;
-                            progressFill.style.width = '100%';
-                            progressFill.classList.remove('processing');
-                            
-                            // Reload after a short delay
-                            setTimeout(() => {
-                                window.location.reload();
-                            }, 1500);
-                        } else {
-                            throw new Error(data.data || 'Upload failed');
-                        }
-                    } catch (error) {
-                        console.error('Upload error:', error);
-                        uploadStatus.textContent = 'Upload failed: ' + error.message;
-                        progressFill.classList.remove('processing');
-                        
-                        // Mark all files as failed
-                        const fileItems = filesList.querySelectorAll('.upload-file-item');
-                        fileItems.forEach(item => {
-                            const status = item.querySelector('.upload-file-status');
-                            status.textContent = 'Failed';
-                            status.className = 'upload-file-status error';
-                        });
-                    }
-                } else {
-                    uploadStatus.textContent = 'Upload failed: Server error';
-                    progressFill.classList.remove('processing');
-                    
-                    // Mark all files as failed
-                    const fileItems = filesList.querySelectorAll('.upload-file-item');
-                    fileItems.forEach(item => {
-                        const status = item.querySelector('.upload-file-status');
-                        status.textContent = 'Failed';
-                        status.className = 'upload-file-status error';
-                    });
-                }
-            });
-            
-            // Handle errors
-            xhr.addEventListener('error', () => {
-                uploadStatus.textContent = 'Upload failed: Network error';
-                progressFill.classList.remove('processing');
-                
-                // Mark all files as failed
-                const fileItems = filesList.querySelectorAll('.upload-file-item');
-                fileItems.forEach(item => {
-                    const status = item.querySelector('.upload-file-status');
-                    status.textContent = 'Failed';
-                    status.className = 'upload-file-status error';
-                });
-            });
+            uploadStatus.textContent = `Preparing to upload ${totalFiles} files...`;
             
             // Set up cancel functionality
             const cancelBtn = document.getElementById('upload-cancel-btn');
             cancelBtn.addEventListener('click', () => {
-                xhr.abort();
+                if (currentXhr) {
+                    currentXhr.abort();
+                }
                 progressOverlay.classList.remove('active');
             });
             
-            // Start upload
-                xhr.open('POST', '<?php echo admin_url('admin-ajax.php'); ?>?action=tomatillo_upload_files');
-            xhr.send(formData);
+            // Upload files one by one
+            uploadNextFile(0);
+            
+            function uploadNextFile(index) {
+                if (index >= files.length) {
+                    // All files processed
+                    const successRate = totalFiles > 0 ? Math.round((successfulCount / totalFiles) * 100) : 0;
+                    uploadStatus.textContent = `Upload complete! ${successfulCount}/${totalFiles} files successful (${successRate}%)`;
+                    progressFill.style.width = '100%';
+                    progressFill.classList.remove('processing');
+                    
+                    // Reload after a short delay
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                    return;
+                }
+                
+                const file = files[index];
+                const fileItem = filesList.children[index];
+                const statusElement = fileItem.querySelector('.upload-file-status');
+                const progressBar = fileItem.querySelector('.upload-file-progress-fill');
+                
+                // Update status to uploading
+                statusElement.textContent = 'Uploading...';
+                statusElement.className = 'upload-file-status uploading';
+                uploadStatus.textContent = `Uploading file ${index + 1} of ${totalFiles}: ${file.name}`;
+                
+                // Move current uploading file to top
+                moveToTop(fileItem);
+                
+                // Create FormData for single file
+                const singleFileFormData = new FormData();
+                singleFileFormData.append('file', file);
+                singleFileFormData.append('action', 'tomatillo_upload_single_file');
+                
+                // Create XMLHttpRequest for this file
+                currentXhr = new XMLHttpRequest();
+                
+                // Track upload progress for this file
+                currentXhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const filePercentComplete = (e.loaded / e.total) * 100;
+                        progressBar.style.width = filePercentComplete + '%';
+                        
+                        // Update overall progress
+                        const overallProgress = ((index + (filePercentComplete / 100)) / totalFiles) * 100;
+                        progressFill.style.width = overallProgress + '%';
+                    }
+                });
+                
+                // Handle response
+                currentXhr.addEventListener('load', () => {
+                    uploadedCount++;
+                    
+                    if (currentXhr.status === 200) {
+                        try {
+                            const data = JSON.parse(currentXhr.responseText);
+                            if (data.success) {
+                                // Success
+                                statusElement.textContent = 'Success';
+                                statusElement.className = 'upload-file-status success';
+                                progressBar.style.width = '100%';
+                                successfulCount++;
+                                
+                                // Add file size info
+                                if (data.data && data.data.file_size_formatted) {
+                                    statusElement.textContent = `Success (${data.data.file_size_formatted})`;
+                                }
+                            } else {
+                                // Failed
+                                statusElement.textContent = 'Failed';
+                                statusElement.className = 'upload-file-status error';
+                                progressBar.style.width = '100%';
+                                failedCount++;
+                                
+                                // Add error details
+                                if (data.data) {
+                                    statusElement.textContent = `Failed: ${data.data}`;
+                                }
+                            }
+                        } catch (error) {
+                            console.error('Upload error:', error);
+                            statusElement.textContent = 'Failed: Parse error';
+                            statusElement.className = 'upload-file-status error';
+                            progressBar.style.width = '100%';
+                            failedCount++;
+                        }
+                    } else {
+                        statusElement.textContent = 'Failed: Server error';
+                        statusElement.className = 'upload-file-status error';
+                        progressBar.style.width = '100%';
+                        failedCount++;
+                    }
+                    
+                    // Move completed file back to its original position
+                    moveToOriginalPosition(fileItem, index);
+                    
+                    // Update overall progress
+                    const overallProgress = (uploadedCount / totalFiles) * 100;
+                    progressFill.style.width = overallProgress + '%';
+                    
+                    // Move to next file
+                    setTimeout(() => {
+                        uploadNextFile(index + 1);
+                    }, 500); // Small delay between files
+                });
+                
+                // Handle errors
+                currentXhr.addEventListener('error', () => {
+                    uploadedCount++;
+                    statusElement.textContent = 'Failed: Network error';
+                    statusElement.className = 'upload-file-status error';
+                    progressBar.style.width = '100%';
+                    failedCount++;
+                    
+                    // Move completed file back to its original position
+                    moveToOriginalPosition(fileItem, index);
+                    
+                    // Update overall progress
+                    const overallProgress = (uploadedCount / totalFiles) * 100;
+                    progressFill.style.width = overallProgress + '%';
+                    
+                    // Move to next file
+                    setTimeout(() => {
+                        uploadNextFile(index + 1);
+                    }, 500);
+                });
+                
+                // Send request
+                currentXhr.open('POST', '<?php echo admin_url('admin-ajax.php'); ?>');
+                currentXhr.send(singleFileFormData);
+            }
+            
+            function moveToTop(fileItem) {
+                // Add uploading class and move to top
+                fileItem.classList.add('uploading');
+                fileItem.style.transition = 'all 0.2s ease';
+                
+                // Move to top
+                filesList.insertBefore(fileItem, filesList.firstChild);
+            }
+            
+            function moveToOriginalPosition(fileItem, originalIndex) {
+                // Remove uploading class
+                fileItem.classList.remove('uploading');
+                fileItem.style.transition = 'all 0.2s ease';
+                
+                // Calculate where it should go back to
+                // Find the position after all completed files
+                const completedCount = uploadedCount;
+                const targetPosition = Math.min(originalIndex, filesList.children.length - completedCount - 1);
+                
+                // Move back to original position
+                if (targetPosition >= 0 && targetPosition < filesList.children.length) {
+                    const targetElement = filesList.children[targetPosition];
+                    if (targetElement && targetElement !== fileItem) {
+                        filesList.insertBefore(fileItem, targetElement);
+                    }
+                }
+            }
         }
     }
     
@@ -3736,6 +3873,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Clear all visual selections - more robust approach
             selectedItems.clear();
+            lastSelectedItem = null; // Reset last selected item for SHIFT+click
             
             // Clear gallery items
             document.querySelectorAll('.gallery-item.selected').forEach(item => {
@@ -3758,6 +3896,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 100);
         }
         
+        // Track last selected item for SHIFT+click range selection
+        let lastSelectedItem = null;
+        
         // Add click handlers to gallery items for bulk selection
         // This handler runs first and intercepts clicks when in bulk mode
         document.addEventListener('click', function(e) {
@@ -3772,16 +3913,48 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const itemId = galleryItem.dataset.id;
             
-            if (selectedItems.has(itemId)) {
-                selectedItems.delete(itemId);
-                galleryItem.classList.remove('selected');
+            if (e.shiftKey && lastSelectedItem && lastSelectedItem !== galleryItem) {
+                // SHIFT+click: select range between last selected and current
+                selectRange(lastSelectedItem, galleryItem);
             } else {
-                selectedItems.add(itemId);
-                galleryItem.classList.add('selected');
+                // Regular click: toggle single item
+                if (selectedItems.has(itemId)) {
+                    selectedItems.delete(itemId);
+                    galleryItem.classList.remove('selected');
+                } else {
+                    selectedItems.add(itemId);
+                    galleryItem.classList.add('selected');
+                }
+                lastSelectedItem = galleryItem;
             }
             
             updateBulkCount();
         }, true); // Use capture phase to run before other handlers
+        
+        function selectRange(startItem, endItem) {
+            // Get all gallery items in the same container
+            const container = startItem.parentElement;
+            const allItems = Array.from(container.querySelectorAll('.gallery-item, .file-item'));
+            
+            // Find indices of start and end items
+            const startIndex = allItems.indexOf(startItem);
+            const endIndex = allItems.indexOf(endItem);
+            
+            if (startIndex === -1 || endIndex === -1) return;
+            
+            // Determine range (handle both directions)
+            const minIndex = Math.min(startIndex, endIndex);
+            const maxIndex = Math.max(startIndex, endIndex);
+            
+            // Select all items in range
+            for (let i = minIndex; i <= maxIndex; i++) {
+                const item = allItems[i];
+                const itemId = item.dataset.id;
+                
+                selectedItems.add(itemId);
+                item.classList.add('selected');
+            }
+        }
         
         function updateBulkCount() {
             const count = selectedItems.size;

@@ -114,6 +114,24 @@ $stats = tomatillo_media_studio()->core->get_media_stats();
                         </td>
                     </tr>
                     <tr>
+                        <th scope="row"><?php _e('Minimum Savings Threshold', 'tomatillo-media-studio'); ?></th>
+                        <td>
+                            <input type="range" name="tomatillo_media_studio_settings[min_savings_threshold]" min="1" max="90" value="<?php echo esc_attr($settings->get_min_savings_threshold()); ?>" class="quality-slider" />
+                            <span class="quality-value"><?php echo esc_html($settings->get_min_savings_threshold()); ?>%</span>
+                            <p class="description"><?php _e('Only optimize images if they achieve at least this percentage of size reduction.', 'tomatillo-media-studio'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php _e('Skip Small Images', 'tomatillo-media-studio'); ?></th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="tomatillo_media_studio_settings[skip_small_images]" value="1" <?php checked($settings->should_skip_small_images()); ?> />
+                                <?php _e('Skip images smaller than 50KB', 'tomatillo-media-studio'); ?>
+                            </label>
+                            <p class="description"><?php _e('Small images may not benefit significantly from optimization.', 'tomatillo-media-studio'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
                         <th scope="row"><?php _e('Preserve Originals', 'tomatillo-media-studio'); ?></th>
                         <td>
                             <label>
@@ -215,6 +233,40 @@ $stats = tomatillo_media_studio()->core->get_media_stats();
                                 <input type="checkbox" name="tomatillo_media_studio_settings[lazy_load_images]" value="1" <?php checked($settings->get('lazy_load_images')); ?> />
                                 <?php _e('Load images only when they come into view', 'tomatillo-media-studio'); ?>
                             </label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php _e('Enable AVIF Conversion', 'tomatillo-media-studio'); ?></th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="tomatillo_media_studio_settings[enable_avif]" value="1" <?php checked($settings->is_avif_enabled()); ?> />
+                                <?php _e('Convert images to AVIF format for maximum compression', 'tomatillo-media-studio'); ?>
+                            </label>
+                            <p class="description"><?php _e('AVIF provides the best compression but has limited browser support.', 'tomatillo-media-studio'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php _e('Enable WebP Conversion', 'tomatillo-media-studio'); ?></th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="tomatillo_media_studio_settings[enable_webp]" value="1" <?php checked($settings->is_webp_enabled()); ?> />
+                                <?php _e('Convert images to WebP format for better compression', 'tomatillo-media-studio'); ?>
+                            </label>
+                            <p class="description"><?php _e('WebP provides good compression with wide browser support.', 'tomatillo-media-studio'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php _e('Maximum Image Dimensions', 'tomatillo-media-studio'); ?></th>
+                        <td>
+                            <input type="number" name="tomatillo_media_studio_settings[max_image_dimensions]" min="1000" max="8000" value="<?php echo esc_attr($settings->get_max_image_dimensions()); ?>" />
+                            <p class="description"><?php _e('Maximum width or height for images to be processed (pixels).', 'tomatillo-media-studio'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php _e('Conversion Timeout', 'tomatillo-media-studio'); ?></th>
+                        <td>
+                            <input type="number" name="tomatillo_media_studio_settings[conversion_timeout]" min="5" max="300" value="<?php echo esc_attr($settings->get_conversion_timeout()); ?>" />
+                            <p class="description"><?php _e('Maximum seconds allowed per image conversion.', 'tomatillo-media-studio'); ?></p>
                         </td>
                     </tr>
                 </table>
