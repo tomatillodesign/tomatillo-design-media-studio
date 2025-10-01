@@ -53,7 +53,7 @@ $stats = tomatillo_media_studio()->core->get_media_stats();
                 
                 <table class="form-table">
                     <tr>
-                        <th scope="row"><?php _e('Image Optimization', 'tomatillo-media-studio'); ?></th>
+                        <th scope="row"><?php _e('Image Processing Engine', 'tomatillo-media-studio'); ?></th>
                         <td>
                             <label class="tomatillo-toggle-label">
                                 <div class="tomatillo-toggle">
@@ -66,7 +66,7 @@ $stats = tomatillo_media_studio()->core->get_media_stats();
                         </td>
                     </tr>
                     <tr>
-                        <th scope="row"><?php _e('Modern Media Library', 'tomatillo-media-studio'); ?></th>
+                        <th scope="row"><?php _e('Enhanced Gallery Interface', 'tomatillo-media-studio'); ?></th>
                         <td>
                             <label class="tomatillo-toggle-label">
                                 <div class="tomatillo-toggle">

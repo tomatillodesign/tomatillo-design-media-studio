@@ -50,10 +50,10 @@
             }
         });
         
-        // Module toggle effects
-        $('input[name*="enable_optimization"], input[name*="enable_media_library"]').on('change', function() {
-            updateModuleDependencies();
-        });
+        // Module toggle effects - removed problematic tab visibility logic
+        // $('input[name*="enable_optimization"], input[name*="enable_media_library"]').on('change', function() {
+        //     updateModuleDependencies();
+        // });
     }
     
     /**
@@ -160,23 +160,24 @@
     /**
      * Update module dependencies
      */
-    function updateModuleDependencies() {
-        var optimizationEnabled = $('input[name*="enable_optimization"]').is(':checked');
-        var libraryEnabled = $('input[name*="enable_media_library"]').is(':checked');
-        
-        // Show/hide dependent settings
-        if (optimizationEnabled) {
-            $('#optimization').show();
-        } else {
-            $('#optimization').hide();
-        }
-        
-        if (libraryEnabled) {
-            $('#media-library').show();
-        } else {
-            $('#media-library').hide();
-        }
-    }
+    // Removed problematic function that was interfering with tab system
+    // function updateModuleDependencies() {
+    //     var optimizationEnabled = $('input[name*="enable_optimization"]').is(':checked');
+    //     var libraryEnabled = $('input[name*="enable_media_library"]').is(':checked');
+    //     
+    //     // Show/hide dependent settings
+    //     if (optimizationEnabled) {
+    //         $('#optimization').show();
+    //     } else {
+    //         $('#optimization').hide();
+    //     }
+    //     
+    //     if (libraryEnabled) {
+    //         $('#media-library').show();
+    //     } else {
+    //         $('#media-library').hide();
+    //     }
+    // }
     
     /**
      * Switch media library view
