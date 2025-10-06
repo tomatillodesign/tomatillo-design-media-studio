@@ -85,14 +85,16 @@ class Tomatillo_Media_Assets {
             return;
         }
         
-        // Enqueue frontend optimization script
-        wp_enqueue_script(
-            'tomatillo-media-studio-frontend',
-            TOMATILLO_MEDIA_STUDIO_ASSETS_URL . 'js/frontend.js',
-            array(),
-            TOMATILLO_MEDIA_STUDIO_VERSION,
-            true
-        );
+        // Only enqueue if the file exists to avoid 404s
+        if ($this->asset_exists('js/frontend.js')) {
+            wp_enqueue_script(
+                'tomatillo-media-studio-frontend',
+                TOMATILLO_MEDIA_STUDIO_ASSETS_URL . 'js/frontend.js',
+                array(),
+                TOMATILLO_MEDIA_STUDIO_VERSION,
+                true
+            );
+        }
     }
     
     /**

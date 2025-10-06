@@ -46,7 +46,7 @@ class Tomatillo_Media_Settings {
         'show_optimization_status' => true,
         
         // Advanced Settings
-        'debug_mode' => false,
+        'debug_mode' => true,
         'cache_thumbnails' => true,
         'lazy_load_images' => true,
     );

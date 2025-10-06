@@ -226,6 +226,8 @@ class Tomatillo_Optimizer {
                     $results['avif_path'] = $avif_result['path'];
                     $results['avif_size'] = $avif_result['size'];
                     $results['avif_savings'] = $this->calculate_savings_percentage($original_size, $avif_result['size']);
+                    // Save convenience meta for fast frontend lookups
+                    update_post_meta($attachment_id, '_tomatillo_avif_url', $this->path_to_url($avif_result['path']));
                 } else {
                     $plugin->core->log('warning', "❌ AVIF conversion failed");
                 }
@@ -240,6 +242,8 @@ class Tomatillo_Optimizer {
                     $results['webp_path'] = $webp_result['path'];
                     $results['webp_size'] = $webp_result['size'];
                     $results['webp_savings'] = $this->calculate_savings_percentage($original_size, $webp_result['size']);
+                    // Save convenience meta for fast frontend lookups
+                    update_post_meta($attachment_id, '_tomatillo_webp_url', $this->path_to_url($webp_result['path']));
                 } else {
                     $plugin->core->log('warning', "❌ WebP conversion failed");
                 }
@@ -439,6 +443,17 @@ class Tomatillo_Optimizer {
         $filename = $path_info['filename'];
         
         return $directory . '/' . $filename . '.' . $format;
+    }
+
+    /**
+     * Convert absolute path within uploads to public URL
+     */
+    private function path_to_url($path) {
+        $upload_dir = wp_upload_dir();
+        if (strpos($path, $upload_dir['basedir']) === 0) {
+            return str_replace($upload_dir['basedir'], $upload_dir['baseurl'], $path);
+        }
+        return $path; // fallback
     }
     
     /**
