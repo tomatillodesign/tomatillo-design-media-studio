@@ -252,18 +252,15 @@ class Tomatillo_Optimizer {
             $plugin->core->log('info', "Best savings: {$best_savings}%, Min threshold: {$min_threshold}%");
             
             if ($best_savings < $min_threshold) {
-                $plugin->core->log('info', "⚠️ Savings below threshold ({$best_savings}% < {$min_threshold}%), cleaning up converted files");
-                // Clean up converted files if they don't meet threshold
-                if ($results['avif_path'] && file_exists($results['avif_path'])) {
-                    unlink($results['avif_path']);
-                }
-                if ($results['webp_path'] && file_exists($results['webp_path'])) {
-                    unlink($results['webp_path']);
-                }
-                
+                $plugin->core->log('info', "⚠️ Savings below threshold ({$best_savings}% < {$min_threshold}%), but keeping files");
+                // Don't clean up files - keep them for future use
+                // Just mark as skipped due to threshold
+                $results['success'] = true; // Still mark as successful
+                $results['skipped'] = true; // But mark as skipped
                 $results['message'] = sprintf(
-                    'Image is already well-optimized. Only %d%% additional savings possible (minimum %d%% required)',
-                    round($best_savings),
+                    'Image optimized but below threshold. AVIF %d%% savings, WebP %d%% savings (minimum %d%% required)',
+                    round($results['avif_savings']),
+                    round($results['webp_savings']),
                     $min_threshold
                 );
                 $plugin->core->log('info', "📊 Threshold decision: {$results['message']}");
@@ -521,6 +518,12 @@ class Tomatillo_Optimizer {
         
         $table_name = $wpdb->prefix . 'tomatillo_media_optimization';
         
+        // Debug: Log the result data
+        $plugin = tomatillo_media_studio();
+        if ($plugin && $plugin->core) {
+            $plugin->core->log('info', "Storing conversion result: " . json_encode($result));
+        }
+        
         $data = array(
             'attachment_id' => $result['attachment_id'],
             'original_format' => pathinfo($result['original_path'], PATHINFO_EXTENSION),
@@ -532,7 +535,16 @@ class Tomatillo_Optimizer {
             'status' => 'completed'
         );
         
-        $wpdb->insert($table_name, $data);
+        $insert_result = $wpdb->insert($table_name, $data);
+        
+        // Debug: Log the insert result
+        if ($plugin && $plugin->core) {
+            if ($insert_result === false) {
+                $plugin->core->log('error', "Database insert failed: " . $wpdb->last_error);
+            } else {
+                $plugin->core->log('info', "Database insert successful, ID: " . $wpdb->insert_id);
+            }
+        }
     }
     
     /**
@@ -598,8 +610,8 @@ class Tomatillo_Optimizer {
             $plugin->core->log('info', "Auto-convert triggered for attachment ID: {$attachment_id}, MIME: {$mime_type}");
         }
         
-        // Schedule conversion to avoid blocking upload
-        wp_schedule_single_event(time() + 5, 'tomatillo_auto_convert_image', array($attachment_id));
+        // Process conversion immediately instead of scheduling
+        $this->process_immediate_conversion($attachment_id);
     }
     
     /**
@@ -637,10 +649,10 @@ class Tomatillo_Optimizer {
             $plugin->core->log('info', "Processing upload: {$upload['type']}");
         }
         
-        // Store upload info for later processing
+        // Store upload info for immediate processing
         if (!isset($upload['error']) && isset($upload['file'])) {
-            // Schedule conversion after WordPress processes the attachment
-            add_action('wp_generate_attachment_metadata', array($this, 'schedule_upload_conversion'), 10, 2);
+            // Process conversion immediately after WordPress processes the attachment
+            add_action('wp_generate_attachment_metadata', array($this, 'process_immediate_upload_conversion'), 10, 2);
         }
         
         return $upload;
@@ -666,6 +678,56 @@ class Tomatillo_Optimizer {
     }
     
     /**
+     * Process immediate conversion for uploaded files
+     */
+    public function process_immediate_upload_conversion($metadata, $attachment_id) {
+        // Remove the hook to prevent multiple calls
+        remove_action('wp_generate_attachment_metadata', array($this, 'process_immediate_upload_conversion'));
+        
+        // Log for debugging
+        $plugin = tomatillo_media_studio();
+        if ($plugin && $plugin->core) {
+            $plugin->core->log('info', "Processing immediate upload conversion for attachment ID: {$attachment_id}");
+        }
+        
+        // Process conversion immediately
+        $this->process_immediate_conversion($attachment_id);
+        
+        return $metadata;
+    }
+    
+    /**
+     * Process conversion immediately (replaces scheduled conversion)
+     */
+    public function process_immediate_conversion($attachment_id) {
+        $settings = $this->get_settings();
+        if (!$settings || !$settings->is_optimization_enabled()) {
+            return;
+        }
+        
+        // Get plugin instance for logging
+        $plugin = tomatillo_media_studio();
+        if (!$plugin) {
+            return;
+        }
+        
+        $plugin->core->log('info', "🔄 Processing immediate conversion for attachment ID: {$attachment_id}");
+        
+        // Convert the image
+        $result = $this->convert_image($attachment_id);
+        
+        $plugin->core->log('info', "Conversion result: " . json_encode($result));
+        
+        if ($result['success']) {
+            // Store result in database
+            $this->store_conversion_result($result);
+            $plugin->core->log('info', "✅ Immediate conversion completed for ID: {$attachment_id}");
+        } else {
+            $plugin->core->log('warning', "❌ Immediate conversion failed for ID: {$attachment_id} - {$result['message']}");
+        }
+    }
+    
+    /**
      * Process scheduled conversion
      */
     public function process_scheduled_conversion($attachment_id) {
@@ -680,10 +742,12 @@ class Tomatillo_Optimizer {
             return;
         }
         
-        $plugin->core->log('info', "Processing scheduled conversion for attachment ID: {$attachment_id}");
+        $plugin->core->log('info', "🔄 Processing scheduled conversion for attachment ID: {$attachment_id}");
         
         // Convert the image
         $result = $this->convert_image($attachment_id);
+        
+        $plugin->core->log('info', "Conversion result: " . json_encode($result));
         
         if ($result['success']) {
             // Store result in database

@@ -26,6 +26,11 @@ class Tomatillo_Media_Admin {
         add_action('admin_init', array($this, 'admin_init'));
         add_action('admin_enqueue_scripts', array($this, 'admin_enqueue_scripts'));
         add_action('admin_menu', array($this, 'hide_traditional_media_library'), 999);
+        
+        // AJAX handlers for bulk operations
+        add_action('wp_ajax_tomatillo_get_unoptimized_count', array($this, 'ajax_get_unoptimized_count'));
+        add_action('wp_ajax_tomatillo_process_bulk_batch', array($this, 'ajax_process_bulk_batch'));
+        add_action('wp_ajax_tomatillo_preview_bulk_optimization', array($this, 'ajax_preview_bulk_optimization'));
     }
     
     /**
@@ -117,6 +122,12 @@ class Tomatillo_Media_Admin {
             TOMATILLO_MEDIA_STUDIO_VERSION,
             true
         );
+        
+        // Localize script with AJAX URL and nonce
+        wp_localize_script('tomatillo-admin', 'tomatilloMediaStudio', array(
+            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('tomatillo_media_settings')
+        ));
     }
     
     /**
@@ -281,5 +292,195 @@ class Tomatillo_Media_Admin {
     public function is_plugin_page() {
         $screen = get_current_screen();
         return strpos($screen->id, 'tomatillo') !== false;
+    }
+    
+    /**
+     * AJAX handler: Get unoptimized images count
+     */
+    public function ajax_get_unoptimized_count() {
+        // Verify nonce
+        if (!wp_verify_nonce($_POST['nonce'], 'tomatillo_bulk_optimize')) {
+            wp_send_json_error('Security check failed');
+        }
+        
+        // Check permissions
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+        
+        $plugin = tomatillo_media_studio();
+        $count = 0;
+        
+        if ($plugin->core) {
+            $count = $plugin->core->get_unoptimized_images_count();
+        }
+        
+        wp_send_json_success(array('count' => $count));
+    }
+    
+    /**
+     * AJAX handler: Process bulk optimization batch
+     */
+    public function ajax_process_bulk_batch() {
+        // Verify nonce
+        if (!wp_verify_nonce($_POST['nonce'], 'tomatillo_bulk_optimize')) {
+            wp_send_json_error('Security check failed');
+        }
+        
+        // Check permissions
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+        
+        $batch = intval($_POST['batch']);
+        $batch_size = 5; // Process 5 images per batch
+        $offset = ($batch - 1) * $batch_size;
+        
+        $plugin = tomatillo_media_studio();
+        $results = array();
+        
+        if ($plugin->core) {
+            // Get unoptimized images for this batch
+            $images = get_posts(array(
+                'post_type' => 'attachment',
+                'post_mime_type' => 'image',
+                'post_status' => 'inherit',
+                'posts_per_page' => $batch_size,
+                'offset' => $offset,
+                'orderby' => 'date',
+                'order' => 'DESC',
+                'meta_query' => array(
+                    array(
+                        'key' => '_wp_attachment_metadata',
+                        'compare' => 'EXISTS'
+                    )
+                )
+            ));
+            
+            foreach ($images as $image) {
+                $result = $this->process_single_image($image, $plugin);
+                $results[] = $result;
+            }
+        }
+        
+        wp_send_json_success(array('images' => $results));
+    }
+    
+    /**
+     * AJAX handler: Preview bulk optimization
+     */
+    public function ajax_preview_bulk_optimization() {
+        // Verify nonce
+        if (!wp_verify_nonce($_POST['nonce'], 'tomatillo_bulk_optimize')) {
+            wp_send_json_error('Security check failed');
+        }
+        
+        // Check permissions
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+        
+        // Get first 10 unoptimized images
+        $images = get_posts(array(
+            'post_type' => 'attachment',
+            'post_mime_type' => 'image',
+            'post_status' => 'inherit',
+            'posts_per_page' => 10,
+            'orderby' => 'date',
+            'order' => 'DESC',
+            'meta_query' => array(
+                array(
+                    'key' => '_wp_attachment_metadata',
+                    'compare' => 'EXISTS'
+                )
+            )
+        ));
+        
+        $preview_data = array();
+        foreach ($images as $image) {
+            $file_path = get_attached_file($image->ID);
+            $file_size = file_exists($file_path) ? filesize($file_path) : 0;
+            $mime_type = get_post_mime_type($image->ID);
+            
+            $preview_data[] = array(
+                'filename' => basename($file_path),
+                'size' => $file_size,
+                'type' => $mime_type,
+                'id' => $image->ID
+            );
+        }
+        
+        wp_send_json_success(array('images' => $preview_data));
+    }
+    
+    /**
+     * Process a single image for optimization
+     */
+    private function process_single_image($image, $plugin) {
+        $file_path = get_attached_file($image->ID);
+        $filename = basename($file_path);
+        $original_size = file_exists($file_path) ? filesize($file_path) : 0;
+        
+        $result = array(
+            'filename' => $filename,
+            'original_size' => $original_size,
+            'success' => false,
+            'space_saved' => 0,
+            'savings_percent' => 0,
+            'error' => null
+        );
+        
+        try {
+            // Check if image is already optimized
+            if ($plugin->core && $plugin->core->is_image_optimized($image->ID)) {
+                $result['success'] = true;
+                $result['skipped'] = true;
+                $result['error'] = 'Already optimized';
+                return $result;
+            }
+            
+            // Check file size threshold
+            $settings = $plugin->settings;
+            if ($settings->should_skip_small_images() && $original_size < $settings->get_min_image_size()) {
+                $result['success'] = true;
+                $result['skipped'] = true;
+                $result['error'] = 'Skipped - too small (' . size_format($original_size) . ')';
+                return $result;
+            }
+            
+            // Check image dimensions
+            $metadata = wp_get_attachment_metadata($image->ID);
+            if ($metadata && isset($metadata['width']) && isset($metadata['height'])) {
+                $max_dimensions = $settings->get_max_image_dimensions();
+                if ($metadata['width'] > $max_dimensions || $metadata['height'] > $max_dimensions) {
+                    $result['success'] = true;
+                    $result['skipped'] = true;
+                    $result['error'] = 'Skipped - too large (' . $metadata['width'] . 'x' . $metadata['height'] . ')';
+                    return $result;
+                }
+            }
+            
+            // Attempt optimization
+            if ($plugin->core) {
+                $optimization_result = $plugin->core->optimize_image($image->ID);
+                
+                if ($optimization_result && isset($optimization_result['success']) && $optimization_result['success']) {
+                    $result['success'] = true;
+                    $result['space_saved'] = $optimization_result['space_saved'] ?? 0;
+                    $result['savings_percent'] = $optimization_result['savings_percent'] ?? 0;
+                } else {
+                    $result['error'] = $optimization_result['error'] ?? 'Optimization failed';
+                }
+            } else {
+                $result['error'] = 'Core module not available';
+            }
+            
+        } catch (Exception $e) {
+            $result['error'] = 'Exception: ' . $e->getMessage();
+        } catch (Error $e) {
+            $result['error'] = 'Error: ' . $e->getMessage();
+        }
+        
+        return $result;
     }
 }

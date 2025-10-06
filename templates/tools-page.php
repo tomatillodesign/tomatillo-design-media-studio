@@ -279,49 +279,151 @@ $memory_percentage = ($memory_usage / $memory_limit) * 100;
             </div>
             
         <?php elseif ($current_tab === 'optimization'): ?>
-            <!-- Optimization Management -->
-            <div class="card">
-                <h2>Optimization Management</h2>
+            <!-- Bulk Operations Action Panel -->
+            <div class="card" style="max-width: none; margin-bottom: 30px;">
+                <h2 style="margin-top: 0; color: #007cba; display: flex; align-items: center; gap: 10px;">
+                    <span class="dashicons dashicons-performance"></span>
+                    Bulk Image Optimization
+                </h2>
                 
-                <!-- Current Status -->
-                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                    <h3 style="margin-top: 0;">Current Status</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-                        <div>
-                            <strong>Total Images:</strong> <?php echo number_format($total_images); ?>
+                <!-- Current Status Overview -->
+                <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 25px; border-radius: 12px; margin: 20px 0;">
+                    <h3 style="margin-top: 0; color: #1d2327;">Library Status</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+                        <div style="text-align: center; padding: 15px; background: rgba(255,255,255,0.8); border-radius: 8px;">
+                            <div style="font-size: 2em; font-weight: bold; color: #007cba;"><?php echo number_format($total_images); ?></div>
+                            <div style="font-size: 0.9em; color: #666; margin-top: 5px;">Total Images</div>
                         </div>
-                        <div>
-                            <strong>Optimized:</strong> <?php echo number_format($optimized_count); ?>
+                        <div style="text-align: center; padding: 15px; background: rgba(255,255,255,0.8); border-radius: 8px;">
+                            <div style="font-size: 2em; font-weight: bold; color: #28a745;"><?php echo number_format($optimized_count); ?></div>
+                            <div style="font-size: 0.9em; color: #666; margin-top: 5px;">Optimized</div>
                         </div>
-                        <div>
-                            <strong>Pending:</strong> <?php echo number_format($unoptimized_count); ?>
+                        <div style="text-align: center; padding: 15px; background: rgba(255,255,255,0.8); border-radius: 8px;">
+                            <div style="font-size: 2em; font-weight: bold; color: #ffc107;"><?php echo number_format($unoptimized_count); ?></div>
+                            <div style="font-size: 0.9em; color: #666; margin-top: 5px;">Pending</div>
                         </div>
-                        <div>
-                            <strong>Success Rate:</strong> <?php echo $total_images > 0 ? round(($optimized_count / $total_images) * 100, 1) : 0; ?>%
+                        <div style="text-align: center; padding: 15px; background: rgba(255,255,255,0.8); border-radius: 8px;">
+                            <div style="font-size: 2em; font-weight: bold; color: #6f42c1;"><?php echo $total_images > 0 ? round(($optimized_count / $total_images) * 100, 1) : 0; ?>%</div>
+                            <div style="font-size: 0.9em; color: #666; margin-top: 5px;">Success Rate</div>
                         </div>
                     </div>
                 </div>
                 
-                <!-- Bulk Operations -->
-                <h3>Bulk Operations</h3>
+                <!-- Action Buttons -->
                 <?php if ($unoptimized_count > 0): ?>
-                    <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                        <h4 style="margin-top: 0;">Ready to Optimize</h4>
-                        <p><strong><?php echo number_format($unoptimized_count); ?></strong> images are ready for optimization.</p>
-                        <p><strong>Estimated time:</strong> <?php echo ($plugin->core) ? $plugin->core->estimate_optimization_time($unoptimized_count) : 'Unknown'; ?></p>
-                        <p><strong>Estimated savings:</strong> <?php echo ($unoptimized_count > 0 && $optimized_count > 0) ? size_format($unoptimized_count * ($space_saved / $optimized_count)) : '0 B'; ?></p>
+                    <div style="background: #fff3cd; border: 2px solid #ffeaa7; padding: 25px; border-radius: 12px; margin: 20px 0;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <div>
+                                <h4 style="margin: 0; color: #856404;">Ready to Optimize</h4>
+                                <p style="margin: 5px 0 0 0; color: #856404;">
+                                    <strong><?php echo number_format($unoptimized_count); ?></strong> images ready for optimization
+                                </p>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 0.9em; color: #856404;">
+                                    <strong>Estimated time:</strong> <?php echo ($plugin->core) ? $plugin->core->estimate_optimization_time($unoptimized_count) : 'Unknown'; ?>
+                                </div>
+                                <div style="font-size: 0.9em; color: #856404;">
+                                    <strong>Estimated savings:</strong> <?php echo ($unoptimized_count > 0 && $optimized_count > 0) ? size_format($unoptimized_count * ($space_saved / $optimized_count)) : '0 B'; ?>
+                                </div>
+                            </div>
+                        </div>
                         
-                        <form method="post" style="margin-top: 15px;">
-                            <?php wp_nonce_field('tomatillo_bulk_optimize'); ?>
-                            <input type="hidden" name="start_bulk_optimization" value="1">
-                            <button type="submit" class="button button-primary button-large">Start Bulk Optimization</button>
-                        </form>
+                        <div style="display: flex; gap: 15px; align-items: center;">
+                            <button id="start-bulk-optimization" class="button button-primary button-large" style="padding: 12px 24px; font-size: 16px;">
+                                <span class="dashicons dashicons-controls-play" style="margin-right: 8px;"></span>
+                                Start Bulk Optimization
+                            </button>
+                            <button id="preview-bulk-optimization" class="button button-secondary" style="padding: 12px 20px;">
+                                <span class="dashicons dashicons-visibility" style="margin-right: 8px;"></span>
+                                Preview First 10 Images
+                            </button>
+                        </div>
                     </div>
                 <?php else: ?>
-                    <div style="background: #d1edff; border: 1px solid #74c0fc; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                        <p style="margin: 0;"><strong>All images are optimized!</strong> Your media library is fully optimized.</p>
+                    <div style="background: #d1edff; border: 2px solid #74c0fc; padding: 25px; border-radius: 12px; margin: 20px 0;">
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <span class="dashicons dashicons-yes-alt" style="font-size: 2em; color: #28a745;"></span>
+                            <div>
+                                <h4 style="margin: 0; color: #004085;">All Images Optimized!</h4>
+                                <p style="margin: 5px 0 0 0; color: #004085;">Your media library is fully optimized and ready to go.</p>
+                            </div>
+                        </div>
                     </div>
                 <?php endif; ?>
+            </div>
+            
+            <!-- Bulk Operations Progress Panel -->
+            <div id="bulk-progress-panel" style="display: none; background: #fff; border: 2px solid #007cba; border-radius: 12px; padding: 30px; margin: 20px 0; box-shadow: 0 4px 12px rgba(0, 124, 186, 0.15); max-width: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+                    <h3 style="margin: 0; color: #007cba; display: flex; align-items: center; gap: 10px; font-size: 1.5em;">
+                        <span class="dashicons dashicons-update" style="animation: spin 1s linear infinite;"></span>
+                        Bulk Optimization in Progress
+                    </h3>
+                    <button id="cancel-bulk-optimization" class="button button-secondary" style="display: none; padding: 8px 16px;">Cancel</button>
+                </div>
+                
+                <!-- Progress Bar -->
+                <div style="margin-bottom: 25px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <span id="progress-text" style="font-weight: 600; color: #1d2327;">Preparing optimization...</span>
+                        <span id="progress-percentage" style="font-weight: bold; color: #007cba; font-size: 1.1em;">0%</span>
+                    </div>
+                    <div style="background: #e1e1e1; height: 16px; border-radius: 8px; overflow: hidden;">
+                        <div id="progress-bar" style="background: linear-gradient(90deg, #007cba 0%, #00a0d2 100%); height: 100%; width: 0%; transition: width 0.3s ease; border-radius: 8px;"></div>
+                    </div>
+                </div>
+                
+                <!-- Statistics -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 20px; margin-bottom: 25px;">
+                    <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #28a745;">
+                        <div style="font-size: 2em; font-weight: bold; color: #28a745;" id="processed-count">0</div>
+                        <div style="font-size: 0.9em; color: #666; margin-top: 5px;">Processed</div>
+                    </div>
+                    <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #007cba;">
+                        <div style="font-size: 2em; font-weight: bold; color: #007cba;" id="success-count">0</div>
+                        <div style="font-size: 0.9em; color: #666; margin-top: 5px;">Successful</div>
+                    </div>
+                    <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #ffc107;">
+                        <div style="font-size: 2em; font-weight: bold; color: #ffc107;" id="skipped-count">0</div>
+                        <div style="font-size: 0.9em; color: #666; margin-top: 5px;">Skipped</div>
+                    </div>
+                    <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #dc3545;">
+                        <div style="font-size: 2em; font-weight: bold; color: #dc3545;" id="error-count">0</div>
+                        <div style="font-size: 0.9em; color: #666; margin-top: 5px;">Failed</div>
+                    </div>
+                    <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #6f42c1;">
+                        <div style="font-size: 2em; font-weight: bold; color: #6f42c1;" id="space-saved-count">0 B</div>
+                        <div style="font-size: 0.9em; color: #666; margin-top: 5px;">Space Saved</div>
+                    </div>
+                </div>
+                
+                <!-- Current Image Status -->
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px; border-left: 4px solid #007cba;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong id="current-image-name" style="font-size: 1.1em; color: #1d2327;">Preparing...</strong>
+                            <div style="font-size: 0.9em; color: #666; margin-top: 5px;" id="current-image-status">Initializing bulk optimization</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div id="current-image-size" style="font-size: 0.9em; color: #666;">-</div>
+                            <div id="current-image-savings" style="font-size: 0.9em; color: #28a745; font-weight: 600;">-</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Recent Activity Log -->
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 10px;">
+                    <h4 style="margin: 0 0 15px 0; font-size: 1.1em; color: #1d2327;">Recent Activity</h4>
+                    <div id="activity-log" style="max-height: 250px; overflow-y: auto; font-family: monospace; font-size: 13px; line-height: 1.5;">
+                        <div style="color: #666;">Waiting for optimization to start...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Optimization Management -->
+            <div class="card" style="max-width: none;">
+                <h2>Optimization Management</h2>
                 
                 <!-- Settings Overview -->
                 <h3>Current Settings</h3>
@@ -469,10 +571,11 @@ $memory_percentage = ($memory_usage / $memory_limit) * 100;
 .card {
     background: #fff;
     border: 1px solid #c3c4c7;
-    border-radius: 8px;
-    padding: 25px;
-    margin-bottom: 20px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    border-radius: 12px;
+    padding: 30px;
+    margin-bottom: 25px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    max-width: 100%;
 }
 
 .card h2 {
@@ -498,4 +601,423 @@ $memory_percentage = ($memory_usage / $memory_limit) * 100;
 .widefat tr:nth-child(even) {
     background: #f9f9f9;
 }
+
+/* Bulk Operations Styles */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.bulk-processing {
+    animation: pulse 2s infinite;
+}
+
+.activity-log-entry {
+    margin-bottom: 5px;
+    padding: 3px 0;
+    border-bottom: 1px solid #e1e1e1;
+}
+
+.activity-log-entry:last-child {
+    border-bottom: none;
+}
+
+.activity-log-success {
+    color: #28a745;
+}
+
+.activity-log-error {
+    color: #dc3545;
+}
+
+.activity-log-warning {
+    color: #ffc107;
+}
+
+.activity-log-info {
+    color: #007cba;
+}
+
+/* Progress Panel Animations */
+#bulk-progress-panel {
+    transition: all 0.3s ease;
+}
+
+#bulk-progress-panel.show {
+    display: block !important;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Status indicators */
+.status-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.status-indicator.success {
+    background: #28a745;
+}
+
+.status-indicator.error {
+    background: #dc3545;
+}
+
+.status-indicator.warning {
+    background: #ffc107;
+}
+
+.status-indicator.info {
+    background: #007cba;
+}
 </style>
+
+<script>
+jQuery(document).ready(function($) {
+    let bulkOptimizationInProgress = false;
+    let currentBatch = 0;
+    let totalImages = 0;
+    let processedImages = 0;
+    let successCount = 0;
+    let skippedCount = 0;
+    let errorCount = 0;
+    let totalSpaceSaved = 0;
+    
+    // Initialize bulk optimization functionality
+    initBulkOptimization();
+    
+    function initBulkOptimization() {
+        // Start bulk optimization button
+        $('#start-bulk-optimization').on('click', function() {
+            startBulkOptimization();
+        });
+        
+        // Preview bulk optimization button
+        $('#preview-bulk-optimization').on('click', function() {
+            previewBulkOptimization();
+        });
+        
+        // Cancel bulk optimization button
+        $('#cancel-bulk-optimization').on('click', function() {
+            cancelBulkOptimization();
+        });
+    }
+    
+    function startBulkOptimization() {
+        if (bulkOptimizationInProgress) {
+            return;
+        }
+        
+        bulkOptimizationInProgress = true;
+        
+        // Show progress panel
+        $('#bulk-progress-panel').addClass('show').show();
+        
+        // Reset counters
+        currentBatch = 0;
+        processedImages = 0;
+        successCount = 0;
+        skippedCount = 0;
+        errorCount = 0;
+        totalSpaceSaved = 0;
+        
+        // Update UI
+        updateProgressUI();
+        addActivityLog('Starting bulk optimization...', 'info');
+        
+        // Get total images count
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'tomatillo_get_unoptimized_count',
+                nonce: '<?php echo wp_create_nonce('tomatillo_bulk_optimize'); ?>'
+            },
+            success: function(response) {
+                if (response.success) {
+                    totalImages = response.data.count;
+                    addActivityLog(`Found ${totalImages} images to optimize`, 'info');
+                    processNextBatch();
+                } else {
+                    addActivityLog('Failed to get image count: ' + response.data, 'error');
+                    stopBulkOptimization();
+                }
+            },
+            error: function() {
+                addActivityLog('Error getting image count', 'error');
+                stopBulkOptimization();
+            }
+        });
+    }
+    
+    function processNextBatch() {
+        if (!bulkOptimizationInProgress) {
+            return;
+        }
+        
+        currentBatch++;
+        addActivityLog(`Processing batch ${currentBatch}...`, 'info');
+        
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'tomatillo_process_bulk_batch',
+                batch: currentBatch,
+                nonce: '<?php echo wp_create_nonce('tomatillo_bulk_optimize'); ?>'
+            },
+            success: function(response) {
+                if (response.success) {
+                    handleBatchResponse(response.data);
+                } else {
+                    addActivityLog('Batch processing failed: ' + response.data, 'error');
+                    errorCount++;
+                }
+                
+                // Continue with next batch or finish
+                if (processedImages < totalImages && bulkOptimizationInProgress) {
+                    setTimeout(processNextBatch, 1000); // 1 second delay between batches
+                } else {
+                    finishBulkOptimization();
+                }
+            },
+            error: function() {
+                addActivityLog('Network error during batch processing', 'error');
+                errorCount++;
+                
+                if (processedImages < totalImages && bulkOptimizationInProgress) {
+                    setTimeout(processNextBatch, 2000); // Longer delay on error
+                } else {
+                    finishBulkOptimization();
+                }
+            }
+        });
+    }
+    
+    function handleBatchResponse(batchData) {
+        if (batchData.images && batchData.images.length > 0) {
+            batchData.images.forEach(function(image) {
+                processedImages++;
+                
+                if (image.success) {
+                    // Check if it's a skip or actual success using the skipped flag
+                    if (image.skipped) {
+                        skippedCount++;
+                        let reason = image.error || 'Skipped';
+                        addActivityLog(`⚠ ${image.filename}: ${reason}`, 'warning');
+                        
+                        // Update current image display
+                        $('#current-image-name').text(image.filename);
+                        $('#current-image-status').text('Skipped: ' + reason);
+                        $('#current-image-size').text(formatFileSize(image.original_size));
+                        $('#current-image-savings').text('Skipped');
+                    } else {
+                        successCount++;
+                        totalSpaceSaved += image.space_saved || 0;
+                        
+                        let savingsText = image.space_saved ? formatFileSize(image.space_saved) : '';
+                        let savingsPercent = image.savings_percent ? ` (${image.savings_percent}%)` : '';
+                        
+                        addActivityLog(`✓ ${image.filename}: ${savingsText}${savingsPercent}`, 'success');
+                        
+                        // Update current image display
+                        $('#current-image-name').text(image.filename);
+                        $('#current-image-status').text('Optimized successfully');
+                        $('#current-image-size').text(formatFileSize(image.original_size));
+                        $('#current-image-savings').text(savingsText + savingsPercent);
+                    }
+                } else {
+                    errorCount++;
+                    let reason = image.error || 'Unknown error';
+                    addActivityLog(`✗ ${image.filename}: ${reason}`, 'error');
+                    
+                    // Update current image display
+                    $('#current-image-name').text(image.filename);
+                    $('#current-image-status').text('Failed: ' + reason);
+                    $('#current-image-size').text(formatFileSize(image.original_size));
+                    $('#current-image-savings').text('Failed');
+                }
+                
+                updateProgressUI();
+            });
+        }
+    }
+    
+    function finishBulkOptimization() {
+        bulkOptimizationInProgress = false;
+        
+        // Update final status
+        $('#progress-text').text('Optimization completed');
+        $('#current-image-name').text('All images processed');
+        $('#current-image-status').text('Bulk optimization finished');
+        
+        // Show completion message
+        let message = `Bulk optimization completed! Processed ${processedImages} images: ${successCount} successful, ${skippedCount} skipped, ${errorCount} failed.`;
+        if (totalSpaceSaved > 0) {
+            message += ` Total space saved: ${formatFileSize(totalSpaceSaved)}.`;
+        }
+        
+        addActivityLog(message, successCount > errorCount ? 'success' : 'warning');
+        
+        // Hide cancel button, show completion
+        $('#cancel-bulk-optimization').hide();
+        
+        // Add completion notice
+        setTimeout(function() {
+            showCompletionNotice();
+        }, 2000);
+    }
+    
+    function stopBulkOptimization() {
+        bulkOptimizationInProgress = false;
+        $('#progress-text').text('Optimization stopped');
+        addActivityLog('Bulk optimization stopped by user', 'warning');
+        $('#cancel-bulk-optimization').hide();
+    }
+    
+    function cancelBulkOptimization() {
+        if (confirm('Are you sure you want to cancel the bulk optimization?')) {
+            stopBulkOptimization();
+        }
+    }
+    
+    function previewBulkOptimization() {
+        addActivityLog('Loading preview of first 10 images...', 'info');
+        
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'tomatillo_preview_bulk_optimization',
+                nonce: '<?php echo wp_create_nonce('tomatillo_bulk_optimize'); ?>'
+            },
+            success: function(response) {
+                if (response.success) {
+                    showPreviewModal(response.data);
+                } else {
+                    addActivityLog('Failed to load preview: ' + response.data, 'error');
+                }
+            },
+            error: function() {
+                addActivityLog('Error loading preview', 'error');
+            }
+        });
+    }
+    
+    function showPreviewModal(previewData) {
+        let modalHtml = `
+            <div id="preview-modal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center;">
+                <div style="background: white; padding: 30px; border-radius: 8px; max-width: 600px; max-height: 80%; overflow-y: auto;">
+                    <h3>Preview: First 10 Images</h3>
+                    <div style="margin: 20px 0;">
+        `;
+        
+        previewData.images.forEach(function(image) {
+            modalHtml += `
+                <div style="padding: 10px; border-bottom: 1px solid #eee;">
+                    <strong>${image.filename}</strong><br>
+                    <small>Size: ${formatFileSize(image.size)} | Type: ${image.type}</small>
+                </div>
+            `;
+        });
+        
+        modalHtml += `
+                    </div>
+                    <div style="text-align: right;">
+                        <button class="button button-secondary" onclick="jQuery('#preview-modal').remove();">Close</button>
+                        <button class="button button-primary" onclick="jQuery('#preview-modal').remove(); startBulkOptimization();" style="margin-left: 10px;">Start Optimization</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        $('body').append(modalHtml);
+    }
+    
+    function updateProgressUI() {
+        // Fix progress bar calculation - cap at 100%
+        let percentage = totalImages > 0 ? Math.min(100, Math.round((processedImages / totalImages) * 100)) : 0;
+        
+        $('#progress-percentage').text(percentage + '%');
+        $('#progress-bar').css('width', percentage + '%');
+        $('#processed-count').text(processedImages);
+        $('#success-count').text(successCount);
+        $('#skipped-count').text(skippedCount);
+        $('#error-count').text(errorCount);
+        $('#space-saved-count').text(formatFileSize(totalSpaceSaved));
+        
+        if (processedImages < totalImages) {
+            $('#progress-text').text(`Processing image ${processedImages + 1} of ${totalImages}...`);
+        }
+    }
+    
+    function addActivityLog(message, type) {
+        let timestamp = new Date().toLocaleTimeString();
+        let logEntry = `
+            <div class="activity-log-entry activity-log-${type}">
+                <span class="status-indicator ${type}"></span>
+                [${timestamp}] ${message}
+            </div>
+        `;
+        
+        $('#activity-log').append(logEntry);
+        
+        // Auto-scroll to bottom
+        let logContainer = $('#activity-log')[0];
+        logContainer.scrollTop = logContainer.scrollHeight;
+        
+        // Keep only last 50 entries
+        let entries = $('#activity-log .activity-log-entry');
+        if (entries.length > 50) {
+            entries.slice(0, entries.length - 50).remove();
+        }
+    }
+    
+    function showCompletionNotice() {
+        let noticeClass = successCount > errorCount ? 'notice-success' : 'notice-warning';
+        let noticeHtml = `
+            <div class="notice ${noticeClass} is-dismissible" style="margin: 20px 0;">
+                <p><strong>Bulk Optimization Complete!</strong> 
+                Processed ${processedImages} images: ${successCount} successful, ${skippedCount} skipped, ${errorCount} failed.
+                ${totalSpaceSaved > 0 ? ` Total space saved: ${formatFileSize(totalSpaceSaved)}.` : ''}</p>
+            </div>
+        `;
+        
+        $('.wrap h1').after(noticeHtml);
+        
+        // Auto-dismiss after 10 seconds
+        setTimeout(function() {
+            $('.notice').fadeOut();
+        }, 10000);
+    }
+    
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 B';
+        
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+});
+</script>

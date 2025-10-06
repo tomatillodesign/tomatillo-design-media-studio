@@ -330,6 +330,15 @@ $has_more = count($images) === $images_per_page;
                                 class="gallery-image"
                             >
                             
+                            <!-- Optimized Watermark -->
+                            <?php if ($is_optimized): ?>
+                                <div class="optimized-watermark">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <polygon points="13,2 3,14 12,14 11,22 21,10 12,10"></polygon>
+                                    </svg>
+                                </div>
+                            <?php endif; ?>
+                            
                             <!-- Overlay -->
                             <div class="image-overlay">
                                 <div class="overlay-content">
@@ -639,6 +648,12 @@ $has_more = count($images) === $images_per_page;
                                 <span class="dashicons dashicons-chart-line badge-icon"></span>
                                 <span class="badge-label">Space Saved:</span>
                                 <span class="badge-text" id="modal-space-saved">0 B</span>
+                            </div>
+                            <div class="debug-button-group">
+                                <button type="button" class="debug-image-btn" onclick="debugImage()">
+                                    <span class="dashicons dashicons-search badge-icon"></span>
+                                    <span class="badge-label">Debug Image</span>
+                                </button>
                             </div>
                         </div>
                         
@@ -1018,21 +1033,39 @@ $has_more = count($images) === $images_per_page;
 
 .upload-file-item {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid #f3f4f6;
+    flex-direction: column;
+    padding: 15px;
+    border-bottom: 1px solid #e1e1e1;
+    background: #fafafa;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.upload-file-item.completed {
+    background: #f8f9fa;
+    opacity: 0.8;
+    border-left: 3px solid #28a745;
+}
+
+.upload-file-item.uploading {
+    background: #e3f2fd !important;
+    border-left: 3px solid #007cba;
+    box-shadow: 0 2px 8px rgba(0, 124, 186, 0.2);
+    transform: scale(1.02);
+    border-radius: 8px !important;
 }
 
 .upload-file-item:last-child {
     border-bottom: none;
+    margin-bottom: 0;
 }
 
 .upload-file-name {
     font-size: 0.875rem;
     color: #374151;
-    flex: 1;
-    margin-right: 1rem;
+    font-weight: 500;
+    margin-bottom: 8px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1040,29 +1073,59 @@ $has_more = count($images) === $images_per_page;
 
 .upload-file-status {
     font-size: 0.75rem;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
+    padding: 4px 8px;
+    border-radius: 12px;
     font-weight: 500;
+    min-width: 60px;
+    text-align: center;
+    margin-bottom: 8px;
+    align-self: flex-start;
 }
 
 .upload-file-status.pending {
-    background: #fef3c7;
-    color: #92400e;
+    background: #fff3cd;
+    color: #856404;
 }
 
 .upload-file-status.uploading {
-    background: #dbeafe;
-    color: #1e40af;
+    background: #cce5ff;
+    color: #004085;
+    animation: pulse 1.5s ease-in-out infinite;
 }
 
 .upload-file-status.success {
-    background: #d1fae5;
-    color: #065f46;
+    background: #d1edff;
+    color: #004085;
 }
 
 .upload-file-status.error {
-    background: #fee2e2;
-    color: #991b1b;
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.upload-file-progress {
+    width: 100%;
+}
+
+.upload-file-progress-bar {
+    width: 100%;
+    height: 4px;
+    background: #e1e1e1;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.upload-file-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #007cba 0%, #00a0d2 100%);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
 }
 
 /* File Modal Styles */
@@ -2117,9 +2180,6 @@ $has_more = count($images) === $images_per_page;
     content: "\f123"; /* dashicons-media-document */
     color: #6b7280; /* All same neutral color */
 }
-    content: "\f123"; /* dashicons-media-document */
-    color: #2563eb; /* Blue for Word */
-}
 
 .file-type-icon.file-type-xls::before,
 .file-type-icon.file-type-xlsx::before {
@@ -2630,6 +2690,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const files = Array.from(formData.getAll('files[]'));
             let uploadedCount = 0;
             let totalFiles = files.length;
+            let successfulCount = 0;
+            let failedCount = 0;
+            let currentXhr = null;
             
             // Initialize file list
             filesList.innerHTML = '';
@@ -2639,108 +2702,188 @@ document.addEventListener('DOMContentLoaded', function() {
                 fileItem.innerHTML = `
                     <div class="upload-file-name">${file.name}</div>
                     <div class="upload-file-status pending">Pending</div>
+                    <div class="upload-file-progress">
+                        <div class="upload-file-progress-bar">
+                            <div class="upload-file-progress-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
                 `;
                 filesList.appendChild(fileItem);
             });
             
             // Update status
-            uploadStatus.textContent = `Uploading 0 of ${totalFiles} files...`;
-            
-            // Create XMLHttpRequest for progress tracking
-            const xhr = new XMLHttpRequest();
-            
-            // Track upload progress
-            xhr.upload.addEventListener('progress', (e) => {
-                if (e.lengthComputable) {
-                    const percentComplete = (e.loaded / e.total) * 100;
-                    progressFill.style.width = percentComplete + '%';
-                    
-                    // Update status during upload
-                    if (percentComplete < 100) {
-                        uploadStatus.textContent = `Uploading files... ${Math.round(percentComplete)}%`;
-                    } else {
-                        uploadStatus.textContent = `Processing files on server...`;
-                        progressFill.classList.add('processing');
-                    }
-                }
-            });
-            
-            // Handle response
-            xhr.addEventListener('load', () => {
-                if (xhr.status === 200) {
-                    try {
-                        const data = JSON.parse(xhr.responseText);
-                        if (data.success) {
-                            // Update all files as successful
-                            const fileItems = filesList.querySelectorAll('.upload-file-item');
-                            fileItems.forEach(item => {
-                                const status = item.querySelector('.upload-file-status');
-                                status.textContent = 'Success';
-                                status.className = 'upload-file-status success';
-                            });
-                            
-                            uploadStatus.textContent = `Successfully uploaded ${totalFiles} files!`;
-                            progressFill.style.width = '100%';
-                            progressFill.classList.remove('processing');
-                            
-                            // Reload after a short delay
-                            setTimeout(() => {
-                                window.location.reload();
-                            }, 1500);
-                        } else {
-                            throw new Error(data.data || 'Upload failed');
-                        }
-                    } catch (error) {
-                        console.error('Upload error:', error);
-                        uploadStatus.textContent = 'Upload failed: ' + error.message;
-                        progressFill.classList.remove('processing');
-                        
-                        // Mark all files as failed
-                        const fileItems = filesList.querySelectorAll('.upload-file-item');
-                        fileItems.forEach(item => {
-                            const status = item.querySelector('.upload-file-status');
-                            status.textContent = 'Failed';
-                            status.className = 'upload-file-status error';
-                        });
-                    }
-                } else {
-                    uploadStatus.textContent = 'Upload failed: Server error';
-                    progressFill.classList.remove('processing');
-                    
-                    // Mark all files as failed
-                    const fileItems = filesList.querySelectorAll('.upload-file-item');
-                    fileItems.forEach(item => {
-                        const status = item.querySelector('.upload-file-status');
-                        status.textContent = 'Failed';
-                        status.className = 'upload-file-status error';
-                    });
-                }
-            });
-            
-            // Handle errors
-            xhr.addEventListener('error', () => {
-                uploadStatus.textContent = 'Upload failed: Network error';
-                progressFill.classList.remove('processing');
-                
-                // Mark all files as failed
-                const fileItems = filesList.querySelectorAll('.upload-file-item');
-                fileItems.forEach(item => {
-                    const status = item.querySelector('.upload-file-status');
-                    status.textContent = 'Failed';
-                    status.className = 'upload-file-status error';
-                });
-            });
+            uploadStatus.textContent = `Preparing to upload ${totalFiles} files...`;
             
             // Set up cancel functionality
             const cancelBtn = document.getElementById('upload-cancel-btn');
             cancelBtn.addEventListener('click', () => {
-                xhr.abort();
+                if (currentXhr) {
+                    currentXhr.abort();
+                }
                 progressOverlay.classList.remove('active');
             });
             
-            // Start upload
-                xhr.open('POST', '<?php echo admin_url('admin-ajax.php'); ?>?action=tomatillo_upload_files');
-            xhr.send(formData);
+            // Upload files one by one
+            uploadNextFile(0);
+            
+            function uploadNextFile(index) {
+                if (index >= files.length) {
+                    // All files processed
+                    const successRate = totalFiles > 0 ? Math.round((successfulCount / totalFiles) * 100) : 0;
+                    uploadStatus.textContent = `Upload complete! ${successfulCount}/${totalFiles} files successful (${successRate}%)`;
+                    progressFill.style.width = '100%';
+                    progressFill.classList.remove('processing');
+                    
+                    // Reload after a short delay
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                    return;
+                }
+                
+                const file = files[index];
+                const fileItem = filesList.children[index];
+                const statusElement = fileItem.querySelector('.upload-file-status');
+                const progressBar = fileItem.querySelector('.upload-file-progress-fill');
+                
+                // Update status to uploading
+                statusElement.textContent = 'Uploading...';
+                statusElement.className = 'upload-file-status uploading';
+                uploadStatus.textContent = `Uploading file ${index + 1} of ${totalFiles}: ${file.name}`;
+                
+                // Move current uploading file to top
+                moveToTop(fileItem);
+                
+                // Create FormData for single file
+                const singleFileFormData = new FormData();
+                singleFileFormData.append('file', file);
+                singleFileFormData.append('action', 'tomatillo_upload_single_file');
+                
+                // Create XMLHttpRequest for this file
+                currentXhr = new XMLHttpRequest();
+                
+                // Track upload progress for this file
+                currentXhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const filePercentComplete = (e.loaded / e.total) * 100;
+                        progressBar.style.width = filePercentComplete + '%';
+                        
+                        // Update overall progress
+                        const overallProgress = ((index + (filePercentComplete / 100)) / totalFiles) * 100;
+                        progressFill.style.width = overallProgress + '%';
+                    }
+                });
+                
+                // Handle response
+                currentXhr.addEventListener('load', () => {
+                    uploadedCount++;
+                    
+                    if (currentXhr.status === 200) {
+                        try {
+                            const data = JSON.parse(currentXhr.responseText);
+                            if (data.success) {
+                                // Success
+                                statusElement.textContent = 'Success';
+                                statusElement.className = 'upload-file-status success';
+                                progressBar.style.width = '100%';
+                                successfulCount++;
+                                
+                                // Add file size info
+                                if (data.data && data.data.file_size_formatted) {
+                                    statusElement.textContent = `Success (${data.data.file_size_formatted})`;
+                                }
+                            } else {
+                                // Failed
+                                statusElement.textContent = 'Failed';
+                                statusElement.className = 'upload-file-status error';
+                                progressBar.style.width = '100%';
+                                failedCount++;
+                                
+                                // Add error details
+                                if (data.data) {
+                                    statusElement.textContent = `Failed: ${data.data}`;
+                                }
+                            }
+                        } catch (error) {
+                            console.error('Upload error:', error);
+                            statusElement.textContent = 'Failed: Parse error';
+                            statusElement.className = 'upload-file-status error';
+                            progressBar.style.width = '100%';
+                            failedCount++;
+                        }
+                    } else {
+                        statusElement.textContent = 'Failed: Server error';
+                        statusElement.className = 'upload-file-status error';
+                        progressBar.style.width = '100%';
+                        failedCount++;
+                    }
+                    
+                    // Move completed file back to its original position
+                    moveToOriginalPosition(fileItem, index);
+                    
+                    // Update overall progress
+                    const overallProgress = (uploadedCount / totalFiles) * 100;
+                    progressFill.style.width = overallProgress + '%';
+                    
+                    // Move to next file
+                    setTimeout(() => {
+                        uploadNextFile(index + 1);
+                    }, 500); // Small delay between files
+                });
+                
+                // Handle errors
+                currentXhr.addEventListener('error', () => {
+                    uploadedCount++;
+                    statusElement.textContent = 'Failed: Network error';
+                    statusElement.className = 'upload-file-status error';
+                    progressBar.style.width = '100%';
+                    failedCount++;
+                    
+                    // Move completed file back to its original position
+                    moveToOriginalPosition(fileItem, index);
+                    
+                    // Update overall progress
+                    const overallProgress = (uploadedCount / totalFiles) * 100;
+                    progressFill.style.width = overallProgress + '%';
+                    
+                    // Move to next file
+                    setTimeout(() => {
+                        uploadNextFile(index + 1);
+                    }, 500);
+                });
+                
+                // Send request
+                currentXhr.open('POST', '<?php echo admin_url('admin-ajax.php'); ?>');
+                currentXhr.send(singleFileFormData);
+            }
+            
+            function moveToTop(fileItem) {
+                // Add uploading class and move to top
+                fileItem.classList.add('uploading');
+                fileItem.style.transition = 'all 0.2s ease';
+                
+                // Move to top
+                filesList.insertBefore(fileItem, filesList.firstChild);
+            }
+            
+            function moveToOriginalPosition(fileItem, originalIndex) {
+                // Remove uploading class
+                fileItem.classList.remove('uploading');
+                fileItem.style.transition = 'all 0.2s ease';
+                
+                // Calculate where it should go back to
+                // Find the position after all completed files
+                const completedCount = uploadedCount;
+                const targetPosition = Math.min(originalIndex, filesList.children.length - completedCount - 1);
+                
+                // Move back to original position
+                if (targetPosition >= 0 && targetPosition < filesList.children.length) {
+                    const targetElement = filesList.children[targetPosition];
+                    if (targetElement && targetElement !== fileItem) {
+                        filesList.insertBefore(fileItem, targetElement);
+                    }
+                }
+            }
         }
     }
     
@@ -3129,6 +3272,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function openModal(imageId) {
         currentImageId = imageId;
+        window.currentImageId = imageId; // Set global variable for debug function
         const modal = document.getElementById('image-modal');
         
         // Load image data
@@ -3266,6 +3410,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const modal = document.getElementById('image-modal');
         modal.classList.remove('active');
         currentImageId = null;
+        window.currentImageId = null; // Clear global variable
         
         // Remove keyboard event listeners
         document.removeEventListener('keydown', handleKeyboard);
@@ -3745,6 +3890,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Clear all visual selections - more robust approach
             selectedItems.clear();
+            lastSelectedItem = null; // Reset last selected item for SHIFT+click
             
             // Clear gallery items
             document.querySelectorAll('.gallery-item.selected').forEach(item => {
@@ -3767,6 +3913,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 100);
         }
         
+        // Track last selected item for SHIFT+click range selection
+        let lastSelectedItem = null;
+        
         // Add click handlers to gallery items for bulk selection
         // This handler runs first and intercepts clicks when in bulk mode
         document.addEventListener('click', function(e) {
@@ -3781,16 +3930,48 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const itemId = galleryItem.dataset.id;
             
-            if (selectedItems.has(itemId)) {
-                selectedItems.delete(itemId);
-                galleryItem.classList.remove('selected');
+            if (e.shiftKey && lastSelectedItem && lastSelectedItem !== galleryItem) {
+                // SHIFT+click: select range between last selected and current
+                selectRange(lastSelectedItem, galleryItem);
             } else {
-                selectedItems.add(itemId);
-                galleryItem.classList.add('selected');
+                // Regular click: toggle single item
+                if (selectedItems.has(itemId)) {
+                    selectedItems.delete(itemId);
+                    galleryItem.classList.remove('selected');
+                } else {
+                    selectedItems.add(itemId);
+                    galleryItem.classList.add('selected');
+                }
+                lastSelectedItem = galleryItem;
             }
             
             updateBulkCount();
         }, true); // Use capture phase to run before other handlers
+        
+        function selectRange(startItem, endItem) {
+            // Get all gallery items in the same container
+            const container = startItem.parentElement;
+            const allItems = Array.from(container.querySelectorAll('.gallery-item, .file-item'));
+            
+            // Find indices of start and end items
+            const startIndex = allItems.indexOf(startItem);
+            const endIndex = allItems.indexOf(endItem);
+            
+            if (startIndex === -1 || endIndex === -1) return;
+            
+            // Determine range (handle both directions)
+            const minIndex = Math.min(startIndex, endIndex);
+            const maxIndex = Math.max(startIndex, endIndex);
+            
+            // Select all items in range
+            for (let i = minIndex; i <= maxIndex; i++) {
+                const item = allItems[i];
+                const itemId = item.dataset.id;
+                
+                selectedItems.add(itemId);
+                item.classList.add('selected');
+            }
+        }
         
         function updateBulkCount() {
             const count = selectedItems.size;
@@ -3873,6 +4054,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Exit bulk mode
                     exitBulkMode();
+                    
+                    // Reload page after a short delay to prevent broken state
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
                 } else {
                     showToast(data.data || 'Failed to delete images', 'error');
                 }
@@ -3963,4 +4149,135 @@ document.addEventListener('DOMContentLoaded', function() {
         initializeHashNavigation();
     }, 100);
 });
+
+// Global debug function for image optimization troubleshooting
+function debugImage() {
+    if (!window.currentImageId) {
+        alert('No image selected. Please open an image modal first.');
+        return;
+    }
+    
+    console.log('Debugging image ID:', window.currentImageId);
+    
+    fetch(`<?php echo admin_url('admin-ajax.php'); ?>?action=tomatillo_debug_image&image_id=${window.currentImageId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('Debug Info:', data.data);
+                
+                // Create a debug modal
+                const debugModal = document.createElement('div');
+                debugModal.className = 'debug-modal';
+                debugModal.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0,0,0,0.8);
+                    z-index: 10000;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                `;
+                
+                const debugContent = document.createElement('div');
+                debugContent.style.cssText = `
+                    background: white;
+                    padding: 30px;
+                    border-radius: 8px;
+                    max-width: 600px;
+                    max-height: 80vh;
+                    overflow-y: auto;
+                    font-family: monospace;
+                    font-size: 12px;
+                    line-height: 1.4;
+                `;
+                
+                const debugInfo = data.data;
+                let html = '<h3>Image Debug Information</h3>';
+                html += `<p><strong>Image ID:</strong> ${debugInfo.image_id}</p>`;
+                
+                html += '<h4>Checks:</h4>';
+                html += `<p><strong>Image Exists:</strong> ${debugInfo.checks.image_exists ? '✅ Yes' : '❌ No'}</p>`;
+                html += `<p><strong>Is Optimized:</strong> ${debugInfo.checks.is_optimized ? '✅ Yes' : '❌ No'}</p>`;
+                
+                html += '<h4>Files:</h4>';
+                html += `<p><strong>Original Path:</strong> ${debugInfo.files.original_path || 'N/A'}</p>`;
+                html += `<p><strong>Original Exists:</strong> ${debugInfo.files.original_exists ? '✅ Yes' : '❌ No'}</p>`;
+                html += `<p><strong>Original Size:</strong> ${debugInfo.files.original_size ? (debugInfo.files.original_size / 1024).toFixed(1) + ' KB' : 'N/A'}</p>`;
+                html += `<p><strong>AVIF Path:</strong> ${debugInfo.files.avif_path || 'N/A'}</p>`;
+                html += `<p><strong>AVIF Exists:</strong> ${debugInfo.files.avif_exists ? '✅ Yes' : '❌ No'}</p>`;
+                html += `<p><strong>AVIF Size:</strong> ${debugInfo.files.avif_size ? (debugInfo.files.avif_size / 1024).toFixed(1) + ' KB' : 'N/A'}</p>`;
+                html += `<p><strong>WebP Path:</strong> ${debugInfo.files.webp_path || 'N/A'}</p>`;
+                html += `<p><strong>WebP Exists:</strong> ${debugInfo.files.webp_exists ? '✅ Yes' : '❌ No'}</p>`;
+                html += `<p><strong>WebP Size:</strong> ${debugInfo.files.webp_size ? (debugInfo.files.webp_size / 1024).toFixed(1) + ' KB' : 'N/A'}</p>`;
+                
+                html += '<h4>Database:</h4>';
+                html += `<p><strong>Has Record:</strong> ${debugInfo.database.has_record ? '✅ Yes' : '❌ No'}</p>`;
+                if (debugInfo.database.has_record) {
+                    html += `<p><strong>Status:</strong> ${debugInfo.database.status || 'N/A'}</p>`;
+                    html += `<p><strong>DB AVIF Path:</strong> ${debugInfo.database.avif_path || 'N/A'}</p>`;
+                    html += `<p><strong>DB WebP Path:</strong> ${debugInfo.database.webp_path || 'N/A'}</p>`;
+                }
+                
+                html += '<h4>Settings:</h4>';
+                html += `<p><strong>AVIF Enabled:</strong> ${debugInfo.settings.avif_enabled ? '✅ Yes' : '❌ No'}</p>`;
+                html += `<p><strong>WebP Enabled:</strong> ${debugInfo.settings.webp_enabled ? '✅ Yes' : '❌ No'}</p>`;
+                html += `<p><strong>Optimization Enabled:</strong> ${debugInfo.settings.optimization_enabled ? '✅ Yes' : '❌ No'}</p>`;
+                html += `<p><strong>AVIF Quality:</strong> ${debugInfo.settings.avif_quality || 'N/A'}</p>`;
+                html += `<p><strong>WebP Quality:</strong> ${debugInfo.settings.webp_quality || 'N/A'}</p>`;
+                
+                // Add fix button if files exist but no database record
+                if ((debugInfo.files.avif_exists || debugInfo.files.webp_exists) && !debugInfo.database.has_record) {
+                    html += '<br><button onclick="fixImageDatabase()" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">Fix Database Record</button>';
+                }
+                
+                html += '<br><button onclick="this.parentElement.parentElement.remove()" style="padding: 10px 20px; background: #007cba; color: white; border: none; border-radius: 4px; cursor: pointer;">Close Debug</button>';
+                
+                debugContent.innerHTML = html;
+                debugModal.appendChild(debugContent);
+                document.body.appendChild(debugModal);
+                
+            } else {
+                alert('Debug failed: ' + (data.data || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Debug error:', error);
+            alert('Debug error: ' + error.message);
+        });
+}
+
+// Global function to fix image database record
+function fixImageDatabase() {
+    if (!window.currentImageId) {
+        alert('No image selected.');
+        return;
+    }
+    
+    if (!confirm('This will create a database record for the existing optimized files. Continue?')) {
+        return;
+    }
+    
+    fetch(`<?php echo admin_url('admin-ajax.php'); ?>?action=tomatillo_fix_image_database&image_id=${window.currentImageId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Database record created successfully! The AVIF/WebP URLs should now appear in the modal.');
+                // Close debug modal and refresh image modal
+                document.querySelector('.debug-modal').remove();
+                // Reload the image data to show the new URLs
+                if (typeof loadImageData === 'function') {
+                    loadImageData(window.currentImageId).then(populateModal);
+                }
+            } else {
+                alert('Failed to create database record: ' + (data.data || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Fix database error:', error);
+            alert('Error: ' + error.message);
+        });
+}
 </script>

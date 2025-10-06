@@ -108,6 +108,102 @@
     padding: 15px 10px;
 }
 
+/* Modern 2025 Toggle Styling */
+.tomatillo-toggle {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 28px;
+    margin-right: 12px;
+    vertical-align: middle;
+}
+
+.tomatillo-toggle input[type="checkbox"] {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+}
+
+.tomatillo-toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #e5e7eb;
+    border-radius: 28px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.tomatillo-toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 22px;
+    width: 22px;
+    left: 3px;
+    bottom: 3px;
+    background: #ffffff;
+    border-radius: 50%;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.tomatillo-toggle input:checked + .tomatillo-toggle-slider {
+    background: #3b82f6;
+    box-shadow: inset 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
+.tomatillo-toggle input:checked + .tomatillo-toggle-slider:before {
+    transform: translateX(22px);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+}
+
+.tomatillo-toggle input:focus + .tomatillo-toggle-slider {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+.tomatillo-toggle input:disabled + .tomatillo-toggle-slider {
+    background: #f3f4f6;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.tomatillo-toggle input:disabled + .tomatillo-toggle-slider:before {
+    background: #d1d5db;
+}
+
+/* Toggle Label Styling */
+.tomatillo-toggle-label {
+    display: flex;
+    align-items: flex-start;
+    font-weight: 500;
+    color: #374151;
+    cursor: pointer;
+    user-select: none;
+    line-height: 1.4;
+    gap: 12px;
+}
+
+.tomatillo-toggle-label:hover {
+    color: #1f2937;
+}
+
+.tomatillo-toggle-label .tomatillo-toggle {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+/* Handle text that comes after the toggle */
+.tomatillo-toggle-label > *:not(.tomatillo-toggle) {
+    flex: 1;
+    min-width: 0;
+    margin-top: 2px;
+}
+
 .form-table input[type="checkbox"] {
     margin-right: 8px;
 }
@@ -314,6 +410,33 @@
     border-radius: 10px;
 }
 
+/* Optimized Icon Styles */
+.optimized-watermark {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 10;
+    opacity: 0.7;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+.optimized-watermark svg {
+    color: rgba(255, 255, 255, 0.9);
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    padding: 3px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(2px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    width: 16px;
+    height: 16px;
+}
+
+.gallery-item:hover .optimized-watermark {
+    opacity: 1;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
     .tomatillo-stats-grid {
@@ -334,4 +457,60 @@
         grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
         gap: 15px;
     }
+    
+    .optimized-watermark {
+        top: 6px;
+        right: 6px;
+    }
+    
+    .optimized-watermark svg {
+        width: 14px;
+        height: 14px;
+        padding: 2px;
+    }
+}
+
+/* Debug Image Button */
+.debug-button-group {
+    margin-top: 0;
+    padding-top: 0;
+}
+
+.debug-button-group .debug-image-btn {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    padding: 0.5rem 0.75rem !important;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    color: #6b7280 !important;
+    width: 100%;
+    justify-content: flex-start;
+    margin: 0 !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+.debug-button-group .debug-image-btn:hover {
+    background: #f1f5f9 !important;
+    border-color: #3b82f6 !important;
+    color: #374151 !important;
+    transform: translateY(-1px);
+}
+
+.debug-button-group .debug-image-btn .badge-icon {
+    font-size: 14px;
+    color: #6b7280;
+}
+
+.debug-button-group .debug-image-btn:hover .badge-icon {
+    color: #374151;
+}
+
+.debug-button-group .debug-image-btn .badge-label {
+    font-weight: 500;
 }

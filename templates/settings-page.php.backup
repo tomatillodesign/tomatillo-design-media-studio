@@ -53,11 +53,11 @@ $stats = tomatillo_media_studio()->core->get_media_stats();
                 
                 <table class="form-table">
                     <tr>
-                        <th scope="row"><?php _e('Image Processing Engine', 'tomatillo-media-studio'); ?></th>
+                        <th scope="row"><?php _e('Image Optimization', 'tomatillo-media-studio'); ?></th>
                         <td>
                             <label class="tomatillo-toggle-label">
                                 <div class="tomatillo-toggle">
-                                    <input type="checkbox" name="tomatillo_media_studio_settings[enable_optimization]" value="1" <?php checked($settings->is_optimization_enabled()); ?> />
+                                    <div class="tomatillo-toggle"><input type="checkbox" name="tomatillo_media_studio_settings[enable_optimization]" value="1" <?php checked($settings->is_optimization_enabled()); ?> />
                                     <span class="tomatillo-toggle-slider"></span>
                                 </div>
                                 <?php _e('Enable automatic AVIF/WebP conversion and optimization', 'tomatillo-media-studio'); ?>
@@ -66,11 +66,11 @@ $stats = tomatillo_media_studio()->core->get_media_stats();
                         </td>
                     </tr>
                     <tr>
-                        <th scope="row"><?php _e('Enhanced Gallery Interface', 'tomatillo-media-studio'); ?></th>
+                        <th scope="row"><?php _e('Modern Media Library', 'tomatillo-media-studio'); ?></th>
                         <td>
                             <label class="tomatillo-toggle-label">
                                 <div class="tomatillo-toggle">
-                                    <input type="checkbox" name="tomatillo_media_studio_settings[enable_media_library]" value="1" <?php checked($settings->is_media_library_enabled()); ?> />
+                                    <div class="tomatillo-toggle"><input type="checkbox" name="tomatillo_media_studio_settings[enable_media_library]" value="1" <?php checked($settings->is_media_library_enabled()); ?> />
                                     <span class="tomatillo-toggle-slider"></span>
                                 </div>
                                 <?php _e('Enable enhanced media library interface', 'tomatillo-media-studio'); ?>
@@ -92,7 +92,7 @@ $stats = tomatillo_media_studio()->core->get_media_stats();
                         <td>
                             <label class="tomatillo-toggle-label">
                                 <div class="tomatillo-toggle">
-                                    <input type="checkbox" name="tomatillo_media_studio_settings[auto_convert]" value="1" <?php checked($settings->is_auto_convert_enabled()); ?> />
+                                    <div class="tomatillo-toggle"><input type="checkbox" name="tomatillo_media_studio_settings[auto_convert]" value="1" <?php checked($settings->is_auto_convert_enabled()); ?> />
                                     <span class="tomatillo-toggle-slider"></span>
                                 </div>
                                 <?php _e('Automatically optimize images when uploaded', 'tomatillo-media-studio'); ?>
@@ -135,7 +135,7 @@ $stats = tomatillo_media_studio()->core->get_media_stats();
                         <td>
                             <label class="tomatillo-toggle-label">
                                 <div class="tomatillo-toggle">
-                                    <input type="checkbox" name="tomatillo_media_studio_settings[skip_small_images]" value="1" <?php checked($settings->should_skip_small_images()); ?> />
+                                    <div class="tomatillo-toggle"><input type="checkbox" name="tomatillo_media_studio_settings[skip_small_images]" value="1" <?php checked($settings->should_skip_small_images()); ?> />
                                     <span class="tomatillo-toggle-slider"></span>
                                 </div>
                                 <?php _e('Skip images smaller than 50KB', 'tomatillo-media-studio'); ?>
@@ -148,7 +148,7 @@ $stats = tomatillo_media_studio()->core->get_media_stats();
                         <td>
                             <label class="tomatillo-toggle-label">
                                 <div class="tomatillo-toggle">
-                                    <input type="checkbox" name="tomatillo_media_studio_settings[preserve_originals]" value="1" <?php checked($settings->get('preserve_originals')); ?> />
+                                    <div class="tomatillo-toggle"><input type="checkbox" name="tomatillo_media_studio_settings[preserve_originals]" value="1" <?php checked($settings->get('preserve_originals')); ?> />
                                     <span class="tomatillo-toggle-slider"></span>
                                 </div>
                                 <?php _e('Keep original files after optimization', 'tomatillo-media-studio'); ?>
@@ -182,7 +182,7 @@ $stats = tomatillo_media_studio()->core->get_media_stats();
                         <td>
                             <label class="tomatillo-toggle-label">
                                 <div class="tomatillo-toggle">
-                                    <input type="checkbox" name="tomatillo_media_studio_settings[enable_bulk_ops]" value="1" <?php checked($settings->is_bulk_ops_enabled()); ?> />
+                                    <div class="tomatillo-toggle"><input type="checkbox" name="tomatillo_media_studio_settings[enable_bulk_ops]" value="1" <?php checked($settings->is_bulk_ops_enabled()); ?> />
                                     <span class="tomatillo-toggle-slider"></span>
                                 </div>
                                 <?php _e('Enable bulk selection and operations', 'tomatillo-media-studio'); ?>
@@ -205,10 +205,7 @@ $stats = tomatillo_media_studio()->core->get_media_stats();
                         <th scope="row"><?php _e('Show File Sizes', 'tomatillo-media-studio'); ?></th>
                         <td>
                             <label class="tomatillo-toggle-label">
-                                <div class="tomatillo-toggle">
-                                    <input type="checkbox" name="tomatillo_media_studio_settings[show_file_sizes]" value="1" <?php checked($settings->get('show_file_sizes')); ?> />
-                                    <span class="tomatillo-toggle-slider"></span>
-                                </div>
+                                <div class="tomatillo-toggle"><input type="checkbox" name="tomatillo_media_studio_settings[show_file_sizes]" value="1" <?php checked($settings->get('show_file_sizes')); ?> />
                                 <?php _e('Display file sizes in the media library', 'tomatillo-media-studio'); ?>
                             </label>
                         </td>
@@ -217,10 +214,7 @@ $stats = tomatillo_media_studio()->core->get_media_stats();
                         <th scope="row"><?php _e('Show Optimization Status', 'tomatillo-media-studio'); ?></th>
                         <td>
                             <label class="tomatillo-toggle-label">
-                                <div class="tomatillo-toggle">
-                                    <input type="checkbox" name="tomatillo_media_studio_settings[show_optimization_status]" value="1" <?php checked($settings->get('show_optimization_status')); ?> />
-                                    <span class="tomatillo-toggle-slider"></span>
-                                </div>
+                                <div class="tomatillo-toggle"><input type="checkbox" name="tomatillo_media_studio_settings[show_optimization_status]" value="1" <?php checked($settings->get('show_optimization_status')); ?> />
                                 <?php _e('Display optimization status indicators', 'tomatillo-media-studio'); ?>
                             </label>
                         </td>
@@ -238,10 +232,7 @@ $stats = tomatillo_media_studio()->core->get_media_stats();
                         <th scope="row"><?php _e('Debug Mode', 'tomatillo-media-studio'); ?></th>
                         <td>
                             <label class="tomatillo-toggle-label">
-                                <div class="tomatillo-toggle">
-                                    <input type="checkbox" name="tomatillo_media_studio_settings[debug_mode]" value="1" <?php checked($settings->is_debug_mode()); ?> />
-                                    <span class="tomatillo-toggle-slider"></span>
-                                </div>
+                                <div class="tomatillo-toggle"><input type="checkbox" name="tomatillo_media_studio_settings[debug_mode]" value="1" <?php checked($settings->is_debug_mode()); ?> />
                                 <?php _e('Enable debug logging', 'tomatillo-media-studio'); ?>
                             </label>
                             <p class="description"><?php _e('Logs detailed information to help troubleshoot issues.', 'tomatillo-media-studio'); ?></p>
@@ -251,10 +242,7 @@ $stats = tomatillo_media_studio()->core->get_media_stats();
                         <th scope="row"><?php _e('Cache Thumbnails', 'tomatillo-media-studio'); ?></th>
                         <td>
                             <label class="tomatillo-toggle-label">
-                                <div class="tomatillo-toggle">
-                                    <input type="checkbox" name="tomatillo_media_studio_settings[cache_thumbnails]" value="1" <?php checked($settings->get('cache_thumbnails')); ?> />
-                                    <span class="tomatillo-toggle-slider"></span>
-                                </div>
+                                <div class="tomatillo-toggle"><input type="checkbox" name="tomatillo_media_studio_settings[cache_thumbnails]" value="1" <?php checked($settings->get('cache_thumbnails')); ?> />
                                 <?php _e('Cache generated thumbnails for better performance', 'tomatillo-media-studio'); ?>
                             </label>
                         </td>
@@ -263,10 +251,7 @@ $stats = tomatillo_media_studio()->core->get_media_stats();
                         <th scope="row"><?php _e('Lazy Load Images', 'tomatillo-media-studio'); ?></th>
                         <td>
                             <label class="tomatillo-toggle-label">
-                                <div class="tomatillo-toggle">
-                                    <input type="checkbox" name="tomatillo_media_studio_settings[lazy_load_images]" value="1" <?php checked($settings->get('lazy_load_images')); ?> />
-                                    <span class="tomatillo-toggle-slider"></span>
-                                </div>
+                                <div class="tomatillo-toggle"><input type="checkbox" name="tomatillo_media_studio_settings[lazy_load_images]" value="1" <?php checked($settings->get('lazy_load_images')); ?> />
                                 <?php _e('Load images only when they come into view', 'tomatillo-media-studio'); ?>
                             </label>
                         </td>
@@ -275,10 +260,7 @@ $stats = tomatillo_media_studio()->core->get_media_stats();
                         <th scope="row"><?php _e('Enable AVIF Conversion', 'tomatillo-media-studio'); ?></th>
                         <td>
                             <label class="tomatillo-toggle-label">
-                                <div class="tomatillo-toggle">
-                                    <input type="checkbox" name="tomatillo_media_studio_settings[enable_avif]" value="1" <?php checked($settings->is_avif_enabled()); ?> />
-                                    <span class="tomatillo-toggle-slider"></span>
-                                </div>
+                                <div class="tomatillo-toggle"><input type="checkbox" name="tomatillo_media_studio_settings[enable_avif]" value="1" <?php checked($settings->is_avif_enabled()); ?> />
                                 <?php _e('Convert images to AVIF format for maximum compression', 'tomatillo-media-studio'); ?>
                             </label>
                             <p class="description"><?php _e('AVIF provides the best compression but has limited browser support.', 'tomatillo-media-studio'); ?></p>
@@ -288,10 +270,7 @@ $stats = tomatillo_media_studio()->core->get_media_stats();
                         <th scope="row"><?php _e('Enable WebP Conversion', 'tomatillo-media-studio'); ?></th>
                         <td>
                             <label class="tomatillo-toggle-label">
-                                <div class="tomatillo-toggle">
-                                    <input type="checkbox" name="tomatillo_media_studio_settings[enable_webp]" value="1" <?php checked($settings->is_webp_enabled()); ?> />
-                                    <span class="tomatillo-toggle-slider"></span>
-                                </div>
+                                <div class="tomatillo-toggle"><input type="checkbox" name="tomatillo_media_studio_settings[enable_webp]" value="1" <?php checked($settings->is_webp_enabled()); ?> />
                                 <?php _e('Convert images to WebP format for better compression', 'tomatillo-media-studio'); ?>
                             </label>
                             <p class="description"><?php _e('WebP provides good compression with wide browser support.', 'tomatillo-media-studio'); ?></p>

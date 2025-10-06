@@ -50,10 +50,10 @@
             }
         });
         
-        // Module toggle effects
-        $('input[name*="enable_optimization"], input[name*="enable_media_library"]').on('change', function() {
-            updateModuleDependencies();
-        });
+        // Module toggle effects - removed problematic tab visibility logic
+        // $('input[name*="enable_optimization"], input[name*="enable_media_library"]').on('change', function() {
+        //     updateModuleDependencies();
+        // });
     }
     
     /**
@@ -107,6 +107,22 @@
         $('.tomatillo-refresh-stats').on('click', function() {
             refreshOptimizationStats();
         });
+        
+        // Initialize bulk optimization if on tools page
+        if ($('#bulk-progress-panel').length) {
+            initBulkOptimizationTools();
+        }
+    }
+    
+    /**
+     * Initialize bulk optimization tools functionality
+     */
+    function initBulkOptimizationTools() {
+        // This will be handled by the inline script in tools-page.php
+        // We just need to make sure ajaxurl is available
+        if (typeof ajaxurl === 'undefined') {
+            window.ajaxurl = tomatilloMediaStudio.ajaxUrl;
+        }
     }
     
     /**
@@ -144,23 +160,24 @@
     /**
      * Update module dependencies
      */
-    function updateModuleDependencies() {
-        var optimizationEnabled = $('input[name*="enable_optimization"]').is(':checked');
-        var libraryEnabled = $('input[name*="enable_media_library"]').is(':checked');
-        
-        // Show/hide dependent settings
-        if (optimizationEnabled) {
-            $('#optimization').show();
-        } else {
-            $('#optimization').hide();
-        }
-        
-        if (libraryEnabled) {
-            $('#media-library').show();
-        } else {
-            $('#media-library').hide();
-        }
-    }
+    // Removed problematic function that was interfering with tab system
+    // function updateModuleDependencies() {
+    //     var optimizationEnabled = $('input[name*="enable_optimization"]').is(':checked');
+    //     var libraryEnabled = $('input[name*="enable_media_library"]').is(':checked');
+    //     
+    //     // Show/hide dependent settings
+    //     if (optimizationEnabled) {
+    //         $('#optimization').show();
+    //     } else {
+    //         $('#optimization').hide();
+    //     }
+    //     
+    //     if (libraryEnabled) {
+    //         $('#media-library').show();
+    //     } else {
+    //         $('#media-library').hide();
+    //     }
+    // }
     
     /**
      * Switch media library view
