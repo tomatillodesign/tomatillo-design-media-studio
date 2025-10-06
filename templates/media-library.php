@@ -2784,6 +2784,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Update allImages array
                     loadAllImages();
+                    
+                    // Recalculate masonry layout after adding new images
+                    setTimeout(() => {
+                        layoutMasonry();
+                    }, 100);
                 } else {
                     hasMore = false;
                     if (loadingIndicator) {
@@ -2900,6 +2905,10 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(waitForImagesAndLayout, 100);
         });
         observer.observe(grid, { childList: true });
+
+        // Expose layout function globally so other features (search, tab switches, infinite load)
+        // can trigger a reflow without reinitializing the whole system
+        window.layoutMasonry = layoutMasonry;
     }
     
     function initializeHashNavigation() {
@@ -3795,6 +3804,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.querySelectorAll('.gallery-item, .file-item').forEach(item => {
                     item.style.display = 'block';
                 });
+                // Recalculate masonry layout after showing all items
+                setTimeout(() => {
+                    layoutMasonry();
+                }, 50);
                 return;
             }
             
@@ -3818,6 +3831,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 const matches = searchTerms.every(term => searchableText.includes(term));
                 item.style.display = matches ? 'block' : 'none';
             });
+            
+            // Recalculate masonry layout after filtering
+            setTimeout(() => {
+                layoutMasonry();
+            }, 50);
         }
         
         function deleteSelectedImages() {
@@ -3892,6 +3910,11 @@ document.addEventListener('DOMContentLoaded', function() {
             // Update tab states
             if (imagesTab) imagesTab.classList.add('active');
             if (filesTab) filesTab.classList.remove('active');
+            
+            // Recalculate masonry layout after switching to images
+            setTimeout(() => {
+                layoutMasonry();
+            }, 50);
         } else if (filter === 'files') {
             console.log('Setting files view');
             imagesGrid.style.display = 'none';
