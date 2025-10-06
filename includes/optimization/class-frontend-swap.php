@@ -58,7 +58,8 @@ class Tomatillo_Frontend_Swap {
      */
     public function init() {
         $settings = $this->get_settings();
-        if (!$settings || !$settings->is_optimization_enabled()) {
+        // Respect Image Processing Engine setting
+        if (!$settings || !$settings->is_image_engine_enabled()) {
             $this->log('Frontend swap disabled (optimization not enabled)');
             return;
         }
@@ -77,7 +78,7 @@ class Tomatillo_Frontend_Swap {
             return;
         }
         $settings = $this->get_settings();
-        if (!$settings || !$settings->is_optimization_enabled()) {
+        if (!$settings || !$settings->is_image_engine_enabled()) {
             return;
         }
         if (ob_get_level() > 0) {

@@ -149,6 +149,20 @@ class Tomatillo_Media_Settings {
     public function is_optimization_enabled() {
         return (bool) $this->get('enable_optimization');
     }
+
+    /**
+     * Whether the Image Processing Engine is enabled.
+     * Falls back to optimization module toggle if an explicit engine toggle is not present.
+     */
+    public function is_image_engine_enabled() {
+        $engine_setting = $this->get('image_processing_engine');
+        // If admin explicitly turned engine off (false, 'off', 'disabled', 'none'), treat as disabled
+        if ($engine_setting === false || $engine_setting === 0 || $engine_setting === 'off' || $engine_setting === 'disabled' || $engine_setting === 'none') {
+            return false;
+        }
+        // Otherwise use the main optimization module toggle
+        return $this->is_optimization_enabled();
+    }
     
     /**
      * Check if media library module is enabled

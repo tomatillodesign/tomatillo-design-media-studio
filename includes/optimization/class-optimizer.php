@@ -184,13 +184,15 @@ class Tomatillo_Optimizer {
                 'attachment_id' => $attachment_id
             );
         }
+        // Prefer the true original image if available so optimized files are not derived from a scaled variant
+        $source_path = $this->get_best_source_path($attachment_id, $file_path);
         
-        $original_size = filesize($file_path);
-        $plugin->core->log('info', "Original file size: {$original_size} bytes for ID: {$attachment_id}");
+        $original_size = filesize($source_path);
+        $plugin->core->log('info', "Original (source) file size: {$original_size} bytes for ID: {$attachment_id} - Using: {$source_path}");
         
         $results = array(
             'attachment_id' => $attachment_id,
-            'original_path' => $file_path,
+            'original_path' => $source_path,
             'original_size' => $original_size,
             'avif_path' => null,
             'webp_path' => null,
@@ -220,7 +222,7 @@ class Tomatillo_Optimizer {
             // Convert to AVIF if enabled
             if ($settings->is_avif_enabled()) {
                 $plugin->core->log('info', "🔄 Converting to AVIF for ID: {$attachment_id}");
-                $avif_result = $this->convert_to_avif($file_path, $attachment_id);
+                $avif_result = $this->convert_to_avif($source_path, $attachment_id);
                 if ($avif_result['success']) {
                     $plugin->core->log('info', "✅ AVIF conversion successful: " . round($this->calculate_savings_percentage($original_size, $avif_result['size'])) . "% savings");
                     $results['avif_path'] = $avif_result['path'];
@@ -236,7 +238,7 @@ class Tomatillo_Optimizer {
             // Convert to WebP if enabled
             if ($settings->is_webp_enabled()) {
                 $plugin->core->log('info', "🔄 Converting to WebP for ID: {$attachment_id}");
-                $webp_result = $this->convert_to_webp($file_path, $attachment_id);
+                $webp_result = $this->convert_to_webp($source_path, $attachment_id);
                 if ($webp_result['success']) {
                     $plugin->core->log('info', "✅ WebP conversion successful: " . round($this->calculate_savings_percentage($original_size, $webp_result['size'])) . "% savings");
                     $results['webp_path'] = $webp_result['path'];
@@ -442,6 +444,12 @@ class Tomatillo_Optimizer {
         $directory = $path_info['dirname'];
         $filename = $path_info['filename'];
         
+        // Ensure optimized filenames are based on the true original, not scaled or subsize variants
+        // Strip WordPress "-scaled" suffix
+        $filename = str_replace('-scaled', '', $filename);
+        // Strip size suffix like "-1024x768"
+        $filename = preg_replace('/-\d+x\d+$/', '', $filename);
+        
         return $directory . '/' . $filename . '.' . $format;
     }
 
@@ -454,6 +462,26 @@ class Tomatillo_Optimizer {
             return str_replace($upload_dir['basedir'], $upload_dir['baseurl'], $path);
         }
         return $path; // fallback
+    }
+
+    /**
+     * Get the best source image path (prefer the true original over scaled/subsizes)
+     */
+    private function get_best_source_path($attachment_id, $default_path) {
+        // Try WordPress original-image metadata
+        $original = wp_get_original_image_path($attachment_id);
+        if ($original && file_exists($original)) {
+            return $original;
+        }
+        
+        // Fallback: strip -scaled and -WxH suffixes from current path
+        $pi = pathinfo($default_path);
+        $candidate = $pi['dirname'] . '/' . preg_replace('/-\d+x\d+$/', '', str_replace('-scaled', '', $pi['filename'])) . '.' . $pi['extension'];
+        if ($candidate && file_exists($candidate)) {
+            return $candidate;
+        }
+        
+        return $default_path;
     }
     
     /**

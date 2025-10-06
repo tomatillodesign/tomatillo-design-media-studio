@@ -866,9 +866,14 @@ jQuery(document).ready(function($) {
         bulkOptimizationInProgress = false;
         
         // Update final status
-        $('#progress-text').text('Optimization completed');
+        // Update headline and stop spinner
+        $('#bulk-progress-panel .dashicons-update').css('animation', 'none');
+        $('#bulk-progress-panel h3').html('<span class="dashicons dashicons-yes"></span> Optimization Completed');
+        // Remove duplicate line under the headline
+        $('#progress-text').text('');
         $('#current-image-name').text('All images processed');
         $('#current-image-status').text('Bulk optimization finished');
+        
         
         // Show completion message
         let message = `Bulk optimization completed! Processed ${processedImages} images: ${successCount} successful, ${skippedCount} skipped, ${errorCount} failed.`;
@@ -889,7 +894,9 @@ jQuery(document).ready(function($) {
     
     function stopBulkOptimization() {
         bulkOptimizationInProgress = false;
-        $('#progress-text').text('Optimization stopped');
+        $('#progress-text').text('');
+        $('#bulk-progress-panel .dashicons-update').css('animation', 'none');
+        $('#bulk-progress-panel h3').html('<span class="dashicons dashicons-dismiss"></span> Optimization Stopped');
         addActivityLog('Bulk optimization stopped by user', 'warning');
         $('#cancel-bulk-optimization').hide();
     }
