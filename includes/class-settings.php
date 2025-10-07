@@ -26,7 +26,7 @@ class Tomatillo_Media_Settings {
         
         // Optimization Settings
         'avif_quality' => 50,
-        'webp_quality' => 85,
+        'webp_quality' => 75,
         'auto_convert' => true,
         'batch_size' => 10,
         'preserve_originals' => true,

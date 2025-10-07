@@ -1212,6 +1212,44 @@ class Tomatillo_Media_Core {
     }
     
     /**
+     * Delete optimized files (AVIF/WebP) for an attachment
+     */
+    private function delete_optimized_files($attachment_id) {
+        $file_path = get_attached_file($attachment_id);
+        if (!$file_path || !file_exists($file_path)) {
+            return;
+        }
+        
+        // Get base filename (strip -scaled and -WxH suffixes)
+        $path_info = pathinfo($file_path);
+        $base_filename = preg_replace('/-\d+x\d+$/', '', str_replace('-scaled', '', $path_info['filename']));
+        $directory = $path_info['dirname'];
+        
+        // Delete AVIF file
+        $avif_path = $directory . '/' . $base_filename . '.avif';
+        if (file_exists($avif_path)) {
+            unlink($avif_path);
+            $this->log('info', "Deleted AVIF file: {$avif_path}");
+        }
+        
+        // Delete WebP file
+        $webp_path = $directory . '/' . $base_filename . '.webp';
+        if (file_exists($webp_path)) {
+            unlink($webp_path);
+            $this->log('info', "Deleted WebP file: {$webp_path}");
+        }
+        
+        // Delete database record
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'tomatillo_media_optimization';
+        $wpdb->delete($table_name, array('attachment_id' => $attachment_id));
+        
+        // Delete convenience meta
+        delete_post_meta($attachment_id, '_tomatillo_avif_url');
+        delete_post_meta($attachment_id, '_tomatillo_webp_url');
+    }
+    
+    /**
      * AJAX handler for deleting image
      */
     public function ajax_delete_image() {
@@ -1225,6 +1263,9 @@ class Tomatillo_Media_Core {
         if (!$image_id) {
             wp_send_json_error('Invalid image ID');
         }
+        
+        // Delete optimized files before deleting the attachment
+        $this->delete_optimized_files($image_id);
         
         $result = wp_delete_attachment($image_id, true);
         
@@ -1272,6 +1313,9 @@ class Tomatillo_Media_Core {
                 $errors[] = "Image not found: $image_id";
                 continue;
             }
+            
+            // Delete optimized files before deleting the attachment
+            $this->delete_optimized_files($image_id);
             
             $result = wp_delete_attachment($image_id, true);
             
