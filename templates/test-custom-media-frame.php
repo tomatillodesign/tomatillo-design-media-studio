@@ -108,6 +108,9 @@ $plugin = tomatillo_media_studio();
 </style>
 
 <script>
+// Add nonce for AJAX requests
+var tomatillo_nonce = '<?php echo wp_create_nonce('tomatillo_get_image_data'); ?>';
+
 jQuery(document).ready(function($) {
     'use strict';
     

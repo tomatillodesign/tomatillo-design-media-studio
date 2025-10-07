@@ -1111,7 +1111,11 @@ class Tomatillo_Media_Core {
         // Get the best optimized image URL for display
         $best_image_url = $this->get_best_optimized_image_url($image_id, 'large');
         
-        // Calculate space saved from database
+        // Calculate space saved from database and get optimized file sizes
+        $avif_file_size = 'Unknown';
+        $webp_file_size = 'Unknown';
+        $smallest_file_size = $file_size; // Default to original
+        
         if ($is_optimized) {
             global $wpdb;
             $table_name = $wpdb->prefix . 'tomatillo_media_optimization';
@@ -1122,10 +1126,26 @@ class Tomatillo_Media_Core {
             
             if ($optimization_data) {
                 $original_size = $optimization_data->original_size;
+                
+                // Get AVIF file size
+                if ($optimization_data->avif_size > 0) {
+                    $avif_file_size = size_format($optimization_data->avif_size);
+                }
+                
+                // Get WebP file size
+                if ($optimization_data->webp_size > 0) {
+                    $webp_file_size = size_format($optimization_data->webp_size);
+                }
+                
+                // Get smallest optimized size
                 $smallest_optimized = min(
                     $optimization_data->avif_size ?: PHP_INT_MAX,
                     $optimization_data->webp_size ?: PHP_INT_MAX
                 );
+                if ($smallest_optimized < PHP_INT_MAX) {
+                    $smallest_file_size = size_format($smallest_optimized);
+                }
+                
                 $space_saved = max(0, $original_size - $smallest_optimized);
             }
         }
@@ -1174,6 +1194,9 @@ class Tomatillo_Media_Core {
             'best_image_url' => $best_image_url, // Smallest optimized image for display
             'avif_url' => $avif_url,
             'webp_url' => $webp_url,
+            'avif_file_size' => $avif_file_size, // Actual AVIF file size
+            'webp_file_size' => $webp_file_size, // Actual WebP file size
+            'smallest_file_size' => $smallest_file_size, // Smallest optimized file size
             'space_saved' => size_format($space_saved),
             'is_optimized' => $is_optimized
         );
