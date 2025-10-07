@@ -88,6 +88,16 @@ class Tomatillo_Media_Admin {
             'tomatillo-media-studio-tools',
             array($this, 'tools_page')
         );
+        
+        // Test page for custom media frame (admin only)
+        add_submenu_page(
+            'tomatillo-media-studio-library',
+            __('Test Media Frame', 'tomatillo-media-studio'),
+            __('Test Media Frame', 'tomatillo-media-studio'),
+            'manage_options', // Admin only
+            'tomatillo-media-studio-test',
+            array($this, 'test_media_frame_page')
+        );
     }
     
     /**
@@ -172,6 +182,21 @@ class Tomatillo_Media_Admin {
         // Redirect should have already happened in check_media_library_redirect()
         // This method should only be called when enhanced interface is enabled
         include TOMATILLO_MEDIA_STUDIO_DIR . 'templates/media-library.php';
+    }
+    
+    /**
+     * Test media frame page
+     */
+    public function test_media_frame_page() {
+        $plugin = tomatillo_media_studio();
+        
+        // Check admin capabilities
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.', 'tomatillo-media-studio'));
+        }
+        
+        // Include the test template
+        include TOMATILLO_MEDIA_STUDIO_DIR . 'templates/test-custom-media-frame.php';
     }
     
     /**

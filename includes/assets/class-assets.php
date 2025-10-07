@@ -15,6 +15,7 @@ class Tomatillo_Media_Assets {
      * Constructor
      */
     public function __construct() {
+        error_log('Tomatillo Media Studio: Assets class constructor called');
         $this->init_hooks();
     }
     
@@ -24,6 +25,19 @@ class Tomatillo_Media_Assets {
     private function init_hooks() {
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
         add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_assets'));
+        
+        // Enqueue custom media frame globally in admin
+        add_action('admin_enqueue_scripts', array($this, 'enqueue_custom_media_frame'));
+        
+        // Debug: Test if hooks are working
+        add_action('admin_enqueue_scripts', array($this, 'debug_test_hook'));
+    }
+    
+    /**
+     * Debug test hook
+     */
+    public function debug_test_hook($hook) {
+        error_log('Tomatillo Media Studio: DEBUG TEST HOOK CALLED with hook: ' . $hook);
     }
     
     /**
@@ -73,6 +87,64 @@ class Tomatillo_Media_Assets {
         // Enqueue optimization assets if enabled
         if (tomatillo_media_studio()->settings->is_optimization_enabled()) {
             $this->enqueue_optimization_assets();
+        }
+    }
+    
+    /**
+     * Enqueue custom media frame globally in admin
+     */
+    public function enqueue_custom_media_frame($hook) {
+        // Debug: Log that we're trying to enqueue
+        error_log('Tomatillo Media Studio: enqueue_custom_media_frame called with hook: ' . $hook);
+        
+        // For testing, always load regardless of settings
+        // TODO: Re-enable this check once working
+        // if (!tomatillo_media_studio()->settings->is_media_library_enabled()) {
+        //     return;
+        // }
+        
+        // Ensure wp.media is available
+        wp_enqueue_media();
+        
+        // Load our script directly instead of using wp_enqueue_script
+        // This bypasses WordPress enqueuing issues
+        add_action('admin_footer', array($this, 'load_custom_media_frame_script'));
+        
+        // Include our template
+        $this->include_media_frame_template();
+        
+        // Localize script
+        wp_localize_script('jquery', 'tomatilloMediaFrame', array(
+            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('tomatillo_media_frame'),
+            'strings' => array(
+                'selectMedia' => __('Select Media', 'tomatillo-media-studio'),
+                'insertMedia' => __('Insert Media', 'tomatillo-media-studio'),
+                'searchPlaceholder' => __('Search media...', 'tomatillo-media-studio'),
+                'allTypes' => __('All Types', 'tomatillo-media-studio'),
+                'images' => __('Images', 'tomatillo-media-studio'),
+                'videos' => __('Videos', 'tomatillo-media-studio'),
+                'audio' => __('Audio', 'tomatillo-media-studio'),
+                'documents' => __('Documents', 'tomatillo-media-studio'),
+            )
+        ));
+    }
+    
+    /**
+     * Load custom media frame script directly
+     */
+    public function load_custom_media_frame_script() {
+        $script_url = TOMATILLO_MEDIA_STUDIO_ASSETS_URL . 'js/custom-media-frame-clean.js';
+        echo '<script src="' . esc_url($script_url) . '"></script>';
+    }
+    
+    /**
+     * Include media frame template
+     */
+    private function include_media_frame_template() {
+        $template_path = TOMATILLO_MEDIA_STUDIO_DIR . 'templates/custom-media-frame-template.php';
+        if (file_exists($template_path)) {
+            include $template_path;
         }
     }
     
