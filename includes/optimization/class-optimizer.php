@@ -184,11 +184,11 @@ class Tomatillo_Optimizer {
                 'attachment_id' => $attachment_id
             );
         }
-        // Prefer the true original image if available so optimized files are not derived from a scaled variant
-        $source_path = $this->get_best_source_path($attachment_id, $file_path);
+        // Use the WordPress-scaled version for optimization (this is what users see)
+        $source_path = $file_path; // Use the scaled version, not the true original
         
         $original_size = filesize($source_path);
-        $plugin->core->log('info', "Original (source) file size: {$original_size} bytes for ID: {$attachment_id} - Using: {$source_path}");
+        $plugin->core->log('info', "Using WordPress-scaled file size: {$original_size} bytes for ID: {$attachment_id} - Using: {$source_path}");
         
         $results = array(
             'attachment_id' => $attachment_id,
@@ -201,7 +201,8 @@ class Tomatillo_Optimizer {
             'avif_savings' => 0,
             'webp_savings' => 0,
             'success' => false,
-            'message' => ''
+            'message' => '',
+            'operation_status' => 'pending'
         );
         
         $settings = $this->get_settings();
@@ -258,13 +259,21 @@ class Tomatillo_Optimizer {
             $plugin->core->log('info', "Best savings: {$best_savings}%, Min threshold: {$min_threshold}%");
             
             if ($best_savings < $min_threshold) {
-                $plugin->core->log('info', "⚠️ Savings below threshold ({$best_savings}% < {$min_threshold}%), but keeping files");
-                // Don't clean up files - keep them for future use
-                // Just mark as skipped due to threshold
-                $results['success'] = true; // Still mark as successful
-                $results['skipped'] = true; // But mark as skipped
+                $plugin->core->log('info', "⚠️ Savings below threshold ({$best_savings}% < {$min_threshold}%), cleaning up files");
+                // Clean up files that don't meet threshold
+                if ($results['avif_path'] && file_exists($results['avif_path'])) {
+                    unlink($results['avif_path']);
+                    $plugin->core->log('info', "🗑️ Deleted AVIF file below threshold");
+                }
+                if ($results['webp_path'] && file_exists($results['webp_path'])) {
+                    unlink($results['webp_path']);
+                    $plugin->core->log('info', "🗑️ Deleted WebP file below threshold");
+                }
+                $results['success'] = false;
+                $results['skipped'] = true;
+                $results['operation_status'] = 'skipped';
                 $results['message'] = sprintf(
-                    'Image optimized but below threshold. AVIF %d%% savings, WebP %d%% savings (minimum %d%% required)',
+                    'Image optimization skipped: AVIF %d%% savings, WebP %d%% savings (minimum %d%% required)',
                     round($results['avif_savings']),
                     round($results['webp_savings']),
                     $min_threshold
@@ -272,6 +281,7 @@ class Tomatillo_Optimizer {
                 $plugin->core->log('info', "📊 Threshold decision: {$results['message']}");
             } else {
                 $results['success'] = true;
+                $results['operation_status'] = 'completed';
                 $results['message'] = sprintf(
                     'Successfully converted: AVIF %d%% savings, WebP %d%% savings',
                     round($results['avif_savings']),
@@ -283,6 +293,7 @@ class Tomatillo_Optimizer {
         } catch (Exception $e) {
             $plugin->core->log('error', "Exception during conversion: {$e->getMessage()}");
             $results['message'] = 'Conversion failed: ' . $e->getMessage();
+            $results['operation_status'] = 'failed';
             
             // Clean up any partial files
             if ($results['avif_path'] && file_exists($results['avif_path'])) {
@@ -302,12 +313,17 @@ class Tomatillo_Optimizer {
     private function convert_to_avif($file_path, $attachment_id) {
         $result = array('success' => false, 'path' => null, 'size' => null);
         
+        $settings = $this->get_settings();
+        $quality = $settings ? $settings->get_avif_quality() : 50;
+        
         // Try GD first (PHP 8.1+)
         if (function_exists('imageavif')) {
+            error_log("DEBUG: Using GD for AVIF conversion with quality: {$quality}");
             $result = $this->convert_with_gd($file_path, 'avif', $attachment_id);
         }
         // Fallback to Imagick
         elseif (class_exists('Imagick')) {
+            error_log("DEBUG: Using Imagick for AVIF conversion with quality: {$quality}");
             $result = $this->convert_with_imagick($file_path, 'avif', $attachment_id);
         }
         
@@ -405,15 +421,26 @@ class Tomatillo_Optimizer {
             $quality = $format === 'avif' ? $settings->get_avif_quality() : $settings->get_webp_quality();
             $imagick->setImageCompressionQuality($quality);
             
-            // Generate output path
-            $output_path = $this->generate_output_path($file_path, $format);
-            
-            // Convert format
+            // AVIF-specific optimizations
             if ($format === 'avif') {
+                // Use lossless compression for better quality/size ratio
+                $imagick->setImageCompression(Imagick::COMPRESSION_LOSSLESS);
+                // Strip metadata to reduce file size
+                $imagick->stripImage();
+                // Optimize for web delivery
                 $imagick->setImageFormat('avif');
+                // Additional AVIF optimization
+                $imagick->setOption('avif:quality', $quality);
+                $imagick->setOption('avif:speed', '6'); // Speed 6 = good compression
             } elseif ($format === 'webp') {
                 $imagick->setImageFormat('webp');
+                // WebP-specific optimizations
+                $imagick->setOption('webp:quality', $quality);
+                $imagick->setOption('webp:method', '6'); // Method 6 = good compression
             }
+            
+            // Generate output path
+            $output_path = $this->generate_output_path($file_path, $format);
             
             // Write image
             $success = $imagick->writeImage($output_path);
@@ -545,10 +572,8 @@ class Tomatillo_Optimizer {
         
         $result = $this->convert_image($attachment_id);
         
-        // Store result in database if successful
-        if ($result['success']) {
-            $this->store_conversion_result($result);
-        }
+        // Always store result in database so Has DB Record reflects immediately
+        $this->store_conversion_result($result);
         
         wp_send_json_success($result);
     }
@@ -556,7 +581,7 @@ class Tomatillo_Optimizer {
     /**
      * Store conversion result in database
      */
-    private function store_conversion_result($result) {
+    public function store_conversion_result($result) {
         global $wpdb;
         
         $table_name = $wpdb->prefix . 'tomatillo_media_optimization';
@@ -575,10 +600,20 @@ class Tomatillo_Optimizer {
             'original_size' => $result['original_size'],
             'avif_size' => $result['avif_size'],
             'webp_size' => $result['webp_size'],
-            'status' => 'completed'
+            'status' => $result['operation_status']
         );
         
-        $insert_result = $wpdb->insert($table_name, $data);
+        // Upsert by attachment_id: try update first, insert if not exists
+        $update_result = $wpdb->update(
+            $table_name,
+            $data,
+            array('attachment_id' => $result['attachment_id'])
+        );
+        if ($update_result === false || $update_result === 0) {
+            $insert_result = $wpdb->insert($table_name, $data);
+        } else {
+            $insert_result = $update_result; // number of rows updated
+        }
         
         // Debug: Log the insert result
         if ($plugin && $plugin->core) {

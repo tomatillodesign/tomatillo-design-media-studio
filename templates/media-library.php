@@ -2552,10 +2552,16 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentPage = 1;
     let hasMore = <?php echo $has_more ? 'true' : 'false'; ?>;
     let currentImageId = null;
-		let allImages = [];
+    let allImages = [];
 		// Pause infinite scroll when searching
 		let infiniteScrollPaused = false;
 		let activeSearchQuery = '';
+
+    function updateAllImagesFromDOM() {
+        const items = Array.from(document.querySelectorAll('#masonry-grid .gallery-item'))
+            .filter(el => el.style.display !== 'none');
+        allImages = items.map(el => parseInt(el.dataset.id, 10)).filter(id => !isNaN(id));
+    }
     
     // Initialize
     initializeDragDrop();
@@ -2925,7 +2931,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         loadingIndicator.style.display = 'none';
                     }
                     
-                    // No need to update an allImages array; we read from DOM data attributes
+                    // Rebuild the allImages list from DOM for modal navigation
+                    updateAllImagesFromDOM();
                     
                     // Recalculate masonry layout after adding new images
                     setTimeout(() => {
@@ -3033,7 +3040,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Initial layout
-        setTimeout(waitForImagesAndLayout, 100);
+        setTimeout(() => { waitForImagesAndLayout(); updateAllImagesFromDOM(); }, 100);
         
         // Layout on resize (with debounce)
         window.addEventListener('resize', () => {
@@ -3271,17 +3278,28 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function openModal(imageId) {
-        currentImageId = imageId;
-        window.currentImageId = imageId; // Set global variable for debug function
+        // Ensure navigation list reflects current DOM
+        updateAllImagesFromDOM();
+        currentImageId = parseInt(imageId, 10);
+        window.currentImageId = currentImageId; // Set global variable for debug function
         const modal = document.getElementById('image-modal');
         
+        // Validate ID before fetching
+        if (!currentImageId || isNaN(currentImageId)) {
+            showToast('Failed to open image: Invalid image ID', 'error');
+            return;
+        }
+        
         // Load image data
-        loadImageData(imageId).then(data => {
+        loadImageData(currentImageId).then(data => {
             populateModal(data);
             modal.classList.add('active');
             
             // Add keyboard event listeners
             document.addEventListener('keydown', handleKeyboard);
+        }).catch(err => {
+            console.error('Modal open error:', err);
+            showToast('Failed to open image: ' + (err.message || err), 'error');
         });
     }
     
@@ -3383,6 +3401,22 @@ document.addEventListener('DOMContentLoaded', function() {
             optimizeBtn.style.display = 'inline-block';
         }
         
+        // Update gallery card optimized watermark for this image
+        const galleryItem = document.querySelector(`.gallery-item[data-id="${data.id}"]`);
+        if (galleryItem) {
+            let watermark = galleryItem.querySelector('.optimized-watermark');
+            if (data.is_optimized) {
+                if (!watermark) {
+                    const div = document.createElement('div');
+                    div.className = 'optimized-watermark';
+                    div.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10"></polygon></svg>';
+                    galleryItem.querySelector('.image-container').appendChild(div);
+                }
+            } else if (watermark) {
+                watermark.parentNode.removeChild(watermark);
+            }
+        }
+        
         // Ensure button is enabled and reset to original text when populating modal
         if (optimizeBtn) {
             optimizeBtn.disabled = false;
@@ -3392,19 +3426,21 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function copyToClipboard(text) {
-        navigator.clipboard.writeText(text).then(() => {
-            showToast('URL copied to clipboard!');
-        }).catch(() => {
-            // Fallback for older browsers
-            const textArea = document.createElement('textarea');
-            textArea.value = text;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
-            showToast('URL copied to clipboard!');
-        });
+        const value = (text || '').toString().trim();
+        if (!value) return;
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(value).then(() => {
+                showToast('URL copied to clipboard!', 'success');
+            }).catch((err) => {
+                console.warn('navigator.clipboard failed, using fallback:', err);
+                fallbackCopyTextToClipboard(value);
+            });
+        } else {
+            fallbackCopyTextToClipboard(value);
+        }
     }
+    // Expose to global scope for inline onclick handlers
+    window.copyToClipboard = copyToClipboard;
     
     function closeModal() {
         const modal = document.getElementById('image-modal');
@@ -3678,15 +3714,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Reload the image data to update the modal with new optimization info
                     loadImageData(currentImageId).then(populateModal);
                 } else {
-                    // Check if it's a savings threshold issue
-                    if (data.data && data.data.includes('well-optimized') && data.data.includes('additional savings')) {
+                    // Check if it's a savings threshold issue (optimization skipped)
+                    if (data.data && (data.data.includes('well-optimized') || data.data.includes('additional savings') || data.data.includes('below threshold'))) {
                         // Extract savings percentage from the message
                         const savingsMatch = data.data.match(/(\d+)%/);
                         const savings = savingsMatch ? savingsMatch[1] : 'unknown';
                         
                         showToast(`This image is already well-optimized! Only ${savings}% additional savings possible, which is below the minimum threshold. No optimization needed.`, 'warning');
+                        
+                        // Hide the optimize button since this image doesn't need optimization
+                        optimizeBtn.style.display = 'none';
+                        // Reload the image data to update the modal with current optimization info
+                        loadImageData(currentImageId).then(populateModal);
                     } else {
                         showToast('Failed to optimize image: ' + (data.data || 'Unknown error'), 'error');
+                        // Reset button state on failure
+                        optimizeBtn.textContent = originalText;
+                        optimizeBtn.disabled = false;
                     }
                 }
             })
@@ -3751,11 +3795,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (optimizeBtn) {
                         optimizeBtn.style.display = 'none';
                     }
+                    // Refresh the gallery to show updated optimization status
+                    loadMoreImages();
                 } else {
-                    alert('Failed to optimize image: ' + (data.data || 'Unknown error'));
-                    if (optimizeBtn) {
-                        optimizeBtn.innerHTML = '<span>⚡</span>';
-                        optimizeBtn.disabled = false;
+                    // Check if it's a threshold issue (optimization skipped)
+                    if (data.data && (data.data.includes('well-optimized') || data.data.includes('additional savings') || data.data.includes('below threshold'))) {
+                        if (optimizeBtn) {
+                            optimizeBtn.style.display = 'none';
+                        }
+                        // Refresh the gallery to show updated optimization status
+                        loadMoreImages();
+                    } else {
+                        alert('Failed to optimize image: ' + (data.data || 'Unknown error'));
+                        if (optimizeBtn) {
+                            optimizeBtn.innerHTML = '<span>⚡</span>';
+                            optimizeBtn.disabled = false;
+                        }
                     }
                 }
             })
@@ -3821,7 +3876,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Show/hide clear button
             searchClear.style.display = query ? 'block' : 'none';
             
-            // Debounce search
+        // Debounce search
             clearTimeout(searchTimeout);
             searchTimeout = setTimeout(() => {
                 activeSearchQuery = query;
@@ -3833,6 +3888,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     loadingIndicator.style.display = 'none';
                 }
                 performSearch(query);
+            // Rebuild navigation list based on currently visible items
+            updateAllImagesFromDOM();
             }, 300);
         });
         

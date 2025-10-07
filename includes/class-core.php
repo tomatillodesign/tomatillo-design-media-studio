@@ -690,6 +690,9 @@ class Tomatillo_Media_Core {
         // Optimize the image
         $result = $plugin->optimization->convert_image($image_id);
         
+        // Always store the result in database (success, skipped, or failed)
+        $plugin->optimization->store_conversion_result($result);
+        
         if ($result && $result['success']) {
             $savings = isset($result['savings']) ? $result['savings'] : 0;
             $plugin->core->log('info', "✅ Image optimization successful: {$filename} (ID: {$image_id}) - Savings: {$savings}%");
@@ -889,9 +892,10 @@ class Tomatillo_Media_Core {
             $path_info = pathinfo($file_path);
             $dir = $path_info['dirname'];
             $filename = $path_info['filename'];
+            $base_filename = preg_replace('/-\d+x\d+$/', '', str_replace('-scaled', '', $filename));
             
-            $avif_path = $dir . '/' . $filename . '.avif';
-            $webp_path = $dir . '/' . $filename . '.webp';
+            $avif_path = $dir . '/' . $base_filename . '.avif';
+            $webp_path = $dir . '/' . $base_filename . '.webp';
             
             $debug_info['files']['avif_path'] = $avif_path;
             $debug_info['files']['avif_exists'] = file_exists($avif_path);
@@ -933,6 +937,7 @@ class Tomatillo_Media_Core {
         
         // Check if image is considered optimized
         $debug_info['checks']['is_optimized'] = $this->is_image_optimized($image_id);
+        $debug_info['checks']['checked_base'] = isset($base_filename) ? $base_filename : null;
         
         wp_send_json_success($debug_info);
     }
@@ -967,10 +972,15 @@ class Tomatillo_Media_Core {
         $path_info = pathinfo($file_path);
         $dir = $path_info['dirname'];
         $filename = $path_info['filename'];
+        $base_filename = preg_replace('/-\d+x\d+$/', '', str_replace('-scaled', '', $filename));
+        // Normalize to base filename (strip -scaled and -WxH suffixes)
+        $base_filename = preg_replace('/-\d+x\d+$/', '', str_replace('-scaled', '', $filename));
+        // Normalize to base filename (no -scaled or -WxH suffix)
+        $base_filename = preg_replace('/-\d+x\d+$/', '', str_replace('-scaled', '', $filename));
         
-        // Check for AVIF/WebP files
-        $avif_path = $dir . '/' . $filename . '.avif';
-        $webp_path = $dir . '/' . $filename . '.webp';
+        // Check for AVIF/WebP files (based on base filename)
+        $avif_path = $dir . '/' . $base_filename . '.avif';
+        $webp_path = $dir . '/' . $base_filename . '.webp';
         
         $avif_exists = file_exists($avif_path);
         $webp_exists = file_exists($webp_path);
@@ -1070,6 +1080,26 @@ class Tomatillo_Media_Core {
         // Check for optimized versions using the database
         $avif_url = $this->get_optimized_image_url($image_id, 'avif');
         $webp_url = $this->get_optimized_image_url($image_id, 'webp');
+
+        // If DB has no paths yet, derive from filesystem using base filename
+        if (!$avif_url || !$webp_url) {
+            $pi = pathinfo($file_path);
+            $dir = $pi['dirname'];
+            $base = preg_replace('/-\d+x\d+$/', '', str_replace('-scaled', '', $pi['filename']));
+            $upload_dir = wp_upload_dir();
+            if (!$avif_url) {
+                $avif_path = $dir . '/' . $base . '.avif';
+                if (file_exists($avif_path)) {
+                    $avif_url = str_replace($upload_dir['basedir'], $upload_dir['baseurl'], $avif_path);
+                }
+            }
+            if (!$webp_url) {
+                $webp_path = $dir . '/' . $base . '.webp';
+                if (file_exists($webp_path)) {
+                    $webp_url = str_replace($upload_dir['basedir'], $upload_dir['baseurl'], $webp_path);
+                }
+            }
+        }
         $is_optimized = $this->is_image_optimized($image_id);
         $space_saved = 0;
         
@@ -1327,19 +1357,25 @@ class Tomatillo_Media_Core {
         $path_info = pathinfo($file_path);
         $dir = $path_info['dirname'];
         $filename = $path_info['filename'];
+        // Normalize to base filename
+        $base_filename = preg_replace('/-\d+x\d+$/', '', str_replace('-scaled', '', $filename));
         
         // Check for AVIF file
-        $avif_path = $dir . '/' . $filename . '.avif';
+        $avif_path = $dir . '/' . $base_filename . '.avif';
         if (file_exists($avif_path)) {
             return true;
         }
         
         // Check for WebP file
-        $webp_path = $dir . '/' . $filename . '.webp';
+        $webp_path = $dir . '/' . $base_filename . '.webp';
         if (file_exists($webp_path)) {
             return true;
         }
         
+        // Debug: log paths checked when not optimized
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('[Tomatillo] is_image_optimized false for ID ' . $attachment_id . ' | checked: ' . $avif_path . ' and ' . $webp_path);
+        }
         return false;
     }
     
@@ -1357,18 +1393,19 @@ class Tomatillo_Media_Core {
         $path_info = pathinfo($file_path);
         $dir = $path_info['dirname'];
         $filename = $path_info['filename'];
+        $base_filename = preg_replace('/-\d+x\d+$/', '', str_replace('-scaled', '', $filename));
         
         $smallest_size = $original_size;
         
         // Check AVIF file
-        $avif_path = $dir . '/' . $filename . '.avif';
+        $avif_path = $dir . '/' . $base_filename . '.avif';
         if (file_exists($avif_path)) {
             $avif_size = filesize($avif_path);
             $smallest_size = min($smallest_size, $avif_size);
         }
         
         // Check WebP file
-        $webp_path = $dir . '/' . $filename . '.webp';
+        $webp_path = $dir . '/' . $base_filename . '.webp';
         if (file_exists($webp_path)) {
             $webp_size = filesize($webp_path);
             $smallest_size = min($smallest_size, $webp_size);

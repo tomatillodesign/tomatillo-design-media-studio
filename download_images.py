@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
-Download 50 high-resolution nature images from Unsplash for testing
+Download random high-resolution images from Unsplash for testing.
+
+Notes:
+- Uses /photos/random (max 30 per call); loops to reach desired count.
+- Saves to ~/Desktop/tomatillo-test-images by default.
 """
 
 import requests
@@ -16,7 +20,7 @@ APP_ID = "28529"
 
 # API endpoints
 BASE_URL = "https://api.unsplash.com"
-SEARCH_URL = f"{BASE_URL}/search/photos"
+RANDOM_URL = f"{BASE_URL}/photos/random"
 
 # Headers for API requests
 headers = {
@@ -43,55 +47,49 @@ def download_image(url, filename, folder):
         print(f"✗ Failed to download {filename}: {str(e)}")
         return False
 
-def get_nature_images(count=50):
-    """Search for nature images on Unsplash"""
-    params = {
-        "query": "nature",
-        "per_page": min(count, 30),  # Unsplash max per page is 30
-        "orientation": "landscape",
-        "order_by": "relevant"
-    }
-    
-    all_images = []
-    page = 1
-    
-    while len(all_images) < count:
-        params["page"] = page
-        
+def get_random_images(count=50, query=None, orientation="landscape"):
+    """Fetch random images from Unsplash."""
+    images = []
+    remaining = count
+    batch_index = 1
+    while remaining > 0:
+        batch = min(remaining, 30)  # Unsplash max count per request
+        params = {
+            "count": batch,
+            "orientation": orientation,
+        }
+        if query:
+            params["query"] = query
         try:
-            print(f"Fetching page {page}...")
-            response = requests.get(SEARCH_URL, headers=headers, params=params)
+            print(f"Fetching random batch {batch_index} (count={batch})...")
+            response = requests.get(RANDOM_URL, headers=headers, params=params, timeout=30)
             response.raise_for_status()
-            
             data = response.json()
-            results = data.get("results", [])
-            
-            if not results:
-                print("No more images found")
+            if isinstance(data, dict):
+                # When count is omitted, Unsplash returns a single object
+                data = [data]
+            if not data:
+                print("No images returned in this batch")
                 break
-            
-            all_images.extend(results)
-            print(f"Found {len(results)} images on page {page}")
-            
-            page += 1
-            time.sleep(1)  # Rate limiting
-            
+            images.extend(data)
+            remaining -= len(data)
+            batch_index += 1
+            time.sleep(1)  # Gentle rate limit
         except Exception as e:
-            print(f"Error fetching page {page}: {str(e)}")
+            print(f"Error fetching random images: {str(e)}")
             break
-    
-    return all_images[:count]
+    return images[:count]
 
 def main():
     # Create download folder
     download_folder = os.path.expanduser("~/Desktop/tomatillo-test-images")
     os.makedirs(download_folder, exist_ok=True)
     
-    print(f"Downloading 50 nature images to: {download_folder}")
+    print(f"Downloading 50 random images to: {download_folder}")
     print("=" * 50)
     
-    # Get images from Unsplash
-    images = get_nature_images(50)
+    # Get images from Unsplash (change query to limit topic if desired)
+    images = get_random_images(50, query=None)
     
     if not images:
         print("No images found!")
@@ -103,9 +101,10 @@ def main():
     successful_downloads = 0
     
     for i, image in enumerate(images, 1):
-        # Get the highest resolution URL
+        # Get a high-resolution URL
         urls = image.get("urls", {})
-        download_url = urls.get("raw") or urls.get("full") or urls.get("regular")
+        # Prefer 'full' to avoid some RAW query param requirements
+        download_url = urls.get("full") or urls.get("raw") or urls.get("regular")
         
         if not download_url:
             print(f"✗ No download URL for image {i}")
