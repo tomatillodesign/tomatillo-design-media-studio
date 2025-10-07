@@ -2555,7 +2555,10 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentPage = 1;
     let hasMore = <?php echo $has_more ? 'true' : 'false'; ?>;
     let currentImageId = null;
-    let allImages = [];
+		let allImages = [];
+		// Pause infinite scroll when searching
+		let infiniteScrollPaused = false;
+		let activeSearchQuery = '';
     
     // Initialize
     initializeDragDrop();
@@ -2890,7 +2893,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function initializeInfiniteScroll() {
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
-                if (entry.isIntersecting && hasMore) {
+                if (entry.isIntersecting && hasMore && !infiniteScrollPaused) {
                     loadMoreImages();
                 }
             });
@@ -2903,7 +2906,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function loadMoreImages() {
-        if (loading || !hasMore) return;
+        if (loading || !hasMore || infiniteScrollPaused) return;
         
         loading = true;
         currentPage++;
@@ -2925,8 +2928,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         loadingIndicator.style.display = 'none';
                     }
                     
-                    // Update allImages array
-                    loadAllImages();
+                    // No need to update an allImages array; we read from DOM data attributes
                     
                     // Recalculate masonry layout after adding new images
                     setTimeout(() => {
@@ -2959,7 +2961,8 @@ document.addEventListener('DOMContentLoaded', function() {
         let resizeTimeout;
         
         function layoutMasonry() {
-            const items = Array.from(grid.children);
+            // Only position VISIBLE items so the first visible item appears at top-left
+            const items = Array.from(grid.children).filter(child => child.style.display !== 'none');
             if (items.length === 0) return;
             
             // Get container width
@@ -3007,7 +3010,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 columnHeights[shortestColumnIndex] += item.offsetHeight + gap;
             });
             
-            // Set container height
+            // Set container height to visible content height
             grid.style.height = Math.max(...columnHeights) + 'px';
         }
         
@@ -3824,6 +3827,14 @@ document.addEventListener('DOMContentLoaded', function() {
             // Debounce search
             clearTimeout(searchTimeout);
             searchTimeout = setTimeout(() => {
+                activeSearchQuery = query;
+                // Pause infinite scroll while a query is active
+                infiniteScrollPaused = activeSearchQuery.length > 0;
+                // Hide loading indicator while searching
+                const loadingIndicator = document.getElementById('loading-indicator');
+                if (loadingIndicator && infiniteScrollPaused) {
+                    loadingIndicator.style.display = 'none';
+                }
                 performSearch(query);
             }, 300);
         });
@@ -3831,6 +3842,13 @@ document.addEventListener('DOMContentLoaded', function() {
         searchClear.addEventListener('click', function() {
             searchInput.value = '';
             this.style.display = 'none';
+            activeSearchQuery = '';
+            infiniteScrollPaused = false; // resume infinite scroll when clearing search
+            // Show loading indicator again if more pages exist
+            const loadingIndicator = document.getElementById('loading-indicator');
+            if (loadingIndicator && hasMore) {
+                loadingIndicator.style.display = 'flex';
+            }
             performSearch('');
         });
         
