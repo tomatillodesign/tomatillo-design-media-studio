@@ -1546,7 +1546,7 @@ $has_more = count($images) === $images_per_page;
     padding: 2rem;
     background: radial-gradient(circle at center, #f5f5f5 0%, #dddddd 100%); /* Radial gradient background */
     position: relative;
-    border-radius: 0 0 0 12px;
+    border-radius: 0;
 }
 
 /* Horizontal image styles */

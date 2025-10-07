@@ -38,17 +38,8 @@ class Tomatillo_Media_Settings {
         'enable_webp' => true,          // Enable WebP conversion
         'conversion_timeout' => 30,     // Max seconds per conversion
         
-        // Media Library Settings
-        'thumbnail_size' => 'large',
-        'enable_bulk_ops' => true,
-        'enable_advanced_search' => true,
-        'show_file_sizes' => true,
-        'show_optimization_status' => true,
-        
         // Advanced Settings
         'debug_mode' => true,
-        'cache_thumbnails' => true,
-        'lazy_load_images' => true,
     );
     
     /**
@@ -200,27 +191,6 @@ class Tomatillo_Media_Settings {
     }
     
     /**
-     * Get thumbnail size setting
-     */
-    public function get_thumbnail_size() {
-        return $this->get('thumbnail_size');
-    }
-    
-    /**
-     * Check if bulk operations are enabled
-     */
-    public function is_bulk_ops_enabled() {
-        return (bool) $this->get('enable_bulk_ops');
-    }
-    
-    /**
-     * Check if advanced search is enabled
-     */
-    public function is_advanced_search_enabled() {
-        return (bool) $this->get('enable_advanced_search');
-    }
-    
-    /**
      * Check if debug mode is enabled
      */
     public function is_debug_mode() {
@@ -300,19 +270,8 @@ class Tomatillo_Media_Settings {
         $sanitized['enable_webp'] = isset($input['enable_webp']) ? (bool) $input['enable_webp'] : true;
         $sanitized['conversion_timeout'] = isset($input['conversion_timeout']) ? max(5, min(300, (int) $input['conversion_timeout'])) : 30;
         
-        // Media Library Settings
-        $allowed_sizes = array('thumbnail', 'medium', 'large', 'full');
-        $sanitized['thumbnail_size'] = isset($input['thumbnail_size']) && in_array($input['thumbnail_size'], $allowed_sizes) 
-            ? $input['thumbnail_size'] : 'large';
-        $sanitized['enable_bulk_ops'] = isset($input['enable_bulk_ops']) ? (bool) $input['enable_bulk_ops'] : false;
-        $sanitized['enable_advanced_search'] = isset($input['enable_advanced_search']) ? (bool) $input['enable_advanced_search'] : false;
-        $sanitized['show_file_sizes'] = isset($input['show_file_sizes']) ? (bool) $input['show_file_sizes'] : false;
-        $sanitized['show_optimization_status'] = isset($input['show_optimization_status']) ? (bool) $input['show_optimization_status'] : false;
-        
         // Advanced Settings
         $sanitized['debug_mode'] = isset($input['debug_mode']) ? (bool) $input['debug_mode'] : false;
-        $sanitized['cache_thumbnails'] = isset($input['cache_thumbnails']) ? (bool) $input['cache_thumbnails'] : true;
-        $sanitized['lazy_load_images'] = isset($input['lazy_load_images']) ? (bool) $input['lazy_load_images'] : true;
         
         return $sanitized;
     }
@@ -353,9 +312,6 @@ class Tomatillo_Media_Settings {
             'webp_quality' => $this->get_webp_quality(),
             'auto_convert' => $this->is_auto_convert_enabled(),
             'batch_size' => $this->get_batch_size(),
-            'thumbnail_size' => $this->get_thumbnail_size(),
-            'enable_bulk_ops' => $this->is_bulk_ops_enabled(),
-            'enable_advanced_search' => $this->is_advanced_search_enabled(),
             'debug_mode' => $this->is_debug_mode(),
         );
     }

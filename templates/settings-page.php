@@ -42,7 +42,6 @@ $stats = tomatillo_media_studio()->core->get_media_stats();
             <nav class="nav-tab-wrapper">
                 <a href="#module-control" class="nav-tab nav-tab-active"><?php _e('Module Control', 'tomatillo-media-studio'); ?></a>
                 <a href="#optimization" class="nav-tab"><?php _e('Optimization', 'tomatillo-media-studio'); ?></a>
-                <a href="#media-library" class="nav-tab"><?php _e('Media Library', 'tomatillo-media-studio'); ?></a>
                 <a href="#advanced" class="nav-tab"><?php _e('Advanced', 'tomatillo-media-studio'); ?></a>
             </nav>
             
@@ -159,75 +158,6 @@ $stats = tomatillo_media_studio()->core->get_media_stats();
                 </table>
             </div>
             
-            <!-- Media Library Tab -->
-            <div id="media-library" class="tab-content">
-                <h2><?php _e('Media Library Settings', 'tomatillo-media-studio'); ?></h2>
-                <p class="description"><?php _e('Configure the enhanced media library interface.', 'tomatillo-media-studio'); ?></p>
-                
-                <table class="form-table">
-                    <tr>
-                        <th scope="row"><?php _e('Thumbnail Size', 'tomatillo-media-studio'); ?></th>
-                        <td>
-                            <select name="tomatillo_media_studio_settings[thumbnail_size]">
-                                <option value="thumbnail" <?php selected($settings->get_thumbnail_size(), 'thumbnail'); ?>><?php _e('Thumbnail (150px)', 'tomatillo-media-studio'); ?></option>
-                                <option value="medium" <?php selected($settings->get_thumbnail_size(), 'medium'); ?>><?php _e('Medium (300px)', 'tomatillo-media-studio'); ?></option>
-                                <option value="large" <?php selected($settings->get_thumbnail_size(), 'large'); ?>><?php _e('Large (1024px)', 'tomatillo-media-studio'); ?></option>
-                                <option value="full" <?php selected($settings->get_thumbnail_size(), 'full'); ?>><?php _e('Full Size', 'tomatillo-media-studio'); ?></option>
-                            </select>
-                            <p class="description"><?php _e('Size of thumbnails displayed in the media library grid.', 'tomatillo-media-studio'); ?></p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><?php _e('Bulk Operations', 'tomatillo-media-studio'); ?></th>
-                        <td>
-                            <label class="tomatillo-toggle-label">
-                                <div class="tomatillo-toggle">
-                                    <input type="checkbox" name="tomatillo_media_studio_settings[enable_bulk_ops]" value="1" <?php checked($settings->is_bulk_ops_enabled()); ?> />
-                                    <span class="tomatillo-toggle-slider"></span>
-                                </div>
-                                <?php _e('Enable bulk selection and operations', 'tomatillo-media-studio'); ?>
-                            </label>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><?php _e('Advanced Search', 'tomatillo-media-studio'); ?></th>
-                        <td>
-                            <label class="tomatillo-toggle-label">
-                                <div class="tomatillo-toggle">
-                                    <input type="checkbox" name="tomatillo_media_studio_settings[enable_advanced_search]" value="1" <?php checked($settings->is_advanced_search_enabled()); ?> />
-                                    <span class="tomatillo-toggle-slider"></span>
-                                </div>
-                                <?php _e('Enable advanced search and filtering', 'tomatillo-media-studio'); ?>
-                            </label>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><?php _e('Show File Sizes', 'tomatillo-media-studio'); ?></th>
-                        <td>
-                            <label class="tomatillo-toggle-label">
-                                <div class="tomatillo-toggle">
-                                    <input type="checkbox" name="tomatillo_media_studio_settings[show_file_sizes]" value="1" <?php checked($settings->get('show_file_sizes')); ?> />
-                                    <span class="tomatillo-toggle-slider"></span>
-                                </div>
-                                <?php _e('Display file sizes in the media library', 'tomatillo-media-studio'); ?>
-                            </label>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><?php _e('Show Optimization Status', 'tomatillo-media-studio'); ?></th>
-                        <td>
-                            <label class="tomatillo-toggle-label">
-                                <div class="tomatillo-toggle">
-                                    <input type="checkbox" name="tomatillo_media_studio_settings[show_optimization_status]" value="1" <?php checked($settings->get('show_optimization_status')); ?> />
-                                    <span class="tomatillo-toggle-slider"></span>
-                                </div>
-                                <?php _e('Display optimization status indicators', 'tomatillo-media-studio'); ?>
-                            </label>
-                        </td>
-                    </tr>
-                </table>
-            </div>
-            
             <!-- Advanced Tab -->
             <div id="advanced" class="tab-content">
                 <h2><?php _e('Advanced Settings', 'tomatillo-media-studio'); ?></h2>
@@ -245,30 +175,6 @@ $stats = tomatillo_media_studio()->core->get_media_stats();
                                 <?php _e('Enable debug logging', 'tomatillo-media-studio'); ?>
                             </label>
                             <p class="description"><?php _e('Logs detailed information to help troubleshoot issues.', 'tomatillo-media-studio'); ?></p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><?php _e('Cache Thumbnails', 'tomatillo-media-studio'); ?></th>
-                        <td>
-                            <label class="tomatillo-toggle-label">
-                                <div class="tomatillo-toggle">
-                                    <input type="checkbox" name="tomatillo_media_studio_settings[cache_thumbnails]" value="1" <?php checked($settings->get('cache_thumbnails')); ?> />
-                                    <span class="tomatillo-toggle-slider"></span>
-                                </div>
-                                <?php _e('Cache generated thumbnails for better performance', 'tomatillo-media-studio'); ?>
-                            </label>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><?php _e('Lazy Load Images', 'tomatillo-media-studio'); ?></th>
-                        <td>
-                            <label class="tomatillo-toggle-label">
-                                <div class="tomatillo-toggle">
-                                    <input type="checkbox" name="tomatillo_media_studio_settings[lazy_load_images]" value="1" <?php checked($settings->get('lazy_load_images')); ?> />
-                                    <span class="tomatillo-toggle-slider"></span>
-                                </div>
-                                <?php _e('Load images only when they come into view', 'tomatillo-media-studio'); ?>
-                            </label>
                         </td>
                     </tr>
                     <tr>

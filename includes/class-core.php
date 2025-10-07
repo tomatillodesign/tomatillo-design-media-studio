@@ -302,7 +302,7 @@ class Tomatillo_Media_Core {
         
         $stats['total_conversions'] = $optimized_count;
         
-        // AVIF and WebP conversions (count by checking actual files)
+        // AVIF and WebP conversions (count by checking actual files with proper base filename)
         $avif_count = 0;
         $webp_count = 0;
         $avif_space_saved = 0;
@@ -317,14 +317,19 @@ class Tomatillo_Media_Core {
             
             foreach ($images as $image) {
                 $file_path = get_attached_file($image->ID);
-                if ($file_path) {
-                    $avif_path = str_replace(array('.jpg', '.jpeg', '.png'), '.avif', $file_path);
-                    $webp_path = str_replace(array('.jpg', '.jpeg', '.png'), '.webp', $file_path);
+                if ($file_path && file_exists($file_path)) {
+                    // Use the same base filename logic as the optimizer
+                    $path_info = pathinfo($file_path);
+                    $base_filename = preg_replace('/-\d+x\d+$/', '', str_replace('-scaled', '', $path_info['filename']));
+                    $directory = $path_info['dirname'];
+                    
+                    $avif_path = $directory . '/' . $base_filename . '.avif';
+                    $webp_path = $directory . '/' . $base_filename . '.webp';
                     
                     if (file_exists($avif_path)) {
                         $avif_count++;
-                        // Calculate space saved for AVIF
-                        $original_size = file_exists($file_path) ? filesize($file_path) : 0;
+                        // Calculate space saved for AVIF (compare against WordPress scaled version)
+                        $original_size = filesize($file_path);
                         $avif_size = filesize($avif_path);
                         if ($original_size > $avif_size) {
                             $avif_space_saved += ($original_size - $avif_size);
@@ -332,8 +337,8 @@ class Tomatillo_Media_Core {
                     }
                     if (file_exists($webp_path)) {
                         $webp_count++;
-                        // Calculate space saved for WebP
-                        $original_size = file_exists($file_path) ? filesize($file_path) : 0;
+                        // Calculate space saved for WebP (compare against WordPress scaled version)
+                        $original_size = filesize($file_path);
                         $webp_size = filesize($webp_path);
                         if ($original_size > $webp_size) {
                             $webp_space_saved += ($original_size - $webp_size);
@@ -799,9 +804,9 @@ class Tomatillo_Media_Core {
             wp_send_json_error('Invalid file type. Only images are allowed.');
         }
         
-        // Check file size (10MB limit)
-        if ($file['size'] > 10 * 1024 * 1024) {
-            wp_send_json_error('File too large. Maximum size is 10MB.');
+        // Check file size (20MB limit)
+        if ($file['size'] > 20 * 1024 * 1024) {
+            wp_send_json_error('File too large. Maximum size is 20MB.');
         }
         
         try {

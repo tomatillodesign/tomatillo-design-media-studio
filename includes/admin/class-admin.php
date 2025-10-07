@@ -27,6 +27,9 @@ class Tomatillo_Media_Admin {
         add_action('admin_enqueue_scripts', array($this, 'admin_enqueue_scripts'));
         add_action('admin_menu', array($this, 'hide_traditional_media_library'), 999);
         
+        // Check for media library redirect early to avoid headers already sent error
+        add_action('admin_init', array($this, 'check_media_library_redirect'), 1);
+        
         // AJAX handlers for bulk operations
         add_action('wp_ajax_tomatillo_get_unoptimized_count', array($this, 'ajax_get_unoptimized_count'));
         add_action('wp_ajax_tomatillo_process_bulk_batch', array($this, 'ajax_process_bulk_batch'));
@@ -147,13 +150,27 @@ class Tomatillo_Media_Admin {
     }
     
     /**
+     * Check for media library redirect early to avoid headers already sent error
+     */
+    public function check_media_library_redirect() {
+        // Only check if we're on our media library page
+        if (!isset($_GET['page']) || $_GET['page'] !== 'tomatillo-media-studio-library') {
+            return;
+        }
+        
+        // Redirect to default WordPress Media Library when enhanced interface is disabled
+        if (!tomatillo_media_studio()->settings->is_media_library_enabled()) {
+            wp_redirect(admin_url('upload.php'));
+            exit;
+        }
+    }
+    
+    /**
      * Media library page
      */
     public function media_library_page() {
-        if (!tomatillo_media_studio()->settings->is_media_library_enabled()) {
-            wp_die(__('Media Library module is disabled.', 'tomatillo-media-studio'));
-        }
-        
+        // Redirect should have already happened in check_media_library_redirect()
+        // This method should only be called when enhanced interface is enabled
         include TOMATILLO_MEDIA_STUDIO_DIR . 'templates/media-library.php';
     }
     
@@ -211,19 +228,12 @@ class Tomatillo_Media_Admin {
         // Handle calculator updates
         if (isset($_POST['update_calculator']) && wp_verify_nonce($_POST['_wpnonce'], 'tomatillo_update_calculator')) {
             $monthly_pageviews = intval($_POST['monthly_pageviews']);
-            $cost_per_gb = floatval($_POST['cost_per_gb']);
             
-            // Handle custom cost input
-            if (isset($_POST['custom_cost']) && $_POST['cost_per_gb'] === 'custom') {
-                $cost_per_gb = floatval($_POST['custom_cost']);
-            }
-            
-            if ($monthly_pageviews > 0 && $cost_per_gb >= 0) {
+            if ($monthly_pageviews > 0) {
                 update_option('tomatillo_monthly_pageviews', $monthly_pageviews);
-                update_option('tomatillo_cost_per_gb', $cost_per_gb);
                 echo '<div class="notice notice-success"><p>' . __('Calculator settings updated successfully!', 'tomatillo-media-studio') . '</p></div>';
             } else {
-                echo '<div class="notice notice-error"><p>' . __('Please enter valid values for page views and cost per GB.', 'tomatillo-media-studio') . '</p></div>';
+                echo '<div class="notice notice-error"><p>' . __('Please enter a valid number of monthly page views.', 'tomatillo-media-studio') . '</p></div>';
             }
         }
     }
@@ -260,6 +270,7 @@ class Tomatillo_Media_Admin {
             // Also remove the Media submenu from other locations
             remove_submenu_page('upload.php', 'upload.php');
         }
+        // When enhanced interface is disabled, keep the default WordPress Media Library visible
     }
     
     /**

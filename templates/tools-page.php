@@ -24,13 +24,29 @@ $optimized_count = isset($stats['total_conversions']) ? max(0, intval($stats['to
 
 // Calculate bandwidth savings with user-configurable settings
 $estimated_monthly_views = get_option('tomatillo_monthly_pageviews', 1000); // Default to 1K views
-$cost_per_gb = get_option('tomatillo_cost_per_gb', 0.08); // Default $0.08/GB (Standard CDN)
+$cost_per_gb_raw = get_option('tomatillo_cost_per_gb', 0.08); // Default $0.08/GB (Standard CDN)
+$cost_per_gb = $cost_per_gb_raw > 0 ? $cost_per_gb_raw : 0.08; // Ensure we always have a valid cost
 
 // Calculate bandwidth savings per page view (in bytes)
-$bandwidth_saved_per_view = $space_saved;
+// Assume each page view loads an average of 3 images, and we have optimized images
+$avg_images_per_page = 3;
+$avg_space_saved_per_image = $optimized_count > 0 ? ($space_saved / $optimized_count) : 0;
+$bandwidth_saved_per_view = $avg_space_saved_per_image * $avg_images_per_page;
 $monthly_bandwidth_saved_bytes = $bandwidth_saved_per_view * $estimated_monthly_views;
 $monthly_bandwidth_saved_gb = $monthly_bandwidth_saved_bytes / (1024 * 1024 * 1024); // Convert to GB
 $monthly_cost_savings = $monthly_bandwidth_saved_gb * $cost_per_gb;
+
+// Debug: Let's see what we're working with
+if (defined('WP_DEBUG') && WP_DEBUG) {
+    error_log("Tomatillo Debug - Monthly Savings Calculation:");
+    error_log("  Total space saved: " . $space_saved . " bytes");
+    error_log("  Optimized count: " . $optimized_count);
+    error_log("  Avg space saved per image: " . $avg_space_saved_per_image . " bytes");
+    error_log("  Bandwidth saved per view: " . $bandwidth_saved_per_view . " bytes");
+    error_log("  Monthly bandwidth saved: " . $monthly_bandwidth_saved_bytes . " bytes");
+    error_log("  Monthly bandwidth saved GB: " . $monthly_bandwidth_saved_gb . " GB");
+    error_log("  Monthly cost savings: $" . $monthly_cost_savings);
+}
 
 // Calculate memory usage
 $memory_usage = memory_get_usage(true);
@@ -152,7 +168,7 @@ $memory_percentage = ($memory_usage / $memory_limit) * 100;
                         <tr>
                             <td><strong>Upload Max Filesize</strong></td>
                             <td><?php echo ini_get('upload_max_filesize'); ?></td>
-                            <td><?php echo wp_convert_hr_to_bytes(ini_get('upload_max_filesize')) >= 10 * 1024 * 1024 ? '✓ Sufficient' : '⚠ Consider increasing'; ?></td>
+                            <td><?php echo wp_convert_hr_to_bytes(ini_get('upload_max_filesize')) >= 20 * 1024 * 1024 ? '✓ Sufficient' : '⚠ Consider increasing'; ?></td>
                         </tr>
                         <tr>
                             <td><strong>GD Extension</strong></td>
@@ -216,7 +232,7 @@ $memory_percentage = ($memory_usage / $memory_limit) * 100;
                     <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 8px;">
                         <h4 style="margin: 0; color: #28a745;">Total Space Saved</h4>
                         <p style="margin: 10px 0 0 0; font-size: 1.5em; font-weight: bold;"><?php echo size_format($space_saved); ?></p>
-                        <p style="margin: 5px 0 0 0; font-size: 0.8em; color: #666;">Per optimized image</p>
+                        <p style="margin: 5px 0 0 0; font-size: 0.8em; color: #666;">Across all optimized images</p>
                     </div>
                     <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 8px;">
                         <h4 style="margin: 0; color: #007bff;">Average Savings</h4>
@@ -230,8 +246,12 @@ $memory_percentage = ($memory_usage / $memory_limit) * 100;
                     </div>
                     <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 8px;">
                         <h4 style="margin: 0; color: #fd7e14;">Monthly Cost Savings</h4>
-                        <p style="margin: 10px 0 0 0; font-size: 1.5em; font-weight: bold;">$<?php echo number_format($monthly_cost_savings, 2); ?></p>
+                        <p style="margin: 10px 0 0 0; font-size: 1.5em; font-weight: bold;">$<?php 
+                            $debug_calc = ($monthly_bandwidth_saved_bytes / (1024 * 1024 * 1024)) * $cost_per_gb;
+                            echo number_format(round($debug_calc, 2), 2); 
+                        ?></p>
                         <p style="margin: 5px 0 0 0; font-size: 0.8em; color: #666;">$0.08/GB</p>
+                        <!-- Debug: <?php echo "Bytes: " . $monthly_bandwidth_saved_bytes . ", GB: " . ($monthly_bandwidth_saved_bytes / (1024 * 1024 * 1024)) . ", Cost: $" . $debug_calc; ?> -->
                     </div>
                 </div>
                 
