@@ -527,7 +527,6 @@ $has_more = count($images) === $images_per_page;
                                 ?>
                             </p>
                             <div class="file-type-pill">
-                                <span class="dashicons file-type-icon file-type-<?php echo strtolower(pathinfo(get_attached_file($file->ID), PATHINFO_EXTENSION)); ?>"></span>
                                 <?php echo strtoupper(pathinfo(get_attached_file($file->ID), PATHINFO_EXTENSION)); ?>
                             </div>
                         </div>
@@ -1993,73 +1992,6 @@ $has_more = count($images) === $images_per_page;
     color: #6b7280;
 }
 
-/* File Type Icons - Using Dashicons */
-.file-icon-default::before {
-    font-family: dashicons;
-    content: "\f123"; /* dashicons-media-document */
-    font-size: 3rem;
-    color: #6b7280;
-}
-
-.file-icon-pdf::before {
-    font-family: dashicons;
-    content: "\f123"; /* dashicons-media-document */
-    font-size: 3rem;
-    color: #dc2626; /* Red for PDF */
-}
-
-.file-icon-pdf-thumbnail::before {
-    display: none; /* Hide icon when thumbnail is present */
-}
-
-.file-icon-word::before {
-    font-family: dashicons;
-    content: "\f123"; /* dashicons-media-document */
-    font-size: 3rem;
-    color: #2563eb; /* Blue for Word */
-}
-
-.file-icon-excel::before {
-    font-family: dashicons;
-    content: "\f123"; /* dashicons-media-document */
-    font-size: 3rem;
-    color: #16a34a; /* Green for Excel */
-}
-
-.file-icon-powerpoint::before {
-    font-family: dashicons;
-    content: "\f123"; /* dashicons-media-document */
-    font-size: 3rem;
-    color: #ea580c; /* Orange for PowerPoint */
-}
-
-.file-icon-text::before {
-    font-family: dashicons;
-    content: "\f123"; /* dashicons-media-document */
-    font-size: 3rem;
-    color: #6b7280; /* Gray for text */
-}
-
-.file-icon-zip::before {
-    font-family: dashicons;
-    content: "\f123"; /* dashicons-media-document */
-    font-size: 3rem;
-    color: #7c3aed; /* Purple for ZIP */
-}
-
-.file-icon-audio::before {
-    font-family: dashicons;
-    content: "\f127"; /* dashicons-format-audio */
-    font-size: 3rem;
-    color: #059669; /* Green for audio */
-}
-
-.file-icon-video::before {
-    font-family: dashicons;
-    content: "\f126"; /* dashicons-format-video */
-    font-size: 3rem;
-    color: #dc2626; /* Red for video */
-}
 
 .file-info {
     padding: 0 0 1rem 0; /* Reduced padding since card has padding */
