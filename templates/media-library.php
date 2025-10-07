@@ -351,87 +351,84 @@ $has_more = count($images) === $images_per_page;
                                             echo date('M j, Y', strtotime($image_date)) . ' • ' . $file_size_formatted . ' • Uploaded by: ' . esc_html($uploader_name); 
                                             ?>
                                         </p>
-                                    </div>
-                                    
-                                </div>
-                                
-                                <!-- Hover Info Overlay - Only show if there's content -->
-                                <?php
-                                // Get optimized file info
-                                $optimized_info = '';
-                                if ($is_optimized && $plugin->core) {
-                                    $avif_url = $plugin->core->get_optimized_image_url($image->ID, 'avif');
-                                    $webp_url = $plugin->core->get_optimized_image_url($image->ID, 'webp');
-                                    $scaled_url = wp_get_attachment_image_url($image->ID, 'medium');
-                                    
-                                    // Find smallest optimized size
-                                    $smallest_size = '';
-                                    $smallest_url = '';
-                                    
-                                    if ($avif_url) {
-                                        $avif_size = filesize(str_replace(home_url('/'), ABSPATH, $avif_url));
-                                        if (!$smallest_size || $avif_size < $smallest_size) {
-                                            $smallest_size = $avif_size;
-                                            $smallest_url = $avif_url;
-                                            $format = 'AVIF';
+                                        <?php
+                                        // Build secondary line with attachment/featured usage
+                                        $secondary_bits = array();
+                                        // Attached to (upload parent)
+                                        if (!empty($image->post_parent)) {
+                                            $parent_post = get_post($image->post_parent);
+                                            if ($parent_post) {
+                                                $secondary_bits[] = 'Attached to: ' . $parent_post->post_title;
+                                            }
                                         }
-                                    }
-                                    
-                                    if ($webp_url) {
-                                        $webp_size = filesize(str_replace(home_url('/'), ABSPATH, $webp_url));
-                                        if (!$smallest_size || $webp_size < $smallest_size) {
-                                            $smallest_size = $webp_size;
-                                            $smallest_url = $webp_url;
-                                            $format = 'WebP';
+						// Usage in content (Gutenberg/Classic) — detect if this image appears inside post content
+						$usage_label = '';
+						$original_url = wp_get_attachment_url($image->ID);
+						if ($original_url) {
+							// Try finding a post that contains the exact URL
+							$used_in = new WP_Query(array(
+								'post_type' => 'any',
+								'post_status' => array('publish', 'future', 'draft', 'pending', 'private'),
+								's' => $original_url,
+								'posts_per_page' => 1,
+								'no_found_rows' => true,
+								'fields' => 'ids'
+							));
+							if (!$used_in->have_posts()) {
+								// Try Gutenberg block id pattern
+								$used_in = new WP_Query(array(
+									'post_type' => 'any',
+									'post_status' => array('publish', 'future', 'draft', 'pending', 'private'),
+									's' => '"id":' . $image->ID,
+									'posts_per_page' => 1,
+									'no_found_rows' => true,
+									'fields' => 'ids'
+								));
+							}
+							if (!$used_in->have_posts()) {
+								// Try classic editor class pattern
+								$used_in = new WP_Query(array(
+									'post_type' => 'any',
+									'post_status' => array('publish', 'future', 'draft', 'pending', 'private'),
+									's' => 'wp-image-' . $image->ID,
+									'posts_per_page' => 1,
+									'no_found_rows' => true,
+									'fields' => 'ids'
+								));
+							}
+							if ($used_in->have_posts()) {
+								$post_id = $used_in->posts[0];
+								$usage_label = 'Used in: ' . get_the_title($post_id);
+								$secondary_bits[] = $usage_label;
+							}
+							wp_reset_postdata();
+						}
+                                        // Featured image usage
+                                        $featured_q = new WP_Query(array(
+                                            'post_type' => 'any',
+                                            'post_status' => array('publish', 'future', 'draft', 'pending', 'private'),
+                                            'meta_key' => '_thumbnail_id',
+                                            'meta_value' => $image->ID,
+                                            'posts_per_page' => 1,
+                                            'no_found_rows' => false
+                                        ));
+                                        if ($featured_q->have_posts()) {
+                                            $first_post = $featured_q->posts[0];
+                                            $total = intval($featured_q->found_posts);
+                                            $label = 'Featured image on: ' . $first_post->post_title;
+                                            if ($total > 1) {
+                                                $label .= ' (+' . ($total - 1) . ' more)';
+                                            }
+                                            $secondary_bits[] = $label;
                                         }
-                                    }
-                                    
-                                    if ($scaled_url) {
-                                        $scaled_size = filesize(str_replace(home_url('/'), ABSPATH, $scaled_url));
-                                        if (!$smallest_size || $scaled_size < $smallest_size) {
-                                            $smallest_size = $scaled_size;
-                                            $smallest_url = $scaled_url;
-                                            $format = 'Scaled';
-                                        }
-                                    }
-                                    
-                                    if ($smallest_size) {
-                                        $optimized_info = $format . ' • ' . size_format($smallest_size);
-                                    }
-                                }
-                                
-                                // Get attachment info
-                                $attachments = get_posts(array(
-                                    'post_type' => 'any',
-                                    'meta_query' => array(
-                                        array(
-                                            'key' => '_thumbnail_id',
-                                            'value' => $image->ID,
-                                            'compare' => '='
-                                        )
-                                    ),
-                                    'posts_per_page' => 1
-                                ));
-                                
-                                $attachment_info = '';
-                                if (!empty($attachments)) {
-                                    $attached_post = $attachments[0];
-                                    $attachment_info = 'Attached to: ' . $attached_post->post_title;
-                                }
-                                
-                                // Only show hover overlay if there's actual content
-                                if ($attachment_info):
-                                ?>
-                                <div class="hover-info-overlay">
-                                    <div class="hover-info-content">
-                                        <?php if ($attachment_info): ?>
-                                            <div class="hover-info-item">
-                                                <span class="hover-info-label"><?php echo esc_html($attachment_info); ?></span>
-                                            </div>
+                                        wp_reset_postdata();
+                                        $secondary_line = trim(implode(' • ', $secondary_bits));
+                                        if (!empty($secondary_line)):
+                                        ?>
+                                        <p class="image-meta image-meta-secondary"><?php echo esc_html($secondary_line); ?></p>
                                         <?php endif; ?>
                                     </div>
                                 </div>
-                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
