@@ -9,6 +9,7 @@
     // Global variables
     var selectedItems = [];
     var currentMediaItems = [];
+    var currentOptimizationData = [];
 
     // Wait for wp.media to be available
     function waitForWpMedia(callback) {
@@ -62,6 +63,7 @@
                     initializeMediaGrid(options);
                     
                     // Handle events
+                    console.log('🚀 Setting up event handlers for modal');
                     setupEventHandlers(options);
                     
                     console.log('CLEAN custom media frame opened');
@@ -349,6 +351,14 @@
                     font-size: 14px;
                 }
                 
+                .tomatillo-no-results {
+                    text-align: center;
+                    padding: 60px 20px;
+                    color: #666;
+                    font-size: 16px;
+                    font-style: italic;
+                }
+                
                 .tomatillo-actions {
                     display: flex;
                     gap: 10px;
@@ -443,6 +453,11 @@
                 }
                 
                 console.log('Media fetched successfully, count:', mediaItems.length);
+                
+                // Store media items globally immediately
+                currentMediaItems = mediaItems;
+                console.log('📦 Stored mediaItems globally:', currentMediaItems.length);
+                
                 renderMediaGrid(mediaItems, options);
             })
             .fail(function(xhr, status, error) {
@@ -725,6 +740,10 @@
         
         Promise.all(optimizationPromises).then(function(optimizationDataArray) {
             console.log('🎯 All optimization data fetched:', optimizationDataArray);
+            
+            // Store optimization data globally for search functionality
+            currentOptimizationData = optimizationDataArray;
+            
             var gridHtml = '';
             
             mediaItems.forEach(function(item, index) {
@@ -856,21 +875,25 @@
     function setupEventHandlers(options) {
         
         // Handle close button
-        $('#tomatillo-close-modal').on('click', function() {
+        $('#tomatillo-close-modal').off('click').on('click', function() {
             console.log('Close button clicked');
-            $('#tomatillo-custom-modal').remove();
+            cleanupModal();
         });
         
         // Handle cancel button
-        $('#tomatillo-cancel').on('click', function() {
+        $('#tomatillo-cancel').off('click').on('click', function() {
             console.log('Cancel button clicked');
-            $('#tomatillo-custom-modal').remove();
+            cleanupModal();
         });
         
         // Handle media item selection
-        $(document).on('click', '.tomatillo-media-item', function() {
+        $(document).off('click.tomatillo-media').on('click.tomatillo-media', '.tomatillo-media-item', function() {
+            console.log('🎯 Media item clicked - checking if selection works');
             var itemId = $(this).data('id');
             var $item = $(this);
+            console.log('🎯 Item ID:', itemId, 'Item element:', $item);
+            console.log('🎯 Current selectedItems before:', selectedItems);
+            console.log('🎯 Options multiple:', options.multiple);
             
             if (options.multiple) {
                 // Multiple selection
@@ -949,25 +972,180 @@
                 }
                 
                 // Close modal
-                $('#tomatillo-custom-modal').remove();
+                cleanupModal();
             }
         });
         
         // Handle clicking outside modal
-        $('#tomatillo-custom-modal').on('click', function(e) {
+        $('#tomatillo-custom-modal').off('click').on('click', function(e) {
             if (e.target.id === 'tomatillo-custom-modal') {
                 console.log('Clicked outside modal');
-                $('#tomatillo-custom-modal').remove();
+                cleanupModal();
             }
         });
         
         // Handle ESC key to close modal
-        $(document).on('keydown', function(e) {
+        $(document).off('keydown.tomatillo-modal').on('keydown.tomatillo-modal', function(e) {
             if (e.key === 'Escape' && $('#tomatillo-custom-modal').length > 0) {
                 console.log('ESC key pressed - closing modal');
-                $('#tomatillo-custom-modal').remove();
+                cleanupModal();
             }
         });
+        
+        // Handle search input
+        $('#tomatillo-search').off('input').on('input', function() {
+            var searchQuery = $(this).val().toLowerCase().trim();
+            console.log('Search query:', searchQuery);
+            
+            if (searchQuery === '') {
+                // Show all items if search is empty
+                renderMediaGrid(currentMediaItems, options);
+            } else {
+                // Filter items based on search query
+                var filteredItems = [];
+                var filteredOptimizationData = [];
+                
+                currentMediaItems.forEach(function(item, index) {
+                    if (searchInMediaItem(item, searchQuery)) {
+                        filteredItems.push(item);
+                        if (currentOptimizationData && currentOptimizationData[index]) {
+                            filteredOptimizationData.push(currentOptimizationData[index]);
+                        } else {
+                            filteredOptimizationData.push(null);
+                        }
+                    }
+                });
+                
+                console.log('Filtered items:', filteredItems.length, 'out of', currentMediaItems.length);
+                
+                // Re-render grid with filtered items
+                if (filteredItems.length === 0) {
+                    // Show "No results found" message
+                    $('#tomatillo-media-grid').html('<div class="tomatillo-no-results">No images found matching "' + searchQuery + '"</div>');
+                } else {
+                    renderMediaGridWithOptimization(filteredItems, filteredOptimizationData, options);
+                }
+            }
+        });
+    }
+
+    /**
+     * Clean up modal and reset state
+     */
+    function cleanupModal() {
+        console.log('🧹 Cleaning up modal');
+        console.log('🧹 Current selectedItems:', selectedItems);
+        console.log('🧹 Current mediaItems length:', currentMediaItems.length);
+        
+        // Remove modal from DOM
+        $('#tomatillo-custom-modal').remove();
+        
+        // Reset global state
+        selectedItems = [];
+        currentMediaItems = [];
+        currentOptimizationData = [];
+        
+        // Remove namespaced event handlers
+        $(document).off('keydown.tomatillo-modal');
+        $(document).off('click.tomatillo-media');
+        
+        console.log('🧹 Modal cleanup complete');
+        console.log('🧹 Reset selectedItems:', selectedItems);
+        console.log('🧹 Reset mediaItems length:', currentMediaItems.length);
+    }
+
+    /**
+     * Render media grid with pre-filtered optimization data (for search)
+     */
+    function renderMediaGridWithOptimization(mediaItems, optimizationDataArray, options) {
+        console.log('Rendering filtered media grid with', mediaItems.length, 'items');
+        
+        var gridHtml = '';
+        
+        mediaItems.forEach(function(item, index) {
+            var optimizationData = optimizationDataArray[index];
+            var hiResImage = getHiResImageWithOptimization(item, optimizationData);
+            
+            var originalFilename = item.filename || item.title || 'Unknown';
+            var filename = cleanFilename(originalFilename);
+            
+            var orientation = item.width > item.height ? 'Landscape' : 'Portrait';
+            
+            gridHtml += `
+                <div class="tomatillo-media-item" data-id="${item.id}">
+                    ${item.type === 'image' ? 
+                        `<img src="${hiResImage.url}" alt="${filename}" loading="lazy">` :
+                        `<div style="width: 100%; height: 200px; background: #f5f5f5; display: flex; align-items: center; justify-content: center; font-size: 48px; color: #666;">📄</div>`
+                    }
+                    
+                    <div class="tomatillo-hover-info">
+                        <div class="filename">${filename}</div>
+                        <div class="dimensions">${orientation} • ${hiResImage.width}×${hiResImage.height}</div>
+                        <div class="details">${hiResImage.filesize} • ${hiResImage.format}</div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        $('#tomatillo-media-grid').html(gridHtml);
+        
+        // Add hover effects
+        $('.tomatillo-media-item').hover(
+            function() {
+                if (!$(this).hasClass('selected')) {
+                    $(this).css({
+                        'transform': 'translateY(-2px)',
+                        'box-shadow': '0 4px 12px rgba(0,0,0,0.12)'
+                    });
+                }
+                $(this).find('.tomatillo-hover-info').css('opacity', '1');
+            },
+            function() {
+                if (!$(this).hasClass('selected')) {
+                    $(this).css({
+                        'transform': 'translateY(0)',
+                        'box-shadow': '0 1px 3px rgba(0,0,0,0.08)'
+                    });
+                } else {
+                    // For selected items, maintain selection styles
+                    $(this).css({
+                        'transform': 'translateY(0)',
+                        'box-shadow': '0 4px 12px rgba(40, 167, 69, 0.3)',
+                        'border-color': '#28a745'
+                    });
+                }
+                $(this).find('.tomatillo-hover-info').css('opacity', '0');
+            }
+        );
+        
+        console.log('Filtered media grid rendered successfully');
+    }
+
+    /**
+     * Search through all fields of a media item
+     */
+    function searchInMediaItem(item, searchQuery) {
+        if (!item || !searchQuery) return false;
+        
+        // Fields to search through
+        var searchFields = [
+            item.filename || '',
+            item.title || '',
+            item.caption || '',
+            item.description || '',
+            item.alt || '',
+            item.name || '',
+            item.slug || ''
+        ];
+        
+        // Search through all fields
+        for (var i = 0; i < searchFields.length; i++) {
+            if (searchFields[i].toLowerCase().includes(searchQuery)) {
+                return true;
+            }
+        }
+        
+        return false;
     }
 
     /**
