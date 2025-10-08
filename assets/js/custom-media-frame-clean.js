@@ -1979,8 +1979,11 @@ var isLoading = false; // Track if infinite scroll is currently loading
         
         // Determine layout type based on content
         var hasImages = mediaItems.some(function(item) { return item.type === 'image'; });
-        var layoutType = hasImages ? 'masonry' : 'grid';
-        console.log('🔍 DEBUG: Layout type:', layoutType, '(hasImages:', hasImages, ')');
+        var hasNonImages = mediaItems.some(function(item) { return item.type !== 'image'; });
+        
+        // Use grid layout if there are any non-image files (mixed content)
+        var layoutType = (hasImages && hasNonImages) ? 'grid' : (hasImages ? 'masonry' : 'grid');
+        console.log('🔍 DEBUG: Layout type:', layoutType, '(hasImages:', hasImages, ', hasNonImages:', hasNonImages, ')');
         
         // Update grid container class
         var $grid = $('#tomatillo-media-grid');
@@ -2006,29 +2009,43 @@ var isLoading = false; // Track if infinite scroll is currently loading
             
             var orientation = item.width > item.height ? 'Landscape' : 'Portrait';
             
-            // Generate different HTML based on layout type
+            // Generate different HTML based on layout type and file type
             var itemStyle, itemContent;
             
             if (layoutType === 'masonry') {
-                // Masonry layout - use absolute positioning for images
+                // Masonry layout - only for pure image content
                 itemStyle = `position: absolute; left: ${position.left}px; top: ${position.top}px; width: ${position.width}px;`;
                 itemContent = `<img src="${hiResImage.url}" alt="${filename}" loading="lazy" style="width: 100%; height: auto;">`;
             } else {
-                // Grid layout - use flexbox for non-image files
+                // Grid layout - for mixed content or non-image files
                 itemStyle = `width: 200px; height: 200px; margin: 8px;`;
                 
-                // Show file info at a glance for non-image files
-                var fileIcon = getFileIcon(item.type);
-                var fileSize = formatFileSize(item.filesizeInBytes || 0);
-                
-                itemContent = `
-                    <div style="width: 100%; height: 100%; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; text-align: center;">
-                        <div style="font-size: 32px; margin-bottom: 8px;">${fileIcon}</div>
-                        <div style="font-size: 12px; font-weight: 600; color: #333; margin-bottom: 4px; word-break: break-all; line-height: 1.2;">${filename}</div>
-                        <div style="font-size: 10px; color: #666; text-transform: uppercase; margin-bottom: 2px;">${item.type}</div>
-                        <div style="font-size: 10px; color: #888;">${fileSize}</div>
-                    </div>
-                `;
+                if (item.type === 'image') {
+                    // Images in grid layout - use thumbnail with overlay info
+                    itemContent = `
+                        <div style="width: 100%; height: 100%; position: relative; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; overflow: hidden;">
+                            <img src="${hiResImage.url}" alt="${filename}" loading="lazy" style="width: 100%; height: 100%; object-fit: cover;">
+                            <div style="position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,0.8)); padding: 8px; color: white;">
+                                <div style="font-size: 11px; font-weight: 600; margin-bottom: 2px;">${filename}</div>
+                                <div style="font-size: 9px; opacity: 0.9;">${orientation} • ${hiResImage.width}×${hiResImage.height}</div>
+                                <div style="font-size: 9px; opacity: 0.8;">${hiResImage.filesize} • ${hiResImage.format}</div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // Non-image files - use file tile format
+                    var fileIcon = getFileIcon(item.type);
+                    var fileSize = formatFileSize(item.filesizeInBytes || 0);
+                    
+                    itemContent = `
+                        <div style="width: 100%; height: 100%; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; text-align: center;">
+                            <div style="font-size: 32px; margin-bottom: 8px;">${fileIcon}</div>
+                            <div style="font-size: 12px; font-weight: 600; color: #333; margin-bottom: 4px; word-break: break-all; line-height: 1.2;">${filename}</div>
+                            <div style="font-size: 10px; color: #666; text-transform: uppercase; margin-bottom: 2px;">${item.type}</div>
+                            <div style="font-size: 10px; color: #888;">${fileSize}</div>
+                        </div>
+                    `;
+                }
             }
             
             var itemHtml = `
