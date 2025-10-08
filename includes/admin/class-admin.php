@@ -111,7 +111,27 @@ class Tomatillo_Media_Admin {
      * Enqueue admin scripts and styles
      */
     public function admin_enqueue_scripts($hook) {
-        // Only load on our plugin pages
+        // Load background loader on all admin pages
+        if (is_admin()) {
+            $settings = tomatillo_media_studio()->settings;
+            
+            // Enqueue background loader if enabled
+            if ($settings->get_background_load_enabled()) {
+                wp_enqueue_script(
+                    'tomatillo-background-loader',
+                    TOMATILLO_MEDIA_STUDIO_ASSETS_URL . 'js/background-loader.js',
+                    array('jquery'),
+                    TOMATILLO_MEDIA_STUDIO_VERSION,
+                    true
+                );
+                
+                // Localize with settings
+                wp_localize_script('tomatillo-background-loader', 'tomatilloSettings', $settings->get_js_settings());
+                wp_localize_script('tomatillo-background-loader', 'tomatillo_nonce', wp_create_nonce('tomatillo_get_image_data'));
+            }
+        }
+        
+        // Only load other assets on our plugin pages
         if (strpos($hook, 'tomatillo') === false) {
             return;
         }

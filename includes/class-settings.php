@@ -40,6 +40,9 @@ class Tomatillo_Media_Settings {
         
         // Advanced Settings
         'debug_mode' => true,
+        'background_load_enabled' => true,
+        'preload_count' => 30,
+        'infinite_scroll_batch' => 100,
     );
     
     /**
@@ -272,6 +275,9 @@ class Tomatillo_Media_Settings {
         
         // Advanced Settings
         $sanitized['debug_mode'] = isset($input['debug_mode']) ? (bool) $input['debug_mode'] : false;
+        $sanitized['background_load_enabled'] = isset($input['background_load_enabled']) ? (bool) $input['background_load_enabled'] : true;
+        $sanitized['preload_count'] = isset($input['preload_count']) ? max(10, min(100, (int) $input['preload_count'])) : 30;
+        $sanitized['infinite_scroll_batch'] = isset($input['infinite_scroll_batch']) ? max(20, min(200, (int) $input['infinite_scroll_batch'])) : 100;
         
         return $sanitized;
     }
@@ -313,6 +319,30 @@ class Tomatillo_Media_Settings {
             'auto_convert' => $this->is_auto_convert_enabled(),
             'batch_size' => $this->get_batch_size(),
             'debug_mode' => $this->is_debug_mode(),
+            'background_load_enabled' => $this->get_background_load_enabled(),
+            'preload_count' => $this->get_preload_count(),
+            'infinite_scroll_batch' => $this->get_infinite_scroll_batch(),
         );
+    }
+    
+    /**
+     * Get background load enabled setting
+     */
+    public function get_background_load_enabled() {
+        return (bool) $this->get('background_load_enabled');
+    }
+    
+    /**
+     * Get preload count setting
+     */
+    public function get_preload_count() {
+        return (int) $this->get('preload_count');
+    }
+    
+    /**
+     * Get infinite scroll batch size setting
+     */
+    public function get_infinite_scroll_batch() {
+        return (int) $this->get('infinite_scroll_batch');
     }
 }

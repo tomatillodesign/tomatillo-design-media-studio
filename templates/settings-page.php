@@ -217,6 +217,33 @@ $stats = tomatillo_media_studio()->core->get_media_stats();
                             <p class="description"><?php _e('Maximum seconds allowed per image conversion.', 'tomatillo-media-studio'); ?></p>
                         </td>
                     </tr>
+                    <tr>
+                        <th scope="row"><?php _e('Infinite Scroll Batch Size', 'tomatillo-media-studio'); ?></th>
+                        <td>
+                            <input type="number" name="tomatillo_media_studio_settings[infinite_scroll_batch]" min="20" max="200" value="<?php echo esc_attr($settings->get_infinite_scroll_batch()); ?>" />
+                            <p class="description"><?php _e('Number of images to load when scrolling to bottom of inserter (20-200).', 'tomatillo-media-studio'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php _e('Background Load Images', 'tomatillo-media-studio'); ?></th>
+                        <td>
+                            <label class="tomatillo-toggle-label">
+                                <div class="tomatillo-toggle">
+                                    <input type="checkbox" name="tomatillo_media_studio_settings[background_load_enabled]" value="1" <?php checked($settings->get_background_load_enabled(), 1); ?> />
+                                    <span class="tomatillo-toggle-slider"></span>
+                                </div>
+                                <?php _e('Enable background loading of images in admin pages', 'tomatillo-media-studio'); ?>
+                            </label>
+                            <p class="description"><?php _e('Preloads images in the background to make media inserter open instantly. Speeds up media insertion from the library.', 'tomatillo-media-studio'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php _e('Preload Count', 'tomatillo-media-studio'); ?></th>
+                        <td>
+                            <input type="number" name="tomatillo_media_studio_settings[preload_count]" min="10" max="100" value="<?php echo esc_attr($settings->get_preload_count()); ?>" />
+                            <p class="description"><?php _e('Number of images to preload in background (10-100). Higher numbers = faster inserter but more memory usage.', 'tomatillo-media-studio'); ?></p>
+                        </td>
+                    </tr>
                 </table>
             </div>
         </div>
@@ -247,5 +274,24 @@ jQuery(document).ready(function($) {
     $('.quality-slider').on('input', function() {
         $(this).next('.quality-value').text($(this).val() + '%');
     });
+    
+    // Background loading toggle - hide/show only preload count
+    function toggleBackgroundSettings() {
+        var isEnabled = $('input[name="tomatillo_media_studio_settings[background_load_enabled]"]').is(':checked');
+        var $preloadRow = $('input[name="tomatillo_media_studio_settings[preload_count]"]').closest('tr');
+        
+        if (isEnabled) {
+            $preloadRow.show();
+        } else {
+            $preloadRow.hide();
+        }
+        // Infinite scroll batch size is always visible (independent of background loading)
+    }
+    
+    // Run on page load
+    toggleBackgroundSettings();
+    
+    // Run when toggle changes
+    $('input[name="tomatillo_media_studio_settings[background_load_enabled]"]').on('change', toggleBackgroundSettings);
 });
 </script>
