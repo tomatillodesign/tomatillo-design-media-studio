@@ -1736,6 +1736,146 @@ class Tomatillo_Media_Core {
      * Get optimized image URL for a specific format
      */
     /**
+     * Get file type icon (emoji or Font Awesome)
+     */
+    public function get_file_type_icon($extension) {
+        $icons = [
+            // Audio files
+            'mp3' => '🎵',
+            'wav' => '🎵',
+            'ogg' => '🎵',
+            'aac' => '🎵',
+            'flac' => '🎵',
+            'm4a' => '🎵',
+            
+            // Video files
+            'mp4' => '🎬',
+            'avi' => '🎬',
+            'mov' => '🎬',
+            'wmv' => '🎬',
+            'flv' => '🎬',
+            'webm' => '🎬',
+            
+            // Document files
+            'pdf' => '📄',
+            'doc' => '📝',
+            'docx' => '📝',
+            'pages' => '📝',
+            'txt' => '📝',
+            'rtf' => '📝',
+            
+            // Spreadsheet files
+            'xls' => '📊',
+            'xlsx' => '📊',
+            'numbers' => '📊',
+            'csv' => '📊',
+            
+            // Presentation files
+            'ppt' => '📽️',
+            'pptx' => '📽️',
+            'keynote' => '📽️',
+            
+            // Archive files
+            'zip' => '📦',
+            'rar' => '📦',
+            '7z' => '📦',
+            'tar' => '📦',
+            'gz' => '📦',
+            
+            // Image files (fallback)
+            'jpg' => '🖼️',
+            'jpeg' => '🖼️',
+            'png' => '🖼️',
+            'gif' => '🖼️',
+            'bmp' => '🖼️',
+            'svg' => '🖼️',
+            'webp' => '🖼️',
+            'avif' => '🖼️',
+            
+            // Code files
+            'html' => '🌐',
+            'css' => '🎨',
+            'js' => '⚡',
+            'php' => '🐘',
+            'py' => '🐍',
+            'java' => '☕',
+            'cpp' => '⚙️',
+            'c' => '⚙️',
+            
+            // Default
+            'default' => '📄'
+        ];
+        
+        $extension = strtolower($extension);
+        return isset($icons[$extension]) ? $icons[$extension] : $icons['default'];
+    }
+    
+    /**
+     * Get file type color for badges
+     */
+    public function get_file_type_color($extension) {
+        $colors = [
+            // Audio files - Purple
+            'mp3' => '#8b5cf6',
+            'wav' => '#8b5cf6',
+            'ogg' => '#8b5cf6',
+            'aac' => '#8b5cf6',
+            'flac' => '#8b5cf6',
+            'm4a' => '#8b5cf6',
+            
+            // Video files - Red
+            'mp4' => '#ef4444',
+            'avi' => '#ef4444',
+            'mov' => '#ef4444',
+            'wmv' => '#ef4444',
+            'flv' => '#ef4444',
+            'webm' => '#ef4444',
+            
+            // Document files - Updated colors
+            'pdf' => '#ef4444',        // Red for PDF
+            'doc' => '#0078d4',        // MS Blue for Word
+            'docx' => '#0078d4',       // MS Blue for Word
+            'pages' => '#ff9500',     // Apple Orange for Pages
+            'txt' => '#6b7280',        // Gray for text files
+            'rtf' => '#6b7280',        // Gray for RTF
+            
+            // Spreadsheet files - Green
+            'xls' => '#10b981',
+            'xlsx' => '#10b981',
+            'numbers' => '#10b981',
+            'csv' => '#10b981',
+            
+            // Presentation files - Orange
+            'ppt' => '#f59e0b',
+            'pptx' => '#f59e0b',
+            'keynote' => '#f59e0b',
+            
+            // Archive files - Gray
+            'zip' => '#6b7280',
+            'rar' => '#6b7280',
+            '7z' => '#6b7280',
+            'tar' => '#6b7280',
+            'gz' => '#6b7280',
+            
+            // Code files - Indigo
+            'html' => '#6366f1',
+            'css' => '#6366f1',
+            'js' => '#6366f1',
+            'php' => '#6366f1',
+            'py' => '#6366f1',
+            'java' => '#6366f1',
+            'cpp' => '#6366f1',
+            'c' => '#6366f1',
+            
+            // Default - Neutral
+            'default' => '#6b7280'
+        ];
+        
+        $extension = strtolower($extension);
+        return isset($colors[$extension]) ? $colors[$extension] : $colors['default'];
+    }
+    
+    /**
      * Get optimized file size from database
      */
     public function get_optimized_file_size($image_id, $format = 'avif') {

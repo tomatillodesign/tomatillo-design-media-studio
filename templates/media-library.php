@@ -505,8 +505,11 @@ $has_more = count($images) === $images_per_page;
                             <?php if ($file_thumbnail): ?>
                                 <img src="<?php echo esc_url($file_thumbnail); ?>" alt="<?php echo esc_attr($file_title); ?>" class="file-thumbnail">
                             <?php else: ?>
-                                <div class="file-icon-large <?php echo $file_icon_class; ?>">
-                                    <span class="dashicons file-type-icon file-type-<?php echo strtolower(pathinfo(get_attached_file($file->ID), PATHINFO_EXTENSION)); ?>"></span>
+                                <div class="file-icon-large">
+                                    <?php 
+                                    $file_extension = strtolower(pathinfo(get_attached_file($file->ID), PATHINFO_EXTENSION));
+                                    echo $plugin->core->get_file_type_icon($file_extension);
+                                    ?>
                                 </div>
                             <?php endif; ?>
                         </div>
@@ -526,7 +529,7 @@ $has_more = count($images) === $images_per_page;
                                 echo 'Uploaded by: ' . esc_html($uploader_name); 
                                 ?>
                             </p>
-                            <div class="file-type-pill">
+                            <div class="file-type-pill file-type-<?php echo strtolower(pathinfo(get_attached_file($file->ID), PATHINFO_EXTENSION)); ?>">
                                 <?php echo strtoupper(pathinfo(get_attached_file($file->ID), PATHINFO_EXTENSION)); ?>
                             </div>
                         </div>
@@ -1171,13 +1174,9 @@ $has_more = count($images) === $images_per_page;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #f8f9fa;
-    color: #6b7280;
-}
-
-.modal-file-cover .file-icon-large .dashicons {
+    background: transparent;
     font-size: 96px;
-    color: #6b7280;
+    line-height: 1;
 }
 
 /* Gallery Container - Contained Width with Padding */
@@ -1959,8 +1958,8 @@ $has_more = count($images) === $images_per_page;
 
 /* File Preview Area - Taller with high-res thumbnails */
 .file-preview {
-    height: 200px; /* Adjusted for padding */
-    background: #f8f9fa;
+    height: 200px;
+    background: transparent;
     border-radius: 8px;
     display: flex;
     align-items: center;
@@ -1983,13 +1982,9 @@ $has_more = count($images) === $images_per_page;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #f8f9fa;
-    color: #6b7280;
-}
-
-.file-icon-large .dashicons {
-    font-size: 48px;
-    color: #6b7280;
+    background: transparent;
+    font-size: 64px;
+    line-height: 1;
 }
 
 
@@ -2062,59 +2057,117 @@ $has_more = count($images) === $images_per_page;
 
 /* File Type Pills */
 .file-type-pill {
-    display: inline-block; /* Changed from inline-flex to inline-block */
+    display: inline-block;
     background: #f3f4f6;
     color: #374151;
     padding: 0.25rem 0.5rem;
-    border-radius: 4px;
+    border-radius: 6px;
     font-size: 0.75rem;
-    font-weight: 500;
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin-top: 0.5rem;
-    width: fit-content; /* Only as wide as needed */
+    transition: all 0.2s ease;
+    width: fit-content;
+}
+
+/* Color-coded file type badges */
+.file-type-pill.file-type-mp3,
+.file-type-pill.file-type-wav,
+.file-type-pill.file-type-ogg,
+.file-type-pill.file-type-aac,
+.file-type-pill.file-type-flac,
+.file-type-pill.file-type-m4a {
+    background: rgba(139, 92, 246, 0.1);
+    color: #8b5cf6;
+    border: 1px solid rgba(139, 92, 246, 0.2);
+}
+
+.file-type-pill.file-type-mp4,
+.file-type-pill.file-type-avi,
+.file-type-pill.file-type-mov,
+.file-type-pill.file-type-wmv,
+.file-type-pill.file-type-flv,
+.file-type-pill.file-type-webm {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.file-type-pill.file-type-pdf {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.file-type-pill.file-type-doc,
+.file-type-pill.file-type-docx {
+    background: rgba(0, 120, 212, 0.1);
+    color: #0078d4;
+    border: 1px solid rgba(0, 120, 212, 0.2);
+}
+
+.file-type-pill.file-type-pages {
+    background: rgba(255, 149, 0, 0.1);
+    color: #ff9500;
+    border: 1px solid rgba(255, 149, 0, 0.2);
+}
+
+.file-type-pill.file-type-txt,
+.file-type-pill.file-type-rtf {
+    background: rgba(107, 114, 128, 0.1);
+    color: #6b7280;
+    border: 1px solid rgba(107, 114, 128, 0.2);
+}
+
+.file-type-pill.file-type-xls,
+.file-type-pill.file-type-xlsx,
+.file-type-pill.file-type-numbers,
+.file-type-pill.file-type-csv {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.file-type-pill.file-type-ppt,
+.file-type-pill.file-type-pptx,
+.file-type-pill.file-type-keynote {
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.file-type-pill.file-type-zip,
+.file-type-pill.file-type-rar,
+.file-type-pill.file-type-7z,
+.file-type-pill.file-type-tar,
+.file-type-pill.file-type-gz {
+    background: rgba(107, 114, 128, 0.1);
+    color: #6b7280;
+    border: 1px solid rgba(107, 114, 128, 0.2);
+}
+
+.file-type-pill.file-type-html,
+.file-type-pill.file-type-css,
+.file-type-pill.file-type-js,
+.file-type-pill.file-type-php,
+.file-type-pill.file-type-py,
+.file-type-pill.file-type-java,
+.file-type-pill.file-type-cpp,
+.file-type-pill.file-type-c {
+    background: rgba(99, 102, 241, 0.1);
+    color: #6366f1;
+    border: 1px solid rgba(99, 102, 241, 0.2);
 }
 
 .file-type-pill .dashicons {
     font-size: 12px;
-    color: #6b7280; /* Neutral color for all icons */
+    color: inherit; /* Use the same color as the pill text */
     margin-right: 0.25rem;
     vertical-align: middle;
 }
 
-/* Smart File Type Icons - All same neutral color */
-.file-type-pdf::before,
-.file-type-doc::before,
-.file-type-docx::before,
-.file-type-xls::before,
-.file-type-xlsx::before,
-.file-type-ppt::before,
-.file-type-pptx::before,
-.file-type-pages::before,
-.file-type-numbers::before,
-.file-type-keynote::before,
-.file-type-txt::before,
-.file-type-rtf::before,
-.file-type-zip::before,
-.file-type-rar::before,
-.file-type-7z::before,
-.file-type-mp3::before,
-.file-type-wav::before,
-.file-type-ogg::before,
-.file-type-mp4::before,
-.file-type-aac::before,
-.file-type-avi::before,
-.file-type-mov::before {
-    font-family: dashicons;
-    content: "\f123"; /* dashicons-media-document */
-    color: #6b7280; /* All same neutral color */
-}
-
-.file-type-icon.file-type-xls::before,
-.file-type-icon.file-type-xlsx::before {
-    content: "\f123"; /* dashicons-media-document */
-    color: #16a34a; /* Green for Excel */
-}
+/* Removed old dashicon CSS - now using emoji icons */
 
 .file-type-icon.file-type-ppt::before,
 .file-type-icon.file-type-pptx::before {
@@ -3063,17 +3116,40 @@ document.addEventListener('DOMContentLoaded', function() {
         const fileCover = document.getElementById('modal-file-cover');
         const fileExtension = data.filename.split('.').pop().toLowerCase();
         
+        // Get file type icon
+        function getFileTypeIcon(extension) {
+            const icons = {
+                // Audio files
+                'mp3': '🎵', 'wav': '🎵', 'ogg': '🎵', 'aac': '🎵', 'flac': '🎵', 'm4a': '🎵',
+                // Video files
+                'mp4': '🎬', 'avi': '🎬', 'mov': '🎬', 'wmv': '🎬', 'flv': '🎬', 'webm': '🎬',
+                // Document files
+                'pdf': '📄', 'doc': '📝', 'docx': '📝', 'pages': '📝', 'txt': '📝', 'rtf': '📝',
+                // Spreadsheet files
+                'xls': '📊', 'xlsx': '📊', 'numbers': '📊', 'csv': '📊',
+                // Presentation files
+                'ppt': '📽️', 'pptx': '📽️', 'keynote': '📽️',
+                // Archive files
+                'zip': '📦', 'rar': '📦', '7z': '📦', 'tar': '📦', 'gz': '📦',
+                // Code files
+                'html': '🌐', 'css': '🎨', 'js': '⚡', 'php': '🐘', 'py': '🐍', 'java': '☕', 'cpp': '⚙️', 'c': '⚙️',
+                // Default
+                'default': '📄'
+            };
+            return icons[extension.toLowerCase()] || icons['default'];
+        }
+        
         if (data.url && (fileExtension === 'jpg' || fileExtension === 'jpeg' || fileExtension === 'png' || fileExtension === 'gif' || fileExtension === 'webp')) {
             // Show thumbnail for actual image files
             fileCover.innerHTML = `<img src="${data.url}" alt="${data.title || data.filename}" title="Click to copy URL">`;
         } else if (fileExtension === 'pdf' && data.thumbnail_url) {
             // For PDFs, use the thumbnail URL
-            fileCover.innerHTML = `<img src="${data.thumbnail_url}" alt="${data.title || data.filename}" title="Click to copy URL" onerror="this.parentNode.innerHTML='<div class=&quot;file-icon-large&quot;><span class=&quot;dashicons file-type-icon file-type-pdf&quot;></span></div>'">`;
+            fileCover.innerHTML = `<img src="${data.thumbnail_url}" alt="${data.title || data.filename}" title="Click to copy URL" onerror="this.parentNode.innerHTML='<div class=&quot;file-icon-large&quot;>${getFileTypeIcon('pdf')}</div>'">`;
         } else {
             // Show file icon for other file types
             fileCover.innerHTML = `
                 <div class="file-icon-large">
-                    <span class="dashicons file-type-icon file-type-${fileExtension}"></span>
+                    ${getFileTypeIcon(fileExtension)}
                 </div>
             `;
         }
@@ -4097,6 +4173,12 @@ document.addEventListener('DOMContentLoaded', function() {
             imagesGrid.style.display = 'block';
             filesGrid.style.display = 'none';
             
+            // Show loading indicator in images view if there are more images to load
+            const loadingIndicator = document.getElementById('loading-indicator');
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'block';
+            }
+            
             // Update tab states
             if (imagesTab) imagesTab.classList.add('active');
             if (filesTab) filesTab.classList.remove('active');
@@ -4109,6 +4191,12 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('Setting files view');
             imagesGrid.style.display = 'none';
             filesGrid.style.display = 'grid';
+            
+            // Hide loading indicator in files view
+            const loadingIndicator = document.getElementById('loading-indicator');
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'none';
+            }
             
             // Update tab states
             if (imagesTab) imagesTab.classList.remove('active');
