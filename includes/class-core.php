@@ -623,39 +623,87 @@ class Tomatillo_Media_Core {
             $settings = $plugin->settings;
             
             foreach ($images as $image) {
-                $image_url = wp_get_attachment_image_url($image->ID, 'large');
+                // Get optimized image URL (AVIF if available)
+                $image_url = $this->get_optimized_image_url($image->ID, 'avif');
+                if (!$image_url) {
+                    $image_url = wp_get_attachment_image_url($image->ID, 'large');
+                }
+                
                 $image_alt = get_post_meta($image->ID, '_wp_attachment_image_alt', true);
                 $image_title = $image->post_title ?: $image->post_name;
                 $image_date = $image->post_date;
-                $file_size = filesize(get_attached_file($image->ID));
-                $file_size_formatted = size_format($file_size);
+                
+                // Get optimized file size (find smallest available format)
+                $optimization_data = $this->get_optimization_data($image->ID);
+                $smallest_size = filesize(get_attached_file($image->ID)); // Default to original
+                
+                if ($optimization_data) {
+                    // Check AVIF
+                    if (!empty($optimization_data['avif_url']) && file_exists(str_replace(home_url('/'), ABSPATH, $optimization_data['avif_url']))) {
+                        $avif_size = filesize(str_replace(home_url('/'), ABSPATH, $optimization_data['avif_url']));
+                        if ($avif_size < $smallest_size) {
+                            $smallest_size = $avif_size;
+                        }
+                    }
+                    
+                    // Check WebP
+                    if (!empty($optimization_data['webp_url']) && file_exists(str_replace(home_url('/'), ABSPATH, $optimization_data['webp_url']))) {
+                        $webp_size = filesize(str_replace(home_url('/'), ABSPATH, $optimization_data['webp_url']));
+                        if ($webp_size < $smallest_size) {
+                            $smallest_size = $webp_size;
+                        }
+                    }
+                    
+                    // Check scaled original
+                    if (!empty($optimization_data['scaled_url']) && file_exists(str_replace(home_url('/'), ABSPATH, $optimization_data['scaled_url']))) {
+                        $scaled_size = filesize(str_replace(home_url('/'), ABSPATH, $optimization_data['scaled_url']));
+                        if ($scaled_size < $smallest_size) {
+                            $smallest_size = $scaled_size;
+                        }
+                    }
+                }
+                
+                $file_size_formatted = size_format($smallest_size);
+                
+                // Get uploader name
+                $uploader_id = $image->post_author;
+                $uploader = get_userdata($uploader_id);
+                $uploader_name = $uploader ? $uploader->display_name : 'Unknown';
                 
                 // Check if optimized
                 $is_optimized = $this->is_image_optimized($image->ID);
                 
-                $html .= '<div class="gallery-item" data-id="' . $image->ID . '">';
+                // Get filename
+                $filename = basename(get_attached_file($image->ID));
+                
+                $html .= '<div class="gallery-item" ';
+                $html .= 'data-id="' . $image->ID . '" ';
+                $html .= 'data-title="' . esc_attr($image_title) . '" ';
+                $html .= 'data-alt="' . esc_attr($image_alt) . '" ';
+                $html .= 'data-caption="' . esc_attr($image->post_excerpt) . '" ';
+                $html .= 'data-description="' . esc_attr($image->post_content) . '" ';
+                $html .= 'data-filename="' . esc_attr($filename) . '">';
+                
                 $html .= '<div class="image-container">';
                 $html .= '<img src="' . esc_url($image_url) . '" alt="' . esc_attr($image_alt) . '" loading="lazy" class="gallery-image">';
+                
+                // Optimized Watermark
+                if ($is_optimized) {
+                    $html .= '<div class="optimized-watermark">';
+                    $html .= '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">';
+                    $html .= '<polygon points="13,2 3,14 12,14 11,22 21,10 12,10"></polygon>';
+                    $html .= '</svg>';
+                    $html .= '</div>';
+                }
+                
+                // Overlay
                 $html .= '<div class="image-overlay">';
                 $html .= '<div class="overlay-content">';
                 $html .= '<div class="image-info">';
                 $html .= '<h4 class="image-title">' . esc_html($image_title) . '</h4>';
-                $html .= '<p class="image-meta">' . date('M j, Y', strtotime($image_date)) . ' • ' . $file_size_formatted . '</p>';
-                $html .= '</div>';
-                $html .= '<div class="image-actions">';
-                $html .= '<button class="action-btn view-btn" title="View"><span>👁️</span></button>';
-                $html .= '<button class="action-btn edit-btn" title="Edit"><span>✏️</span></button>';
-                $html .= '<button class="action-btn download-btn" title="Download"><span>⬇️</span></button>';
-                if (!$is_optimized && $settings->is_optimization_enabled()) {
-                    $html .= '<button class="action-btn optimize-btn" title="Optimize"><span>⚡</span></button>';
-                }
+                $html .= '<p class="image-meta">' . date('M j, Y', strtotime($image_date)) . ' • ' . $file_size_formatted . ' • Uploaded by: ' . $uploader_name . '</p>';
                 $html .= '</div>';
                 $html .= '</div>';
-                if ($is_optimized) {
-                    $html .= '<div class="optimization-badge"><span class="badge optimized">✓ Optimized</span></div>';
-                } elseif ($settings->is_optimization_enabled()) {
-                    $html .= '<div class="optimization-badge"><span class="badge pending">⚡ Optimize</span></div>';
-                }
                 $html .= '</div>';
                 $html .= '</div>';
                 $html .= '</div>';
@@ -1687,6 +1735,22 @@ class Tomatillo_Media_Core {
     /**
      * Get optimized image URL for a specific format
      */
+    /**
+     * Get optimized file size from database
+     */
+    public function get_optimized_file_size($image_id, $format = 'avif') {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'tomatillo_media_optimization';
+        
+        $result = $wpdb->get_var($wpdb->prepare(
+            "SELECT {$format}_file_size FROM $table_name WHERE attachment_id = %d AND status = 'completed'",
+            $image_id
+        ));
+        
+        return $result ? intval($result) : null;
+    }
+    
     public function get_optimized_image_url($attachment_id, $format) {
         global $wpdb;
         
