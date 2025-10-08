@@ -162,84 +162,71 @@ var isLoading = false; // Track if infinite scroll is currently loading
                             acf.newMediaPopup = function(options) {
                                 console.log('ACF newMediaPopup intercepted');
                                 console.log('ACF Media Popup Options:', options);
-                                console.log('Stack trace:', new Error().stack);
+                                console.log('ACF Options keys:', Object.keys(options));
+                                console.log('ACF Options context:', options.context);
+                                console.log('ACF Options context type:', typeof options.context);
                                 
-                                // Store the original callback for ACF - check multiple possible callback properties
-                                var originalCallback = options.select || options.callback || options.onSelect;
-                                console.log('ACF Original callback:', originalCallback);
-                                console.log('ACF Full options object:', options);
-                                console.log('ACF Callback function name:', originalCallback ? originalCallback.name : 'anonymous');
-                                console.log('ACF Available callback properties:', {
-                                    select: options.select,
-                                    callback: options.callback,
-                                    onSelect: options.onSelect,
-                                    state: options.state,
-                                    frame: options.frame
-                                });
+                                // Find the ACF field instance from the context
+                                var fieldInstance = TomatilloMediaFrame.findACFFieldInstance(options);
+                                console.log('ACF Field instance found:', fieldInstance);
                                 
-                                // Modify options to use our custom frame with ACF-compatible callback
-                                var modifiedOptions = Object.assign({}, options, {
-                                    onSelect: function(selection) {
-                                        console.log('ACF Custom frame selection:', selection);
-                                        console.log('ACF Original callback type:', typeof originalCallback);
-                                        console.log('ACF Selection length:', selection.length);
-                                        
-                                        // Convert our selection to ACF format
-                                        var acfSelection = selection.map(function(item) {
-                                            var converted = {
-                                                id: item.id,
-                                                url: item.url,
-                                                title: item.title,
-                                                filename: item.filename,
-                                                alt: item.alt,
-                                                description: item.description,
-                                                caption: item.caption,
-                                                mime: item.mime,
-                                                subtype: item.subtype,
-                                                icon: item.icon,
-                                                sizes: item.sizes,
-                                                thumbnail: item.thumbnail,
-                                                width: item.width,
-                                                height: item.height
-                                            };
-                                            console.log('ACF Converting item:', item.id, 'to:', converted);
-                                            return converted;
-                                        });
-                                        
-                                        console.log('ACF Converted selection:', acfSelection);
-                                        console.log('ACF Converted selection length:', acfSelection.length);
-                                        
-                                        // Call ACF's original callback if it exists
-                                        if (typeof originalCallback === 'function') {
-                                            console.log('Calling ACF original callback with:', acfSelection);
-                                            console.log('ACF Callback context (this):', this);
-                                            console.log('ACF Callback arguments:', arguments);
+                                // Always try the fallback approach since the primary isn't working
+                                console.log('ACF Bridge: Trying fallback approach');
+                                
+                                // Find ACF field by looking at the current active element
+                                var $activeElement = $(document.activeElement);
+                                console.log('ACF Bridge: Active element:', $activeElement);
+                                
+                                var $fallbackField = $activeElement.closest('.acf-field-image, .acf-field, [data-key][data-type="image"]');
+                                if ($fallbackField.length) {
+                                    console.log('ACF Bridge: Found fallback field:', $fallbackField);
+                                    
+                                    var modifiedOptions = Object.assign({}, options, {
+                                        onSelect: function(selection) {
+                                            console.log('ACF Bridge Fallback: Processing selection:', selection);
                                             
-                                            try {
-                                                // Try calling with different contexts and parameters
-                                                var result1 = originalCallback.call(this, acfSelection);
-                                                console.log('ACF Callback result (call with this):', result1);
-                                                
-                                                var result2 = originalCallback(acfSelection);
-                                                console.log('ACF Callback result (direct call):', result2);
-                                                
-                                                // Try calling with the original context if available
-                                                if (options.context) {
-                                                    var result3 = originalCallback.call(options.context, acfSelection);
-                                                    console.log('ACF Callback result (with context):', result3);
-                                                }
-                                                
-                                            } catch (error) {
-                                                console.error('ACF Callback error:', error);
-                                            }
-                                        } else {
-                                            console.log('No ACF callback found');
+                                            var acfAttachment = TomatilloMediaFrame.normalizeToACFAttachment(selection, $fallbackField);
+                                            console.log('ACF Bridge Fallback: Normalized attachment:', acfAttachment);
+                                            
+                                            TomatilloMediaFrame.setACFFieldValue($fallbackField, acfAttachment);
+                                            TomatilloMediaFrame.triggerACFChange($fallbackField);
+                                            
+                                            console.log('ACF Bridge Fallback: Field updated successfully');
                                         }
-                                    }
-                                });
-                                
-                                // Use our custom frame instead
-                                return TomatilloMediaFrame.open(modifiedOptions);
+                                    });
+                                    
+                                    return TomatilloMediaFrame.open(modifiedOptions);
+                                } else {
+                                    console.log('ACF Bridge: No fallback field found, using original callback');
+                                    // Final fallback to original callback approach
+                                    var originalCallback = options.select || options.callback || options.onSelect;
+                                    var modifiedOptions = Object.assign({}, options, {
+                                        onSelect: function(selection) {
+                                            if (typeof originalCallback === 'function') {
+                                                var acfSelection = selection.map(function(item) {
+                                                    return {
+                                                        id: item.id,
+                                                        url: item.url,
+                                                        title: item.title,
+                                                        filename: item.filename,
+                                                        alt: item.alt,
+                                                        description: item.description,
+                                                        caption: item.caption,
+                                                        mime: item.mime,
+                                                        subtype: item.subtype,
+                                                        icon: item.icon,
+                                                        sizes: item.sizes,
+                                                        thumbnail: item.thumbnail,
+                                                        width: item.width,
+                                                        height: item.height
+                                                    };
+                                                });
+                                                originalCallback(acfSelection);
+                                            }
+                                        }
+                                    });
+                                    return TomatilloMediaFrame.open(modifiedOptions);
+                                }
                             };
                         } else {
                             console.log('ACF not ready yet, retrying...');
@@ -248,6 +235,190 @@ var isLoading = false; // Track if infinite scroll is currently loading
                     };
                     
                     checkACF();
+                },
+                
+                /**
+                 * Find ACF field instance from options or DOM context
+                 */
+                findACFFieldInstance: function(options) {
+                    console.log('ACF Bridge: Looking for field instance');
+                    console.log('ACF Bridge: Options context:', options.context);
+                    
+                    // Try to find field instance from options context
+                    if (options && options.field) {
+                        console.log('ACF Bridge: Found field in options:', options.field);
+                        return options.field;
+                    }
+                    
+                    // Try to find field instance from DOM context
+                    if (options && options.context) {
+                        var $context = $(options.context);
+                        console.log('ACF Bridge: Context element:', $context);
+                        
+                        // Look for the field wrapper in the context
+                        var $fieldWrapper = $context.closest('[data-key][data-type="image"]');
+                        if ($fieldWrapper.length) {
+                            var fieldKey = $fieldWrapper.attr('data-key');
+                            console.log('ACF Bridge: Found field wrapper with key:', fieldKey);
+                            return $fieldWrapper; // Return the DOM element instead of ACF instance
+                        }
+                        
+                        // If no field wrapper found, try to find it by looking for ACF image field elements
+                        var $acfImageField = $context.closest('.acf-field-image');
+                        if ($acfImageField.length) {
+                            console.log('ACF Bridge: Found ACF image field:', $acfImageField);
+                            return $acfImageField;
+                        }
+                        
+                        // Try to find any ACF field wrapper
+                        var $acfField = $context.closest('.acf-field');
+                        if ($acfField.length) {
+                            console.log('ACF Bridge: Found ACF field:', $acfField);
+                            return $acfField;
+                        }
+                    }
+                    
+                    console.log('ACF Bridge: No field instance found');
+                    return null;
+                },
+                
+                /**
+                 * Normalize media selection to ACF attachment format
+                 */
+                normalizeToACFAttachment: function(selection, fieldInstance) {
+                    console.log('ACF Bridge: Normalizing selection:', selection);
+                    
+                    // Handle single vs multiple
+                    var media = Array.isArray(selection) ? selection[0] : selection;
+                    
+                    var attachment = {
+                        id: media.id || media.ID,
+                        url: media.url || media.source_url,
+                        alt: media.alt || media.alt_text || '',
+                        width: media.width || (media.media_details && media.media_details.width),
+                        height: media.height || (media.media_details && media.media_details.height),
+                        title: media.title || media.filename || '',
+                        filename: media.filename || '',
+                        mime: media.mime || '',
+                        sizes: media.sizes || {}
+                    };
+                    
+                    // Ensure we have a thumbnail URL
+                    if (attachment.sizes && attachment.sizes.thumbnail) {
+                        attachment.thumbnail = attachment.sizes.thumbnail.url;
+                    } else {
+                        attachment.thumbnail = attachment.url;
+                    }
+                    
+                    console.log('ACF Bridge: Normalized attachment:', attachment);
+                    return attachment;
+                },
+                
+                /**
+                 * Set ACF field value by directly manipulating DOM elements
+                 */
+                setACFFieldValue: function(fieldInstance, attachment) {
+                    console.log('ACF Bridge: Setting field value:', attachment);
+                    console.log('ACF Bridge: Field instance:', fieldInstance);
+                    
+                    try {
+                        // fieldInstance should now be a jQuery object
+                        var $fieldWrapper = $(fieldInstance);
+                        console.log('ACF Bridge: Field wrapper:', $fieldWrapper);
+                        console.log('ACF Bridge: Field wrapper length:', $fieldWrapper.length);
+                        
+                        if ($fieldWrapper.length === 0) {
+                            console.log('ACF Bridge: No field wrapper found');
+                            return;
+                        }
+                        
+                        // Set the hidden input value (this is what ACF actually stores)
+                        var $hiddenInput = $fieldWrapper.find('input[type="hidden"]');
+                        if ($hiddenInput.length) {
+                            $hiddenInput.val(attachment.id);
+                            console.log('ACF Bridge: Set hidden input value to:', attachment.id);
+                            console.log('ACF Bridge: Hidden input:', $hiddenInput);
+                        } else {
+                            console.log('ACF Bridge: No hidden input found');
+                            console.log('ACF Bridge: Available inputs:', $fieldWrapper.find('input'));
+                        }
+                        
+                        // Update the preview image
+                        var $previewImg = $fieldWrapper.find('.acf-image-value img');
+                        if ($previewImg.length) {
+                            $previewImg.attr('src', attachment.thumbnail);
+                            $previewImg.attr('alt', attachment.alt);
+                            console.log('ACF Bridge: Updated preview image');
+                        } else {
+                            console.log('ACF Bridge: No preview image found');
+                            console.log('ACF Bridge: Available images:', $fieldWrapper.find('img'));
+                        }
+                        
+                        // Show the preview container
+                        var $previewContainer = $fieldWrapper.find('.acf-image-value');
+                        if ($previewContainer.length) {
+                            $previewContainer.show();
+                            console.log('ACF Bridge: Showed preview container');
+                        } else {
+                            console.log('ACF Bridge: No preview container found');
+                        }
+                        
+                        // Hide the "Add Image" button
+                        var $addButton = $fieldWrapper.find('.acf-button');
+                        if ($addButton.length) {
+                            $addButton.hide();
+                            console.log('ACF Bridge: Hid add button');
+                        } else {
+                            console.log('ACF Bridge: No add button found');
+                        }
+                        
+                        // Update field state classes
+                        $fieldWrapper.addClass('has-value');
+                        $fieldWrapper.removeClass('no-value');
+                        
+                        console.log('ACF Bridge: Updated field state classes');
+                        
+                    } catch (error) {
+                        console.error('ACF Bridge: Error setting field value:', error);
+                    }
+                },
+                
+                /**
+                 * Trigger ACF change events
+                 */
+                triggerACFChange: function(fieldInstance) {
+                    console.log('ACF Bridge: Triggering change events');
+                    
+                    try {
+                        // Find the field wrapper and input
+                        var $fieldWrapper = $(fieldInstance).closest('[data-key][data-type="image"]');
+                        if (!$fieldWrapper.length) {
+                            $fieldWrapper = $(fieldInstance);
+                        }
+                        
+                        var $input = $fieldWrapper.find('input[type="hidden"]');
+                        if ($input && $input.length) {
+                            // Dispatch input and change events
+                            $input.trigger('input');
+                            $input.trigger('change');
+                            console.log('ACF Bridge: Triggered input/change events on input:', $input);
+                        } else {
+                            console.log('ACF Bridge: No input found for change events');
+                        }
+                        
+                        // Trigger ACF action if available
+                        if (typeof acf !== 'undefined' && acf.doAction) {
+                            acf.doAction('change', fieldInstance);
+                            console.log('ACF Bridge: Triggered ACF change action');
+                        }
+                        
+                        // Also trigger change on the field wrapper
+                        $fieldWrapper.trigger('change');
+                        console.log('ACF Bridge: Triggered change on field wrapper');
+                        
+                    } catch (error) {
+                        console.error('ACF Bridge: Error triggering change events:', error);
+                    }
                 }
             };
 
