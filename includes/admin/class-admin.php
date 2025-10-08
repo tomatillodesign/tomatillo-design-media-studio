@@ -27,6 +27,9 @@ class Tomatillo_Media_Admin {
         add_action('admin_enqueue_scripts', array($this, 'admin_enqueue_scripts'));
         add_action('admin_menu', array($this, 'hide_traditional_media_library'), 999);
         
+        // Enqueue block editor assets for React Media Upload override
+        add_action('enqueue_block_editor_assets', array($this, 'enqueue_block_editor_assets'));
+        
         // Check for media library redirect early to avoid headers already sent error
         add_action('admin_init', array($this, 'check_media_library_redirect'), 1);
         
@@ -98,6 +101,16 @@ class Tomatillo_Media_Admin {
             'tomatillo-media-studio-test',
             array($this, 'test_media_frame_page')
         );
+        
+        // Test page for React integration (admin only)
+        add_submenu_page(
+            'tomatillo-media-studio-library',
+            __('Test React Integration', 'tomatillo-media-studio'),
+            __('Test React Integration', 'tomatillo-media-studio'),
+            'manage_options', // Admin only
+            'tomatillo-media-studio-react-test',
+            array($this, 'test_react_integration_page')
+        );
     }
     
     /**
@@ -130,6 +143,9 @@ class Tomatillo_Media_Admin {
                 wp_localize_script('tomatillo-background-loader', 'tomatillo_nonce', wp_create_nonce('tomatillo_get_image_data'));
             }
         }
+        
+        // Enqueue React Media Upload override for block editor
+        $this->enqueue_block_editor_assets();
         
         // Only load other assets on our plugin pages
         if (strpos($hook, 'tomatillo') === false) {
@@ -179,6 +195,86 @@ class Tomatillo_Media_Admin {
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('tomatillo_media_settings')
         ));
+    }
+    
+    /**
+     * Enqueue block editor assets
+     * This loads our React Media Upload override in the Gutenberg editor iframe
+     */
+    public function enqueue_block_editor_assets() {
+        // Log that this method was called
+        error_log('Tomatillo: enqueue_block_editor_assets called');
+        
+        $rel = 'js/tomatillo-react-media-upload.js';
+        $path = TOMATILLO_MEDIA_STUDIO_DIR . 'assets/' . $rel;
+        $url = TOMATILLO_MEDIA_STUDIO_ASSETS_URL . $rel;
+
+        error_log('Tomatillo: Checking file at: ' . $path);
+        error_log('Tomatillo: Script URL: ' . $url);
+
+        // 1) Smoke-test the file actually exists
+        if (!file_exists($path)) {
+            error_log('Tomatillo: ERROR - File does not exist at: ' . $path);
+            // Cheap breadcrumb in the parent console (visible from iframe via window.top)
+            wp_add_inline_script(
+                'wp-block-editor',
+                'try{ window.top.console.error("Tomatillo: JS missing at ' . esc_js($path) . '"); }catch(e){}'
+            );
+            return;
+        }
+
+        error_log('Tomatillo: File exists, proceeding with enqueue');
+
+        // 2) Register + enqueue inside the editor iframe
+        wp_enqueue_script(
+            'tomatillo-react-media-upload',
+            $url,
+            array('wp-element', 'wp-components', 'wp-hooks', 'wp-block-editor', 'wp-data', 'wp-i18n'),
+            filemtime($path),
+            true // footer of the iframe
+        );
+
+        // 3) Inline breadcrumb so you *know* we're in the right place
+        wp_add_inline_script(
+            'tomatillo-react-media-upload',
+            '
+            console.log("🚀 Tomatillo React Media Upload: Script loaded! (iframe)");
+            console.log("📁 Tomatillo: File path checked:", "' . esc_js($path) . '");
+            console.log("🌐 Tomatillo: Script URL:", "' . esc_js($url) . '");
+            console.log("⏰ Tomatillo: File modified:", "' . filemtime($path) . '");
+            
+            // Also log to parent window for easy debugging
+            try {
+                window.top.console.log("🚀 Tomatillo: React script loaded in iframe!");
+                window.top.console.log("📁 Tomatillo: File exists at:", "' . esc_js($path) . '");
+            } catch(e) {
+                console.log("Tomatillo: Could not log to parent window");
+            }
+            '
+        );
+
+        // 4) Also enqueue our custom media frame for the React wrapper to use
+        wp_enqueue_media();
+        wp_enqueue_script(
+            'tomatillo-custom-media-frame',
+            TOMATILLO_MEDIA_STUDIO_ASSETS_URL . 'js/custom-media-frame-clean.js',
+            array('jquery', 'wp-media'),
+            TOMATILLO_MEDIA_STUDIO_VERSION,
+            true
+        );
+
+        // Include the template for our custom media frame
+        include TOMATILLO_MEDIA_STUDIO_DIR . 'templates/custom-media-frame-template.php';
+
+        // Localize script with AJAX URL for uploads
+        wp_localize_script('tomatillo-react-media-upload', 'ajaxurl', admin_url('admin-ajax.php'));
+        
+        error_log('Tomatillo: React Media Upload component enqueued successfully');
+        
+        // Add a notice to the parent window for easy debugging
+        add_action('admin_notices', function() {
+            echo '<div class="notice notice-success"><p>🚀 Tomatillo: React Media Upload component enqueued for block editor!</p></div>';
+        });
     }
     
     /**
@@ -235,6 +331,21 @@ class Tomatillo_Media_Admin {
         
         // Include the test template
         include TOMATILLO_MEDIA_STUDIO_DIR . 'templates/test-custom-media-frame.php';
+    }
+    
+    /**
+     * Test React integration page
+     */
+    public function test_react_integration_page() {
+        $plugin = tomatillo_media_studio();
+        
+        // Check admin capabilities
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.', 'tomatillo-media-studio'));
+        }
+        
+        // Include the React integration test template
+        include TOMATILLO_MEDIA_STUDIO_DIR . 'templates/test-react-integration.php';
     }
     
     /**
