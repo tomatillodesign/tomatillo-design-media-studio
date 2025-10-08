@@ -8,6 +8,7 @@
 
     // Global variables
     var selectedItems = [];
+    var currentMediaItems = [];
 
     // Wait for wp.media to be available
     function waitForWpMedia(callback) {
@@ -259,8 +260,8 @@
                 }
                 
                 .tomatillo-media-item.selected {
-                    border-color: #28a745;
-                    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+                    border-color: #28a745 !important;
+                    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3) !important;
                 }
                 
                 .tomatillo-media-item.selected::after {
@@ -284,11 +285,11 @@
                 
                 /* Dim unselected images in single selection mode */
                 .tomatillo-single-selection .tomatillo-media-item:not(.selected) {
-                    opacity: 0.33;
+                    opacity: 0.33 !important;
                 }
                 
                 .tomatillo-single-selection .tomatillo-media-item.selected {
-                    opacity: 1;
+                    opacity: 1 !important;
                 }
                 
                 .tomatillo-media-item img {
@@ -692,6 +693,8 @@
      * Render the media grid with real WordPress media
      */
     function renderMediaGrid(mediaItems, options) {
+        // Store media items globally for access in event handlers
+        currentMediaItems = mediaItems;
         console.log('Rendering media grid with', mediaItems ? mediaItems.length : 'undefined', 'items');
         
         // Safety check
@@ -784,7 +787,7 @@
                         'box-shadow': '0 1px 3px rgba(0,0,0,0.08)'
                     });
                 } else {
-                    // For selected items, don't override the selection styles
+                    // For selected items, maintain selection styles
                     $(this).css({
                         'transform': 'translateY(0)',
                         'box-shadow': '0 4px 12px rgba(40, 167, 69, 0.3)',
@@ -796,9 +799,6 @@
         );
         
         console.log('Media grid rendered successfully');
-        
-        // Setup event handlers after rendering
-        setupEventHandlers(options);
         }).catch(function(error) {
             console.error('Error fetching optimization data:', error);
             // Fallback to rendering without optimization data
@@ -810,6 +810,8 @@
      * Fallback rendering without optimization data
      */
     function renderMediaGridFallback(mediaItems, options) {
+        // Store media items globally for access in event handlers
+        currentMediaItems = mediaItems;
         var gridHtml = '';
         
         mediaItems.forEach(function(item) {
@@ -846,9 +848,6 @@
         
         $('#tomatillo-media-grid').html(gridHtml);
         console.log('Media grid rendered successfully (fallback)');
-        
-        // Setup event handlers after rendering
-        setupEventHandlers(options);
     }
 
     /**
@@ -870,61 +869,37 @@
         
         // Handle media item selection
         $(document).on('click', '.tomatillo-media-item', function() {
-            console.log('🎯 Media item clicked!');
-            console.log('🎯 Event target:', this);
-            console.log('🎯 jQuery object:', $(this));
             var itemId = $(this).data('id');
             var $item = $(this);
-            console.log('🎯 Item ID:', itemId);
-            console.log('🎯 Options multiple:', options.multiple);
-            console.log('🎯 Current selectedItems:', selectedItems);
-            console.log('🎯 selectedItems array length:', selectedItems.length);
-            console.log('🎯 selectedItems contents:', selectedItems);
             
             if (options.multiple) {
                 // Multiple selection
+                console.log('Multiple selection mode');
                 $('#tomatillo-media-grid').removeClass('tomatillo-single-selection');
                 if ($item.hasClass('selected')) {
+                    console.log('Deselecting item in multiple mode');
                     $item.removeClass('selected');
                     selectedItems = selectedItems.filter(id => id !== itemId);
                 } else {
+                    console.log('Selecting item in multiple mode');
                     $item.addClass('selected');
                     selectedItems.push(itemId);
                 }
             } else {
                 // Single selection - check if clicking the same item again
                 if ($item.hasClass('selected')) {
-                    console.log('🎯 Deselecting item');
                     // Deselect - remove dimming and clear selection
                     $('#tomatillo-media-grid').removeClass('tomatillo-single-selection');
                     $item.removeClass('selected');
                     selectedItems = [];
-                    
-                    // Reset styles to default
-                    $item.css({
-                        'transform': 'translateY(0)',
-                        'box-shadow': '0 1px 3px rgba(0,0,0,0.08)',
-                        'border-color': 'transparent'
-                    });
                 } else {
-                    console.log('🎯 Selecting item');
                     // Select - add dimming class and clear all other selections
                     $('#tomatillo-media-grid').addClass('tomatillo-single-selection');
                     $('.tomatillo-media-item').removeClass('selected');
                     $item.addClass('selected');
                     selectedItems = [itemId];
-                    
-                    // Apply selection styles directly
-                    $item.css({
-                        'transform': 'translateY(0)',
-                        'box-shadow': '0 4px 12px rgba(40, 167, 69, 0.3)',
-                        'border-color': '#28a745'
-                    });
                 }
             }
-            
-            console.log('🎯 After selection logic, selectedItems:', selectedItems);
-            console.log('🎯 After selection logic, length:', selectedItems.length);
             
             // Update selection count and button state
             updateSelectionUI(selectedItems.length, options);
@@ -934,13 +909,36 @@
         $('#tomatillo-select').on('click', function() {
             if (selectedItems.length > 0) {
                 console.log('Select button clicked, selected items:', selectedItems);
+                console.log('Current media items available:', currentMediaItems.length);
                 
-                // Create selection data
+                // Create selection data from our media items
                 var selection = selectedItems.map(function(id) {
-                    // Find the media item
-                    var query = wp.media.query();
-                    var item = query.get(id);
-                    return item ? item.toJSON() : { id: id };
+                    // Find the media item from our fetched data
+                    var item = currentMediaItems.find(function(item) {
+                        return item.id == id;
+                    });
+                    
+                    if (item) {
+                        // Return WordPress-compatible format
+                        return {
+                            id: item.id,
+                            url: item.url,
+                            title: item.title || item.filename,
+                            filename: item.filename,
+                            alt: item.alt || item.filename,
+                            description: item.description || '',
+                            caption: item.caption || '',
+                            mime: item.mime,
+                            subtype: item.subtype,
+                            icon: item.icon,
+                            sizes: item.sizes || {},
+                            thumbnail: item.sizes && item.sizes.thumbnail ? item.sizes.thumbnail.url : item.url,
+                            width: item.width,
+                            height: item.height
+                        };
+                    } else {
+                        return { id: id };
+                    }
                 });
                 
                 console.log('Selection created:', selection);
@@ -962,21 +960,22 @@
                 $('#tomatillo-custom-modal').remove();
             }
         });
+        
+        // Handle ESC key to close modal
+        $(document).on('keydown', function(e) {
+            if (e.key === 'Escape' && $('#tomatillo-custom-modal').length > 0) {
+                console.log('ESC key pressed - closing modal');
+                $('#tomatillo-custom-modal').remove();
+            }
+        });
     }
 
     /**
      * Update selection UI
      */
     function updateSelectionUI(count, options) {
-        console.log('🎯 Updating selection UI, count:', count);
-        console.log('🎯 Options:', options);
         var $count = $('#tomatillo-selection-count');
         var $button = $('#tomatillo-select');
-        console.log('🎯 Count element:', $count);
-        console.log('🎯 Button element:', $button);
-        console.log('🎯 Count element length:', $count.length);
-        console.log('🎯 Button element length:', $button.length);
-        console.log('🎯 Count element text before:', $count.text());
         
         if (count === 0) {
             $count.text('No items selected');
@@ -985,12 +984,6 @@
             $count.text(count + ' item' + (count > 1 ? 's' : '') + ' selected');
             $button.prop('disabled', false);
         }
-        
-        console.log('🎯 Count element text after:', $count.text());
-        console.log('🎯 Count element is visible:', $count.is(':visible'));
-        console.log('🎯 Count element offset:', $count.offset());
-        console.log('🎯 Count element height:', $count.height());
-        console.log('🎯 Count element width:', $count.width());
     }
 
     // Initialize when DOM is ready
