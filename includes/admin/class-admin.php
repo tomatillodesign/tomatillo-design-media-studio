@@ -156,6 +156,24 @@ class Tomatillo_Media_Admin {
             true
         );
         
+        // Enqueue custom media frame for test page
+        if ($hook === 'tomatillo-media-studio_page_tomatillo-media-studio-test') {
+            wp_enqueue_media();
+            wp_enqueue_script(
+                'tomatillo-custom-media-frame',
+                TOMATILLO_MEDIA_STUDIO_ASSETS_URL . 'js/custom-media-frame-clean.js',
+                array('jquery', 'wp-media'),
+                TOMATILLO_MEDIA_STUDIO_VERSION,
+                true
+            );
+            
+            // Include the template
+            include TOMATILLO_MEDIA_STUDIO_DIR . 'templates/custom-media-frame-template.php';
+            
+            // Localize script with AJAX URL for uploads
+            wp_localize_script('tomatillo-custom-media-frame', 'ajaxurl', admin_url('admin-ajax.php'));
+        }
+        
         // Localize script with AJAX URL and nonce
         wp_localize_script('tomatillo-admin', 'tomatilloMediaStudio', array(
             'ajaxUrl' => admin_url('admin-ajax.php'),

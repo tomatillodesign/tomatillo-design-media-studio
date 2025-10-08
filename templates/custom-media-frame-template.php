@@ -9,6 +9,8 @@
                 <option value="audio">Audio</option>
                 <option value="application">Documents</option>
             </select>
+            <button class="tomatillo-upload-btn">Upload Files</button>
+            <input type="file" class="tomatillo-file-input" multiple accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar">
         </div>
     </div>
     <div class="tomatillo-attachments-container">

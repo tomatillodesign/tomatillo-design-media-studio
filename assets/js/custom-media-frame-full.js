@@ -41,7 +41,12 @@
                 'click .tomatillo-media-item': 'toggleSelection',
                 'input .tomatillo-search-input': 'handleSearch',
                 'change .tomatillo-filter-select': 'handleFilter',
-                'scroll .tomatillo-attachments-container': 'handleScroll'
+                'scroll .tomatillo-attachments-container': 'handleScroll',
+                'click .tomatillo-upload-btn': 'openFileDialog',
+                'change .tomatillo-file-input': 'handleFileUpload',
+                'dragover .tomatillo-attachments-container': 'handleDragOver',
+                'dragleave .tomatillo-attachments-container': 'handleDragLeave',
+                'drop .tomatillo-attachments-container': 'handleDrop'
             },
             
             initialize: function(options) {
@@ -61,6 +66,7 @@
             },
             
             render: function() {
+                console.log('TomatilloAttachmentsBrowser render called');
                 // Call parent render
                 wp.media.view.AttachmentsBrowser.prototype.render.apply(this, arguments);
                 
@@ -237,6 +243,9 @@
                 // Add custom classes
                 $container.addClass('tomatillo-masonry-grid');
                 
+                // Initialize upload functionality
+                this.initUploadFunctionality();
+                
                 // Add custom CSS if not already added
                 if (!$('#tomatillo-media-frame-styles').length) {
                     $('head').append(`
@@ -334,9 +343,336 @@
                                 border-radius: 4px;
                                 background: white;
                             }
+                            
+                            .tomatillo-upload-btn {
+                                background: #0073aa;
+                                color: white;
+                                border: none;
+                                padding: 8px 16px;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                font-size: 14px;
+                                margin-left: 10px;
+                            }
+                            
+                            .tomatillo-upload-btn:hover {
+                                background: #005a87;
+                            }
+                            
+                            .tomatillo-file-input {
+                                display: none;
+                            }
+                            
+                            .tomatillo-drag-overlay {
+                                position: absolute;
+                                top: 0;
+                                left: 0;
+                                right: 0;
+                                bottom: 0;
+                                background: rgba(0, 115, 170, 0.1);
+                                border: 2px dashed #0073aa;
+                                display: none;
+                                align-items: center;
+                                justify-content: center;
+                                z-index: 1000;
+                                pointer-events: none;
+                            }
+                            
+                            .tomatillo-drag-overlay.active {
+                                display: flex;
+                            }
+                            
+                            .tomatillo-drag-message {
+                                text-align: center;
+                                color: #0073aa;
+                                font-size: 18px;
+                                font-weight: 600;
+                            }
+                            
+                            .tomatillo-upload-progress {
+                                position: fixed;
+                                top: 50%;
+                                left: 50%;
+                                transform: translate(-50%, -50%);
+                                background: white;
+                                border: 1px solid #ddd;
+                                border-radius: 8px;
+                                padding: 20px;
+                                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                                z-index: 10000;
+                                min-width: 300px;
+                                display: none;
+                            }
+                            
+                            .tomatillo-upload-progress.active {
+                                display: block;
+                            }
+                            
+                            .tomatillo-progress-bar {
+                                width: 100%;
+                                height: 20px;
+                                background: #f0f0f0;
+                                border-radius: 10px;
+                                overflow: hidden;
+                                margin: 10px 0;
+                            }
+                            
+                            .tomatillo-progress-fill {
+                                height: 100%;
+                                background: #0073aa;
+                                width: 0%;
+                                transition: width 0.3s ease;
+                            }
+                            
+                            .tomatillo-upload-status {
+                                text-align: center;
+                                font-size: 14px;
+                                color: #666;
+                                margin-bottom: 10px;
+                            }
                         </style>
                     `);
                 }
+            },
+            
+            /**
+             * Initialize upload functionality
+             */
+            initUploadFunctionality: function() {
+                console.log('Initializing upload functionality...');
+                var self = this;
+                var $container = this.$('.tomatillo-attachments-container');
+                
+                // Add drag overlay
+                if (!$container.find('.tomatillo-drag-overlay').length) {
+                    $container.append(`
+                        <div class="tomatillo-drag-overlay">
+                            <div class="tomatillo-drag-message">
+                                Drop files here to upload
+                            </div>
+                        </div>
+                    `);
+                }
+                
+                // Add upload progress modal
+                if (!$('body').find('.tomatillo-upload-progress').length) {
+                    $('body').append(`
+                        <div class="tomatillo-upload-progress">
+                            <div class="tomatillo-upload-status">Preparing upload...</div>
+                            <div class="tomatillo-progress-bar">
+                                <div class="tomatillo-progress-fill"></div>
+                            </div>
+                            <div style="text-align: center;">
+                                <button class="tomatillo-cancel-upload" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Cancel</button>
+                            </div>
+                        </div>
+                    `);
+                }
+            },
+            
+            /**
+             * Open file dialog
+             */
+            openFileDialog: function(e) {
+                e.preventDefault();
+                this.$('.tomatillo-file-input').click();
+            },
+            
+            /**
+             * Handle file upload from file input
+             */
+            handleFileUpload: function(e) {
+                var files = e.target.files;
+                if (files && files.length > 0) {
+                    this.uploadFiles(Array.from(files));
+                }
+            },
+            
+            /**
+             * Handle drag over
+             */
+            handleDragOver: function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.$('.tomatillo-drag-overlay').addClass('active');
+            },
+            
+            /**
+             * Handle drag leave
+             */
+            handleDragLeave: function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                // Only hide if we're leaving the container entirely
+                if (!$(e.currentTarget).find(e.relatedTarget).length) {
+                    this.$('.tomatillo-drag-overlay').removeClass('active');
+                }
+            },
+            
+            /**
+             * Handle drop
+             */
+            handleDrop: function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.$('.tomatillo-drag-overlay').removeClass('active');
+                
+                var files = e.originalEvent.dataTransfer.files;
+                if (files && files.length > 0) {
+                    this.uploadFiles(Array.from(files));
+                }
+            },
+            
+            /**
+             * Upload files with progress tracking
+             */
+            uploadFiles: function(files) {
+                var self = this;
+                var $progressModal = $('.tomatillo-upload-progress');
+                var $progressFill = $('.tomatillo-progress-fill');
+                var $uploadStatus = $('.tomatillo-upload-status');
+                var $cancelBtn = $('.tomatillo-cancel-upload');
+                
+                // Show progress modal
+                $progressModal.addClass('active');
+                $uploadStatus.text('Preparing upload...');
+                $progressFill.css('width', '0%');
+                
+                var uploadedCount = 0;
+                var totalFiles = files.length;
+                var successfulCount = 0;
+                var failedCount = 0;
+                var currentXhr = null;
+                
+                // Set up cancel functionality
+                $cancelBtn.off('click').on('click', function() {
+                    if (currentXhr) {
+                        currentXhr.abort();
+                    }
+                    $progressModal.removeClass('active');
+                });
+                
+                // Upload files one by one
+                uploadNextFile(0);
+                
+                function uploadNextFile(index) {
+                    if (index >= files.length) {
+                        // All files processed
+                        var successRate = totalFiles > 0 ? Math.round((successfulCount / totalFiles) * 100) : 0;
+                        $uploadStatus.text('Upload complete! ' + successfulCount + '/' + totalFiles + ' files successful (' + successRate + '%)');
+                        $progressFill.css('width', '100%');
+                        
+                        // Refresh the collection and close modal after delay
+                        setTimeout(function() {
+                            self.refreshCollection();
+                            $progressModal.removeClass('active');
+                        }, 2000);
+                        return;
+                    }
+                    
+                    var file = files[index];
+                    $uploadStatus.text('Uploading file ' + (index + 1) + ' of ' + totalFiles + ': ' + file.name);
+                    
+                    // Create FormData for single file
+                    var formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('action', 'tomatillo_upload_single_file');
+                    
+                    // Create XMLHttpRequest for this file
+                    currentXhr = new XMLHttpRequest();
+                    
+                    // Track upload progress for this file
+                    currentXhr.upload.addEventListener('progress', function(e) {
+                        if (e.lengthComputable) {
+                            var filePercentComplete = (e.loaded / e.total) * 100;
+                            var overallProgress = ((index + (filePercentComplete / 100)) / totalFiles) * 100;
+                            $progressFill.css('width', overallProgress + '%');
+                        }
+                    });
+                    
+                    // Handle response
+                    currentXhr.addEventListener('load', function() {
+                        if (currentXhr.status === 200) {
+                            try {
+                                var response = JSON.parse(currentXhr.responseText);
+                                if (response.success) {
+                                    successfulCount++;
+                                    // Store the uploaded attachment ID for auto-selection
+                                    if (response.data && response.data.attachment_id) {
+                                        self.newlyUploadedIds = self.newlyUploadedIds || [];
+                                        self.newlyUploadedIds.push(response.data.attachment_id);
+                                    }
+                                } else {
+                                    failedCount++;
+                                    console.error('Upload failed:', response.data);
+                                }
+                            } catch (e) {
+                                failedCount++;
+                                console.error('Invalid response:', currentXhr.responseText);
+                            }
+                        } else {
+                            failedCount++;
+                            console.error('Upload failed with status:', currentXhr.status);
+                        }
+                        
+                        uploadedCount++;
+                        
+                        // Upload next file
+                        setTimeout(function() {
+                            uploadNextFile(index + 1);
+                        }, 100);
+                    });
+                    
+                    // Handle error
+                    currentXhr.addEventListener('error', function() {
+                        failedCount++;
+                        uploadedCount++;
+                        console.error('Upload error for file:', file.name);
+                        
+                        // Upload next file
+                        setTimeout(function() {
+                            uploadNextFile(index + 1);
+                        }, 100);
+                    });
+                    
+                    // Send request
+                    currentXhr.open('POST', ajaxurl || '/wp-admin/admin-ajax.php');
+                    currentXhr.send(formData);
+                }
+            },
+            
+            /**
+             * Refresh the collection and auto-select newly uploaded items
+             */
+            refreshCollection: function() {
+                var self = this;
+                
+                // Refresh the collection
+                this.collection.fetch().done(function() {
+                    // Auto-select newly uploaded items
+                    if (self.newlyUploadedIds && self.newlyUploadedIds.length > 0) {
+                        self.newlyUploadedIds.forEach(function(attachmentId) {
+                            var attachment = self.collection.get(attachmentId);
+                            if (attachment && !self.selection.get(attachmentId)) {
+                                if (!self.multiple) {
+                                    self.selection.reset();
+                                }
+                                self.selection.add(attachment);
+                            }
+                        });
+                        
+                        // Clear the newly uploaded IDs
+                        self.newlyUploadedIds = [];
+                        
+                        // Update UI
+                        self.updateSelectionUI();
+                    }
+                    
+                    // Re-layout masonry
+                    setTimeout(function() {
+                        self.layoutMasonry();
+                    }, 100);
+                });
             }
         });
 
