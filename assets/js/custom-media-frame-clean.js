@@ -193,7 +193,7 @@ var isLoading = false; // Track if infinite scroll is currently loading
                 }
                 
                 .tomatillo-header {
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
                     color: white;
                     padding: 20px;
                     border-radius: 8px 8px 0 0;
@@ -205,6 +205,7 @@ var isLoading = false; // Track if infinite scroll is currently loading
                 .tomatillo-header h2 {
                     margin: 0;
                     font-weight: 600;
+                    color: white;
                 }
                 
                 .tomatillo-close-btn {
@@ -416,16 +417,32 @@ var isLoading = false; // Track if infinite scroll is currently loading
                 .tomatillo-btn-cancel {
                     background: #6c757d;
                     color: white;
+                    transition: all 0.3s ease;
+                }
+                
+                .tomatillo-btn-cancel:hover {
+                    background: #5a6268;
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
                 }
                 
                 .tomatillo-btn-select {
                     background: #667eea;
                     color: white;
                     opacity: 0.5;
+                    transition: all 0.3s ease;
                 }
                 
                 .tomatillo-btn-select:not(:disabled) {
                     opacity: 1;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+                    transform: translateY(-1px);
+                }
+                
+                .tomatillo-btn-select:not(:disabled):hover {
+                    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+                    transform: translateY(-2px);
                 }
                 
                 .tomatillo-loading {
@@ -460,11 +477,37 @@ var isLoading = false; // Track if infinite scroll is currently loading
     }
 
     /**
+     * Get current column heights from existing DOM elements
+     */
+    function getCurrentColumnHeights(columns, columnWidth, gap) {
+        var columnHeights = new Array(columns).fill(0);
+        
+        $('.tomatillo-media-item').each(function() {
+            var $item = $(this);
+            var itemLeft = parseInt($item.css('left')) || 0;
+            var itemTop = parseInt($item.css('top')) || 0;
+            var itemHeight = this.offsetHeight || 0;
+            
+            // Calculate which column this item is in
+            var columnIndex = Math.round(itemLeft / (columnWidth + gap));
+            columnIndex = Math.max(0, Math.min(columns - 1, columnIndex)); // Clamp to valid range
+            
+            // Update column height
+            var itemBottom = itemTop + itemHeight + gap;
+            columnHeights[columnIndex] = Math.max(columnHeights[columnIndex], itemBottom);
+        });
+        
+        console.log('🔍 DEBUG: Current column heights from DOM:', columnHeights);
+        return columnHeights;
+    }
+
+    /**
      * Pre-calculate masonry positions using known dimensions
      */
-    function preCalculateMasonryPositions(mediaItems, optimizationDataArray) {
+    function preCalculateMasonryPositions(mediaItems, optimizationDataArray, startColumnHeights) {
         console.log('🔍 DEBUG: preCalculateMasonryPositions called with', mediaItems.length, 'items');
         console.log('🔍 DEBUG: optimizationDataArray length:', optimizationDataArray ? optimizationDataArray.length : 'null');
+        console.log('🔍 DEBUG: startColumnHeights:', startColumnHeights);
         
         if (mediaItems.length === 0) {
             console.log('🔍 DEBUG: No items to calculate positions for');
@@ -511,7 +554,15 @@ var isLoading = false; // Track if infinite scroll is currently loading
         console.log('🔍 DEBUG: Container width:', containerWidth, 'Columns:', columns, 'Column width:', columnWidth);
         
         // Initialize column heights
-        var columnHeights = new Array(columns).fill(0);
+        var columnHeights;
+        if (startColumnHeights && Array.isArray(startColumnHeights)) {
+            columnHeights = startColumnHeights.slice(); // Copy the array
+            console.log('🔍 DEBUG: Using provided startColumnHeights:', columnHeights);
+        } else {
+            columnHeights = new Array(columns).fill(0);
+            console.log('🔍 DEBUG: Starting with fresh column heights:', columnHeights);
+        }
+        
         var positions = [];
         
         // Pre-calculate positions for each item
@@ -525,8 +576,18 @@ var isLoading = false; // Track if infinite scroll is currently loading
             var width = hiResImage.width;
             var height = hiResImage.height;
             
+            // Validate dimensions
+            if (!width || !height || width <= 0 || height <= 0) {
+                console.error('🚨 INVALID DIMENSIONS for item', index, 'ID:', item.id, 'Width:', width, 'Height:', height);
+                console.error('🚨 HiRes image:', hiResImage);
+                console.error('🚨 Item:', item);
+                console.error('🚨 Optimization data:', optimizationData);
+                // Use fallback dimensions
+                width = width || 400;
+                height = height || 300;
+            }
+            
             console.log('🔍 DEBUG: Item', index, 'ID:', item.id, 'Dimensions:', width, 'x', height);
-            console.log('🔍 DEBUG: HiRes image dimensions:', hiResImage.width, 'x', hiResImage.height);
             
             // Calculate aspect ratio and scaled dimensions
             var aspectRatio = height / width;
@@ -1450,6 +1511,7 @@ var isLoading = false; // Track if infinite scroll is currently loading
         
         isLoading = true;
         console.log('🔄 Infinite scroll triggered - rendering preloaded images from offset:', offset);
+        console.log('🔄 Options multiple:', options.multiple);
 
         // Calculate how many items to render
         var itemsToRender = Math.min(batchSize, currentMediaItems.length - offset);
@@ -1479,8 +1541,38 @@ var isLoading = false; // Track if infinite scroll is currently loading
     function renderAdditionalItemsWithOptimization(newItems, newOptimizationData, options) {
         console.log('🔍 DEBUG: renderAdditionalItemsWithOptimization called with', newItems.length, 'new items');
         
-        // Pre-calculate positions for the new items
-        var newPositions = preCalculateMasonryPositions(newItems, newOptimizationData);
+        // Get current column heights from existing DOM elements
+        var containerWidth = 1200; // fallback
+        var gridElement = document.getElementById('tomatillo-media-grid');
+        var modalElement = document.getElementById('tomatillo-modal');
+        
+        if (gridElement && gridElement.offsetWidth > 0) {
+            containerWidth = gridElement.offsetWidth;
+        } else if (modalElement) {
+            var modalWidth = modalElement.offsetWidth;
+            var modalPadding = 40;
+            containerWidth = modalWidth - modalPadding;
+        }
+        
+        var gap = 16;
+        var columns = 4;
+        if (containerWidth < 768) {
+            columns = 2;
+        } else if (containerWidth < 1200) {
+            columns = 3;
+        } else if (containerWidth < 1600) {
+            columns = 4;
+        } else {
+            columns = 5;
+        }
+        
+        var columnWidth = (containerWidth - (gap * (columns - 1))) / columns;
+        
+        // Get current column heights from existing items
+        var currentColumnHeights = getCurrentColumnHeights(columns, columnWidth, gap);
+        
+        // Pre-calculate positions for the new items using current column heights
+        var newPositions = preCalculateMasonryPositions(newItems, newOptimizationData, currentColumnHeights);
         
         var additionalHtml = '';
         
@@ -1710,11 +1802,33 @@ var isLoading = false; // Track if infinite scroll is currently loading
         insertedItems.each(function(index) {
             var $item = $(this);
             var computedStyle = window.getComputedStyle(this);
+            var rect = this.getBoundingClientRect();
             console.log('🔍 DEBUG: Item', index, 'ID:', $item.data('id'));
             console.log('🔍 DEBUG: Computed position:', computedStyle.position);
             console.log('🔍 DEBUG: Computed left:', computedStyle.left);
             console.log('🔍 DEBUG: Computed top:', computedStyle.top);
             console.log('🔍 DEBUG: Computed width:', computedStyle.width);
+            console.log('🔍 DEBUG: Computed height:', computedStyle.height);
+            console.log('🔍 DEBUG: Bounding rect:', rect.left, rect.top, rect.width, rect.height);
+            
+            // Check for overlapping
+            if (index > 0) {
+                var prevItem = insertedItems.eq(index - 1)[0];
+                var prevRect = prevItem.getBoundingClientRect();
+                var currentRect = this.getBoundingClientRect();
+                
+                // Check if items are overlapping
+                var overlapping = !(currentRect.left >= prevRect.right || 
+                                 currentRect.right <= prevRect.left || 
+                                 currentRect.top >= prevRect.bottom || 
+                                 currentRect.bottom <= prevRect.top);
+                
+                if (overlapping) {
+                    console.error('🚨 OVERLAPPING DETECTED! Item', index, 'overlaps with item', index - 1);
+                    console.error('🚨 Current rect:', currentRect);
+                    console.error('🚨 Previous rect:', prevRect);
+                }
+            }
         });
         
         // Add hover effects
