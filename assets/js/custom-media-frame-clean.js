@@ -1147,25 +1147,52 @@ var isLoading = false; // Track if infinite scroll is currently loading
                 currentOptimizationData = deduplicatedOptimizationData;
             }
             
-            // Filter to images only by default
-            var imageItems = currentMediaItems.filter(function(item) {
-                var isImage = item.type === 'image' || item.mime && item.mime.startsWith('image/');
-                console.log('🔍 DEBUG: Item', item.id, 'type:', item.type, 'mime:', item.mime, 'isImage:', isImage);
-                return isImage;
+            // Apply current filter (defaults to "image" if not set)
+            var currentFilter = $('#tomatillo-filter').val() || 'image';
+            console.log('🔍 Applying initial filter:', currentFilter);
+            
+            var filteredItems = currentMediaItems.filter(function(item) {
+                if (currentFilter === 'all') return true;
+                
+                if (currentFilter === 'image') {
+                    var isImage = item.type === 'image' || (item.mime && item.mime.startsWith('image/'));
+                    console.log('🔍 DEBUG: Item', item.id, 'type:', item.type, 'mime:', item.mime, 'isImage:', isImage);
+                    return isImage;
+                } else if (currentFilter === 'video') {
+                    return item.type === 'video' || (item.mime && item.mime.startsWith('video/'));
+                } else if (currentFilter === 'audio') {
+                    return item.type === 'audio' || (item.mime && item.mime.startsWith('audio/'));
+                } else if (currentFilter === 'application') {
+                    return item.type === 'application' || (item.mime && item.mime.startsWith('application/'));
+                }
+                
+                return item.type === currentFilter;
             });
             
-            var imageOptimizationData = currentOptimizationData.filter(function(data, index) {
+            var filteredOptimizationData = currentOptimizationData.filter(function(data, index) {
+                if (currentFilter === 'all') return true;
                 var item = currentMediaItems[index];
-                return item.type === 'image' || item.mime && item.mime.startsWith('image/');
+                
+                if (currentFilter === 'image') {
+                    return item.type === 'image' || (item.mime && item.mime.startsWith('image/'));
+                } else if (currentFilter === 'video') {
+                    return item.type === 'video' || (item.mime && item.mime.startsWith('video/'));
+                } else if (currentFilter === 'audio') {
+                    return item.type === 'audio' || (item.mime && item.mime.startsWith('audio/'));
+                } else if (currentFilter === 'application') {
+                    return item.type === 'application' || (item.mime && item.mime.startsWith('application/'));
+                }
+                
+                return item.type === currentFilter;
             });
             
-            console.log('🔍 Filtered to images only:', imageItems.length, 'of', currentMediaItems.length);
+            console.log('🔍 Filtered to', currentFilter + ':', filteredItems.length, 'of', currentMediaItems.length);
             
-            // Render immediately with filtered image data
-            renderMediaGridWithOptimization(imageItems, imageOptimizationData, options, true);
+            // Render immediately with filtered data
+            renderMediaGridWithOptimization(filteredItems, filteredOptimizationData, options, true);
             
             // Initialize rendered count
-            renderedItemsCount = imageItems.length;
+            renderedItemsCount = filteredItems.length;
             
             // Setup infinite scroll after rendering
             setupInfiniteScroll(options);
@@ -1272,16 +1299,31 @@ var isLoading = false; // Track if infinite scroll is currently loading
                     currentMediaItems = deduplicatedItems;
                 }
                 
-                // Filter to images only by default
-                var imageItems = currentMediaItems.filter(function(item) {
-                    var isImage = item.type === 'image' || item.mime && item.mime.startsWith('image/');
-                    console.log('🔍 DEBUG: Item', item.id, 'type:', item.type, 'mime:', item.mime, 'isImage:', isImage);
-                    return isImage;
+                // Apply current filter (defaults to "image" if not set)
+                var currentFilter = $('#tomatillo-filter').val() || 'image';
+                console.log('🔍 Applying initial filter:', currentFilter);
+                
+                var filteredItems = currentMediaItems.filter(function(item) {
+                    if (currentFilter === 'all') return true;
+                    
+                    if (currentFilter === 'image') {
+                        var isImage = item.type === 'image' || item.mime && item.mime.startsWith('image/');
+                        console.log('🔍 DEBUG: Item', item.id, 'type:', item.type, 'mime:', item.mime, 'isImage:', isImage);
+                        return isImage;
+                    } else if (currentFilter === 'video') {
+                        return item.type === 'video' || item.mime && item.mime.startsWith('video/');
+                    } else if (currentFilter === 'audio') {
+                        return item.type === 'audio' || item.mime && item.mime.startsWith('audio/');
+                    } else if (currentFilter === 'application') {
+                        return item.type === 'application' || item.mime && item.mime.startsWith('application/');
+                    }
+                    
+                    return item.type === currentFilter;
                 });
                 
-                console.log('🔍 Filtered to images only:', imageItems.length, 'of', currentMediaItems.length);
+                console.log('🔍 Filtered to', currentFilter + ':', filteredItems.length, 'of', currentMediaItems.length);
                 
-                renderMediaGrid(imageItems, options);
+                renderMediaGrid(filteredItems, options);
             })
             .fail(function(xhr, status, error) {
                 console.error('Error fetching media:', error);
@@ -1818,15 +1860,42 @@ var isLoading = false; // Track if infinite scroll is currently loading
             
             // Filter items based on type
             var filteredItems = currentMediaItems.filter(function(item) {
-                console.log('🔍 Checking item:', item.id, 'type:', item.type, 'matches filter:', filterValue);
+                console.log('🔍 Checking item:', item.id, 'filename:', item.filename, 'type:', item.type, 'mime:', item.mime, 'matches filter:', filterValue);
                 if (filterValue === 'all') return true;
+                
+                // More robust type checking
+                if (filterValue === 'image') {
+                    var isImage = item.type === 'image' || (item.mime && item.mime.startsWith('image/'));
+                    console.log('🔍 Image check for', item.filename, ':', item.type === 'image', '||', (item.mime && item.mime.startsWith('image/')), '=', isImage);
+                    return isImage;
+                } else if (filterValue === 'video') {
+                    return item.type === 'video' || (item.mime && item.mime.startsWith('video/'));
+                } else if (filterValue === 'audio') {
+                    return item.type === 'audio' || (item.mime && item.mime.startsWith('audio/'));
+                } else if (filterValue === 'application') {
+                    return item.type === 'application' || (item.mime && item.mime.startsWith('application/'));
+                }
+                
                 return item.type === filterValue;
             });
             
             // Get corresponding optimization data
             var filteredOptimizationData = currentOptimizationData.filter(function(data, index) {
                 if (filterValue === 'all') return true;
-                return currentMediaItems[index].type === filterValue;
+                var item = currentMediaItems[index];
+                
+                // Use same robust type checking as above
+                if (filterValue === 'image') {
+                    return item.type === 'image' || (item.mime && item.mime.startsWith('image/'));
+                } else if (filterValue === 'video') {
+                    return item.type === 'video' || (item.mime && item.mime.startsWith('video/'));
+                } else if (filterValue === 'audio') {
+                    return item.type === 'audio' || (item.mime && item.mime.startsWith('audio/'));
+                } else if (filterValue === 'application') {
+                    return item.type === 'application' || (item.mime && item.mime.startsWith('application/'));
+                }
+                
+                return item.type === filterValue;
             });
             
             console.log('🔍 Filtered items:', filteredItems.length, 'of', currentMediaItems.length);
@@ -1881,9 +1950,24 @@ var isLoading = false; // Track if infinite scroll is currently loading
                 console.log('🔍 DEBUG: Current filter:', currentFilter);
                 
                 var filteredItems = currentMediaItems.filter(function(item) {
-                    // First apply type filter
-                    if (currentFilter !== 'all' && item.type !== currentFilter) {
-                        return false;
+                    // First apply type filter with robust checking
+                    if (currentFilter !== 'all') {
+                        var matchesType = false;
+                        if (currentFilter === 'image') {
+                            matchesType = item.type === 'image' || (item.mime && item.mime.startsWith('image/'));
+                        } else if (currentFilter === 'video') {
+                            matchesType = item.type === 'video' || (item.mime && item.mime.startsWith('video/'));
+                        } else if (currentFilter === 'audio') {
+                            matchesType = item.type === 'audio' || (item.mime && item.mime.startsWith('audio/'));
+                        } else if (currentFilter === 'application') {
+                            matchesType = item.type === 'application' || (item.mime && item.mime.startsWith('application/'));
+                        } else {
+                            matchesType = item.type === currentFilter;
+                        }
+                        
+                        if (!matchesType) {
+                            return false;
+                        }
                     }
                     
                     // Then apply search filter
