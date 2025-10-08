@@ -103,6 +103,7 @@ try {
             // Handle opening our custom media frame
             const handleOpenMediaFrame = () => {
                 console.log('Opening Tomatillo custom media frame from React component');
+                console.log('Props received:', { title, multiple, allowedTypes: typeFilter, value });
                 
                 // Ensure our custom media frame is available
                 if (typeof TomatilloMediaFrame === 'undefined') {

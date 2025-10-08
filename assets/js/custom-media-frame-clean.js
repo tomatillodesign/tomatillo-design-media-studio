@@ -90,6 +90,8 @@ var isLoading = false; // Track if infinite scroll is currently loading
                     
                     wp.media.editor.open = function(id, options) {
                         console.log('wp.media.editor.open intercepted');
+                        console.log('ACF/Classic Media Call - ID:', id, 'Options:', options);
+                        console.log('Stack trace:', new Error().stack);
                         // Use our custom frame instead
                         return TomatilloMediaFrame.open(options);
                     };
@@ -104,7 +106,148 @@ var isLoading = false; // Track if infinite scroll is currently loading
                     // Intercept classic editor calls
                     this.interceptClassicEditor();
                     
+                    // Also intercept wp.media() calls (ACF might use this)
+                    this.interceptWpMedia();
+                    
+                    // Intercept ACF's specific media popup function
+                    this.interceptACFMediaPopup();
+                    
                     console.log('CLEAN Tomatillo Media Frame initialized');
+                },
+                
+                /**
+                 * Intercept wp.media() calls (ACF might use this)
+                 */
+                interceptWpMedia: function() {
+                    console.log('Intercepting wp.media() calls');
+                    var originalWpMedia = wp.media;
+                    
+                    wp.media = function(options) {
+                        console.log('wp.media() intercepted');
+                        console.log('ACF/wp.media Call - Options:', options);
+                        console.log('Stack trace:', new Error().stack);
+                        
+                        // Check if this looks like a media picker call
+                        if (options && (options.title || options.button || options.multiple !== undefined)) {
+                            console.log('This looks like a media picker - using custom frame');
+                            return TomatilloMediaFrame.open(options);
+                        }
+                        
+                        // Otherwise, use original wp.media
+                        return originalWpMedia.call(this, options);
+                    };
+                    
+                    // Preserve all wp.media properties and methods
+                    Object.keys(originalWpMedia).forEach(function(key) {
+                        if (typeof originalWpMedia[key] === 'function') {
+                            wp.media[key] = originalWpMedia[key];
+                        } else {
+                            wp.media[key] = originalWpMedia[key];
+                        }
+                    });
+                },
+                
+                /**
+                 * Intercept ACF's specific media popup function
+                 */
+                interceptACFMediaPopup: function() {
+                    console.log('Intercepting ACF media popup');
+                    
+                    // Wait for ACF to be available
+                    var checkACF = function() {
+                        if (typeof acf !== 'undefined' && acf.newMediaPopup) {
+                            console.log('ACF found, intercepting acf.newMediaPopup');
+                            var originalACFMediaPopup = acf.newMediaPopup;
+                            
+                            acf.newMediaPopup = function(options) {
+                                console.log('ACF newMediaPopup intercepted');
+                                console.log('ACF Media Popup Options:', options);
+                                console.log('Stack trace:', new Error().stack);
+                                
+                                // Store the original callback for ACF - check multiple possible callback properties
+                                var originalCallback = options.select || options.callback || options.onSelect;
+                                console.log('ACF Original callback:', originalCallback);
+                                console.log('ACF Full options object:', options);
+                                console.log('ACF Callback function name:', originalCallback ? originalCallback.name : 'anonymous');
+                                console.log('ACF Available callback properties:', {
+                                    select: options.select,
+                                    callback: options.callback,
+                                    onSelect: options.onSelect,
+                                    state: options.state,
+                                    frame: options.frame
+                                });
+                                
+                                // Modify options to use our custom frame with ACF-compatible callback
+                                var modifiedOptions = Object.assign({}, options, {
+                                    onSelect: function(selection) {
+                                        console.log('ACF Custom frame selection:', selection);
+                                        console.log('ACF Original callback type:', typeof originalCallback);
+                                        console.log('ACF Selection length:', selection.length);
+                                        
+                                        // Convert our selection to ACF format
+                                        var acfSelection = selection.map(function(item) {
+                                            var converted = {
+                                                id: item.id,
+                                                url: item.url,
+                                                title: item.title,
+                                                filename: item.filename,
+                                                alt: item.alt,
+                                                description: item.description,
+                                                caption: item.caption,
+                                                mime: item.mime,
+                                                subtype: item.subtype,
+                                                icon: item.icon,
+                                                sizes: item.sizes,
+                                                thumbnail: item.thumbnail,
+                                                width: item.width,
+                                                height: item.height
+                                            };
+                                            console.log('ACF Converting item:', item.id, 'to:', converted);
+                                            return converted;
+                                        });
+                                        
+                                        console.log('ACF Converted selection:', acfSelection);
+                                        console.log('ACF Converted selection length:', acfSelection.length);
+                                        
+                                        // Call ACF's original callback if it exists
+                                        if (typeof originalCallback === 'function') {
+                                            console.log('Calling ACF original callback with:', acfSelection);
+                                            console.log('ACF Callback context (this):', this);
+                                            console.log('ACF Callback arguments:', arguments);
+                                            
+                                            try {
+                                                // Try calling with different contexts and parameters
+                                                var result1 = originalCallback.call(this, acfSelection);
+                                                console.log('ACF Callback result (call with this):', result1);
+                                                
+                                                var result2 = originalCallback(acfSelection);
+                                                console.log('ACF Callback result (direct call):', result2);
+                                                
+                                                // Try calling with the original context if available
+                                                if (options.context) {
+                                                    var result3 = originalCallback.call(options.context, acfSelection);
+                                                    console.log('ACF Callback result (with context):', result3);
+                                                }
+                                                
+                                            } catch (error) {
+                                                console.error('ACF Callback error:', error);
+                                            }
+                                        } else {
+                                            console.log('No ACF callback found');
+                                        }
+                                    }
+                                });
+                                
+                                // Use our custom frame instead
+                                return TomatilloMediaFrame.open(modifiedOptions);
+                            };
+                        } else {
+                            console.log('ACF not ready yet, retrying...');
+                            setTimeout(checkACF, 100);
+                        }
+                    };
+                    
+                    checkACF();
                 }
             };
 
@@ -496,6 +639,12 @@ var isLoading = false; // Track if infinite scroll is currently loading
                 .tomatillo-btn-select:not(:disabled):hover {
                     box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
                     transform: translateY(-2px);
+                }
+                
+                .tomatillo-btn-select:focus {
+                    outline: 2px solid #0073aa;
+                    outline-offset: 2px;
+                    box-shadow: 0 0 0 3px rgba(0, 115, 170, 0.3);
                 }
                 
                 .tomatillo-loading {
@@ -1787,10 +1936,10 @@ var isLoading = false; // Track if infinite scroll is currently loading
             console.log('🎯 Selected item IDs:', $('.tomatillo-media-item.selected').map(function() { return $(this).data('id'); }).get());
         });
         
-        // Handle select button
-        $('#tomatillo-select').on('click', function() {
+        // Function to handle select action (used by both click and keyboard)
+        function handleSelectAction() {
             if (selectedItems.length > 0) {
-                console.log('Select button clicked, selected items:', selectedItems);
+                console.log('Select action triggered, selected items:', selectedItems);
                 console.log('Current media items available:', currentMediaItems.length);
                 
                 // Create selection data from our media items
@@ -1832,6 +1981,17 @@ var isLoading = false; // Track if infinite scroll is currently loading
                 
                 // Close modal
                 cleanupModal();
+            }
+        }
+
+        // Handle select button click
+        $('#tomatillo-select').on('click', handleSelectAction);
+        
+        // Handle ENTER key on SELECT button
+        $('#tomatillo-select').on('keydown', function(e) {
+            if (e.key === 'Enter' || e.keyCode === 13) {
+                e.preventDefault();
+                handleSelectAction();
             }
         });
         
@@ -3001,6 +3161,11 @@ var isLoading = false; // Track if infinite scroll is currently loading
         } else {
             $count.text(count + ' item' + (count > 1 ? 's' : '') + ' selected');
             $button.prop('disabled', false);
+            
+            // Focus the SELECT button when items are selected for keyboard accessibility
+            setTimeout(function() {
+                $button.focus();
+            }, 100);
         }
     }
 
