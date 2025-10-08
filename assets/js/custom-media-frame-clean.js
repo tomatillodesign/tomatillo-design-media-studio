@@ -129,7 +129,10 @@ var isLoading = false; // Track if infinite scroll is currently loading
                     
                     <!-- Search and Filter Bar -->
                     <div class="tomatillo-controls">
-                        <input type="text" id="tomatillo-search" placeholder="Search media..." class="tomatillo-search">
+                        <div class="tomatillo-search-container">
+                            <input type="text" id="tomatillo-search" placeholder="Search media..." class="tomatillo-search">
+                            <button id="tomatillo-clear-search" class="tomatillo-clear-search" style="display: none;">×</button>
+                        </div>
                         <select id="tomatillo-filter" class="tomatillo-filter">
                             <option value="all">All Types</option>
                             <option value="image">Images</option>
@@ -227,12 +230,43 @@ var isLoading = false; // Track if infinite scroll is currently loading
                     align-items: center;
                 }
                 
+                .tomatillo-search-container {
+                    flex: 1;
+                    position: relative;
+                    display: flex;
+                    align-items: center;
+                }
+                
                 .tomatillo-search {
                     flex: 1;
                     padding: 10px 15px;
+                    padding-right: 40px; /* Make room for clear button */
                     border: 2px solid #e9ecef;
                     border-radius: 8px;
                     font-size: 14px;
+                }
+                
+                .tomatillo-clear-search {
+                    position: absolute;
+                    right: 8px;
+                    background: none;
+                    border: none;
+                    color: #666;
+                    font-size: 18px;
+                    cursor: pointer;
+                    padding: 4px;
+                    width: 24px;
+                    height: 24px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border-radius: 50%;
+                    transition: all 0.2s ease;
+                }
+                
+                .tomatillo-clear-search:hover {
+                    background: #e9ecef;
+                    color: #333;
                 }
                 
                 .tomatillo-filter {
@@ -262,15 +296,15 @@ var isLoading = false; // Track if infinite scroll is currently loading
                     border-radius: 6px;
                     overflow: hidden;
                     cursor: pointer;
-                    transition: all 0.3s ease;
+                    transition: transform 0.3s ease, box-shadow 0.3s ease;
                     min-width: 300px;
                     box-shadow: 0 1px 3px rgba(0,0,0,0.08);
                     border: 2px solid transparent;
                 }
                 
                 .tomatillo-media-item.selected {
-                    border-color: #28a745 !important;
-                    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3) !important;
+                    border-color: #28a745;
+                    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
                 }
                 
                 .tomatillo-media-item.selected::after {
@@ -630,6 +664,11 @@ var isLoading = false; // Track if infinite scroll is currently loading
      */
     function initializeMediaGrid(options) {
         console.log('Initializing media grid...');
+        
+        // Clear any existing selections to start fresh
+        selectedItems = [];
+        $('.tomatillo-media-item').removeClass('selected');
+        $('#tomatillo-media-grid').removeClass('tomatillo-single-selection');
         
         // Check if we have preloaded media
         console.log('🔍 Checking for preloaded media...');
@@ -1054,8 +1093,7 @@ var isLoading = false; // Track if infinite scroll is currently loading
                     // For selected items, maintain selection styles
                     $(this).css({
                         'transform': 'translateY(0)',
-                        'box-shadow': '0 4px 12px rgba(40, 167, 69, 0.3)',
-                        'border-color': '#28a745'
+                        'box-shadow': '0 4px 12px rgba(40, 167, 69, 0.3)'
                     });
                 }
                 $(this).find('.tomatillo-hover-info').css('opacity', '0');
@@ -1147,9 +1185,10 @@ var isLoading = false; // Track if infinite scroll is currently loading
                 // Multiple selection
                 console.log('Multiple selection mode');
                 $('#tomatillo-media-grid').removeClass('tomatillo-single-selection');
+                
                 if ($item.hasClass('selected')) {
                     console.log('Deselecting item in multiple mode');
-                    $item.removeClass('selected');
+                    $item.removeClass('selected').css('border-color', 'transparent');
                     selectedItems = selectedItems.filter(id => id !== itemId);
                 } else {
                     console.log('Selecting item in multiple mode');
@@ -1160,13 +1199,15 @@ var isLoading = false; // Track if infinite scroll is currently loading
                 // Single selection - check if clicking the same item again
                 if ($item.hasClass('selected')) {
                     // Deselect - remove dimming and clear selection
+                    console.log('Deselecting item in single mode');
                     $('#tomatillo-media-grid').removeClass('tomatillo-single-selection');
-                    $item.removeClass('selected');
+                    $item.removeClass('selected').css('border-color', 'transparent');
                     selectedItems = [];
                 } else {
                     // Select - add dimming class and clear all other selections
+                    console.log('Selecting item in single mode');
                     $('#tomatillo-media-grid').addClass('tomatillo-single-selection');
-                    $('.tomatillo-media-item').removeClass('selected');
+                    $('.tomatillo-media-item').removeClass('selected').css('border-color', 'transparent');
                     $item.addClass('selected');
                     selectedItems = [itemId];
                 }
@@ -1174,6 +1215,12 @@ var isLoading = false; // Track if infinite scroll is currently loading
             
             // Update selection count and button state
             updateSelectionUI(selectedItems.length, options);
+            
+            // Debug: Log current selection state
+            console.log('🎯 Selection state after click:');
+            console.log('🎯 selectedItems array:', selectedItems);
+            console.log('🎯 Items with selected class:', $('.tomatillo-media-item.selected').length);
+            console.log('🎯 Selected item IDs:', $('.tomatillo-media-item.selected').map(function() { return $(this).data('id'); }).get());
         });
         
         // Handle select button
@@ -1245,9 +1292,24 @@ var isLoading = false; // Track if infinite scroll is currently loading
             var searchQuery = $(this).val().toLowerCase().trim();
             console.log('Search query:', searchQuery);
             
+            // Show/hide clear button based on search content
             if (searchQuery === '') {
-                // Show all items if search is empty
-                renderMediaGrid(currentMediaItems, options);
+                $('#tomatillo-clear-search').hide();
+            } else {
+                $('#tomatillo-clear-search').show();
+            }
+            
+            if (searchQuery === '') {
+                // Show all items if search is empty - use the same method as initial load
+                if (window.TomatilloBackgroundLoader && window.TomatilloBackgroundLoader.isMediaPreloaded()) {
+                    // Use preloaded data with pre-calculated positions
+                    renderMediaGridWithOptimization(currentMediaItems, currentOptimizationData, options, true);
+                    // Reset rendered count for infinite scroll
+                    renderedItemsCount = currentMediaItems.length;
+                } else {
+                    // Fallback to regular rendering
+                    renderMediaGrid(currentMediaItems, options);
+                }
             } else {
                 // Filter items based on search query
                 var filteredItems = [];
@@ -1274,6 +1336,12 @@ var isLoading = false; // Track if infinite scroll is currently loading
                     renderMediaGridWithOptimization(filteredItems, filteredOptimizationData, options, false);
                 }
             }
+        });
+        
+        // Handle clear search button
+        $('#tomatillo-clear-search').off('click').on('click', function() {
+            console.log('Clear search clicked');
+            $('#tomatillo-search').val('').trigger('input'); // Trigger input event to update UI
         });
     }
 
@@ -1670,8 +1738,7 @@ var isLoading = false; // Track if infinite scroll is currently loading
                     // For selected items, maintain selection styles
                     $(this).css({
                         'transform': 'translateY(0)',
-                        'box-shadow': '0 4px 12px rgba(40, 167, 69, 0.3)',
-                        'border-color': '#28a745'
+                        'box-shadow': '0 4px 12px rgba(40, 167, 69, 0.3)'
                     });
                 }
                 $(this).find('.tomatillo-hover-info').css('opacity', '0');
