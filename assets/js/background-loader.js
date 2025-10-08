@@ -54,15 +54,15 @@
         preloadedMedia.loading = true;
 
         var preloadCount = window.tomatilloSettings ? window.tomatilloSettings.preload_count : 30;
-        console.log('🚀 Preloading', preloadCount, 'images in background');
+        console.log('🚀 Preloading', preloadCount, 'media items in background');
         
         // Use WordPress AJAX to fetch media
         var data = {
             action: 'query-attachments',
             query: {
-                post_mime_type: 'image',
                 posts_per_page: preloadCount,
                 post_status: 'inherit'
+                // Remove post_mime_type restriction to load all file types
             }
         };
 
@@ -80,6 +80,24 @@
                 }
 
                 if (mediaItems.length > 0) {
+                    // Check for duplicates in preloaded data
+                    var allIds = mediaItems.map(function(item) { return item.id; });
+                    var uniqueIds = [...new Set(allIds)];
+                    if (allIds.length !== uniqueIds.length) {
+                        console.warn('🚨 Duplicates detected in preloaded data:', allIds.length, '→', uniqueIds.length);
+                        
+                        // Remove duplicates
+                        var seenIds = new Set();
+                        mediaItems = mediaItems.filter(function(item) {
+                            if (!seenIds.has(item.id)) {
+                                seenIds.add(item.id);
+                                return true;
+                            }
+                            return false;
+                        });
+                        console.log('🔧 Deduplicated preloaded data:', allIds.length, '→', mediaItems.length);
+                    }
+                    
                     var loadTime = performance.now() - startTime;
                     preloadedMedia.items = mediaItems;
                     preloadedMedia.loaded = true;

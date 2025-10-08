@@ -134,8 +134,8 @@ var isLoading = false; // Track if infinite scroll is currently loading
                             <button id="tomatillo-clear-search" class="tomatillo-clear-search" style="display: none;">×</button>
                         </div>
                         <select id="tomatillo-filter" class="tomatillo-filter">
-                            <option value="all">All Types</option>
                             <option value="image">Images</option>
+                            <option value="all">All Types</option>
                             <option value="video">Videos</option>
                             <option value="audio">Audio</option>
                             <option value="application">Documents</option>
@@ -291,8 +291,16 @@ var isLoading = false; // Track if infinite scroll is currently loading
                     padding: 0;
                 }
                 
+                .tomatillo-grid-layout {
+                    display: flex;
+                    flex-wrap: wrap;
+                    justify-content: flex-start;
+                    align-items: flex-start;
+                    gap: 16px;
+                    padding: 20px;
+                }
+                
                 .tomatillo-media-item {
-                    position: absolute;
                     background: white;
                     border-radius: 6px;
                     overflow: hidden;
@@ -301,6 +309,15 @@ var isLoading = false; // Track if infinite scroll is currently loading
                     min-width: 300px;
                     box-shadow: 0 1px 3px rgba(0,0,0,0.08);
                     border: 2px solid transparent;
+                }
+                
+                .tomatillo-masonry-grid .tomatillo-media-item {
+                    position: absolute;
+                }
+                
+                .tomatillo-grid-layout .tomatillo-media-item {
+                    position: relative;
+                    flex: 0 0 auto;
                 }
                 
                 .tomatillo-media-item.selected {
@@ -499,6 +516,42 @@ var isLoading = false; // Track if infinite scroll is currently loading
         
         console.log('🔍 DEBUG: Current column heights from DOM:', columnHeights);
         return columnHeights;
+    }
+
+    /**
+     * Get file icon based on file type
+     */
+    function getFileIcon(fileType) {
+        var icons = {
+            'audio': '🎵',
+            'video': '🎬',
+            'application': '📄',
+            'text': '📝',
+            'image': '🖼️'
+        };
+        
+        // Check for specific subtypes
+        if (fileType === 'audio') return '🎵';
+        if (fileType === 'video') return '🎬';
+        if (fileType === 'application') return '📄';
+        if (fileType === 'text') return '📝';
+        
+        // Default fallback
+        return '📄';
+    }
+    
+    /**
+     * Format file size in human readable format
+     */
+    function formatFileSize(bytes) {
+        if (!bytes || bytes === 0) return '0 B';
+        
+        var sizes = ['B', 'KB', 'MB', 'GB'];
+        var i = Math.floor(Math.log(bytes) / Math.log(1024));
+        
+        if (i >= sizes.length) i = sizes.length - 1;
+        
+        return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
     }
 
     /**
@@ -743,11 +796,59 @@ var isLoading = false; // Track if infinite scroll is currently loading
             currentMediaItems = preloadedData.items;
             currentOptimizationData = preloadedData.optimizationData;
             
-            // Render immediately with preloaded data
-            renderMediaGridWithOptimization(currentMediaItems, currentOptimizationData, options, true);
+            // Debug: Check what types we actually have
+            console.log('🔍 DEBUG: All media item types:', currentMediaItems.map(function(item) {
+                return {id: item.id, type: item.type, mime: item.mime, filename: item.filename};
+            }));
+            
+            // Debug: Check for duplicates in source data
+            var allIds = currentMediaItems.map(function(item) { return item.id; });
+            var uniqueIds = [...new Set(allIds)];
+            if (allIds.length !== uniqueIds.length) {
+                console.error('🚨 DUPLICATES IN SOURCE DATA!', allIds.length, 'items,', uniqueIds.length, 'unique');
+                var duplicates = allIds.filter(function(id, index) { return allIds.indexOf(id) !== index; });
+                console.error('🚨 Duplicate IDs in source:', duplicates);
+                
+                // Remove duplicates from source data
+                console.log('🔧 Removing duplicates from source data...');
+                var seenIds = new Set();
+                var deduplicatedItems = [];
+                var deduplicatedOptimizationData = [];
+                
+                currentMediaItems.forEach(function(item, index) {
+                    if (!seenIds.has(item.id)) {
+                        seenIds.add(item.id);
+                        deduplicatedItems.push(item);
+                        if (currentOptimizationData[index]) {
+                            deduplicatedOptimizationData.push(currentOptimizationData[index]);
+                        }
+                    }
+                });
+                
+                console.log('🔧 Deduplicated:', currentMediaItems.length, '→', deduplicatedItems.length);
+                currentMediaItems = deduplicatedItems;
+                currentOptimizationData = deduplicatedOptimizationData;
+            }
+            
+            // Filter to images only by default
+            var imageItems = currentMediaItems.filter(function(item) {
+                var isImage = item.type === 'image' || item.mime && item.mime.startsWith('image/');
+                console.log('🔍 DEBUG: Item', item.id, 'type:', item.type, 'mime:', item.mime, 'isImage:', isImage);
+                return isImage;
+            });
+            
+            var imageOptimizationData = currentOptimizationData.filter(function(data, index) {
+                var item = currentMediaItems[index];
+                return item.type === 'image' || item.mime && item.mime.startsWith('image/');
+            });
+            
+            console.log('🔍 Filtered to images only:', imageItems.length, 'of', currentMediaItems.length);
+            
+            // Render immediately with filtered image data
+            renderMediaGridWithOptimization(imageItems, imageOptimizationData, options, true);
             
             // Initialize rendered count
-            renderedItemsCount = currentMediaItems.length;
+            renderedItemsCount = imageItems.length;
             
             // Setup infinite scroll after rendering
             setupInfiniteScroll(options);
@@ -791,9 +892,9 @@ var isLoading = false; // Track if infinite scroll is currently loading
         var data = {
             action: 'query-attachments',
             query: {
-                post_mime_type: 'image',
                 posts_per_page: 50,
                 post_status: 'inherit'
+                // Remove post_mime_type restriction to load all file types
             }
         };
         
@@ -825,7 +926,45 @@ var isLoading = false; // Track if infinite scroll is currently loading
                 currentMediaItems = mediaItems;
                 console.log('📦 Stored mediaItems globally:', currentMediaItems.length);
                 
-                renderMediaGrid(mediaItems, options);
+                // Debug: Check what types we actually have
+                console.log('🔍 DEBUG: All media item types:', currentMediaItems.map(function(item) {
+                    return {id: item.id, type: item.type, mime: item.mime, filename: item.filename};
+                }));
+                
+                // Debug: Check for duplicates in source data
+                var allIds = currentMediaItems.map(function(item) { return item.id; });
+                var uniqueIds = [...new Set(allIds)];
+                if (allIds.length !== uniqueIds.length) {
+                    console.error('🚨 DUPLICATES IN SOURCE DATA!', allIds.length, 'items,', uniqueIds.length, 'unique');
+                    var duplicates = allIds.filter(function(id, index) { return allIds.indexOf(id) !== index; });
+                    console.error('🚨 Duplicate IDs in source:', duplicates);
+                    
+                    // Remove duplicates from source data
+                    console.log('🔧 Removing duplicates from source data...');
+                    var seenIds = new Set();
+                    var deduplicatedItems = [];
+                    
+                    currentMediaItems.forEach(function(item) {
+                        if (!seenIds.has(item.id)) {
+                            seenIds.add(item.id);
+                            deduplicatedItems.push(item);
+                        }
+                    });
+                    
+                    console.log('🔧 Deduplicated:', currentMediaItems.length, '→', deduplicatedItems.length);
+                    currentMediaItems = deduplicatedItems;
+                }
+                
+                // Filter to images only by default
+                var imageItems = currentMediaItems.filter(function(item) {
+                    var isImage = item.type === 'image' || item.mime && item.mime.startsWith('image/');
+                    console.log('🔍 DEBUG: Item', item.id, 'type:', item.type, 'mime:', item.mime, 'isImage:', isImage);
+                    return isImage;
+                });
+                
+                console.log('🔍 Filtered to images only:', imageItems.length, 'of', currentMediaItems.length);
+                
+                renderMediaGrid(imageItems, options);
             })
             .fail(function(xhr, status, error) {
                 console.error('Error fetching media:', error);
@@ -1133,33 +1272,38 @@ var isLoading = false; // Track if infinite scroll is currently loading
         
         $('#tomatillo-media-grid').html(gridHtml);
         
-        // Add hover effects
-        $('.tomatillo-media-item').hover(
-            function() {
-                if (!$(this).hasClass('selected')) {
-                    $(this).css({
-                        'transform': 'translateY(-2px)',
-                        'box-shadow': '0 4px 12px rgba(0,0,0,0.12)'
-                    });
+        // Add hover effects (only for masonry layout - images)
+        if (layoutType === 'masonry') {
+            // Remove any existing hover effects first
+            $('.tomatillo-media-item').off('mouseenter mouseleave');
+            
+            $('.tomatillo-media-item').hover(
+                function() {
+                    if (!$(this).hasClass('selected')) {
+                        $(this).css({
+                            'transform': 'translateY(-2px)',
+                            'box-shadow': '0 4px 12px rgba(0,0,0,0.12)'
+                        });
+                    }
+                    $(this).find('.tomatillo-hover-info').css('opacity', '1');
+                },
+                function() {
+                    if (!$(this).hasClass('selected')) {
+                        $(this).css({
+                            'transform': 'translateY(0)',
+                            'box-shadow': '0 1px 3px rgba(0,0,0,0.08)'
+                        });
+                    } else {
+                        // For selected items, maintain selection styles
+                        $(this).css({
+                            'transform': 'translateY(0)',
+                            'box-shadow': '0 4px 12px rgba(40, 167, 69, 0.3)'
+                        });
+                    }
+                    $(this).find('.tomatillo-hover-info').css('opacity', '0');
                 }
-                $(this).find('.tomatillo-hover-info').css('opacity', '1');
-            },
-            function() {
-                if (!$(this).hasClass('selected')) {
-                    $(this).css({
-                        'transform': 'translateY(0)',
-                        'box-shadow': '0 1px 3px rgba(0,0,0,0.08)'
-                    });
-                } else {
-                    // For selected items, maintain selection styles
-                    $(this).css({
-                        'transform': 'translateY(0)',
-                        'box-shadow': '0 4px 12px rgba(40, 167, 69, 0.3)'
-                    });
-                }
-                $(this).find('.tomatillo-hover-info').css('opacity', '0');
-            }
-        );
+            );
+        }
         
         console.log('Media grid rendered successfully');
         
@@ -1348,6 +1492,49 @@ var isLoading = false; // Track if infinite scroll is currently loading
             }
         });
         
+        // Handle filter dropdown
+        $('#tomatillo-filter').off('change').on('change', function() {
+            var filterValue = $(this).val();
+            console.log('🔍 Filter changed to:', filterValue);
+            console.log('🔍 Current media items:', currentMediaItems);
+            console.log('🔍 Current media items types:', currentMediaItems.map(function(item) { return item.type; }));
+            
+            // Filter items based on type
+            var filteredItems = currentMediaItems.filter(function(item) {
+                console.log('🔍 Checking item:', item.id, 'type:', item.type, 'matches filter:', filterValue);
+                if (filterValue === 'all') return true;
+                return item.type === filterValue;
+            });
+            
+            // Get corresponding optimization data
+            var filteredOptimizationData = currentOptimizationData.filter(function(data, index) {
+                if (filterValue === 'all') return true;
+                return currentMediaItems[index].type === filterValue;
+            });
+            
+            console.log('🔍 Filtered items:', filteredItems.length, 'of', currentMediaItems.length);
+            console.log('🔍 Filtered optimization data:', filteredOptimizationData.length);
+            console.log('🔍 Filtered items details:', filteredItems);
+            
+            // Debug: Check for duplicates in filtered items
+            var itemIds = filteredItems.map(function(item) { return item.id; });
+            var uniqueIds = [...new Set(itemIds)];
+            if (itemIds.length !== uniqueIds.length) {
+                console.error('🚨 DUPLICATE ITEMS DETECTED!', itemIds.length, 'items,', uniqueIds.length, 'unique');
+                console.error('🚨 Duplicate IDs:', itemIds.filter(function(id, index) { return itemIds.indexOf(id) !== index; }));
+            }
+            
+            // Clear search when filter changes
+            $('#tomatillo-search').val('');
+            $('#tomatillo-clear-search').hide();
+            
+            // Re-render with filtered items
+            renderMediaGridWithOptimization(filteredItems, filteredOptimizationData, options, true);
+            
+            // Reset rendered count for infinite scroll
+            renderedItemsCount = filteredItems.length;
+        });
+        
         // Handle search input
         $('#tomatillo-search').off('input').on('input', function() {
             var searchQuery = $(this).val().toLowerCase().trim();
@@ -1372,30 +1559,57 @@ var isLoading = false; // Track if infinite scroll is currently loading
                     renderMediaGrid(currentMediaItems, options);
                 }
             } else {
-                // Filter items based on search query
-                var filteredItems = [];
-                var filteredOptimizationData = [];
+                // Filter items based on search query AND current filter
+                var currentFilter = $('#tomatillo-filter').val();
+                console.log('🔍 DEBUG: Current filter:', currentFilter);
                 
-                currentMediaItems.forEach(function(item, index) {
-                    if (searchInMediaItem(item, searchQuery)) {
-                        filteredItems.push(item);
-                        if (currentOptimizationData && currentOptimizationData[index]) {
-                            filteredOptimizationData.push(currentOptimizationData[index]);
-                        } else {
-                            filteredOptimizationData.push(null);
-                        }
+                var filteredItems = currentMediaItems.filter(function(item) {
+                    // First apply type filter
+                    if (currentFilter !== 'all' && item.type !== currentFilter) {
+                        return false;
                     }
+                    
+                    // Then apply search filter
+                    var searchableText = [
+                        item.filename || '',
+                        item.title || '',
+                        item.caption || '',
+                        item.description || '',
+                        item.alt || '',
+                        item.name || '',
+                        item.slug || ''
+                    ].join(' ').toLowerCase();
+                    
+                    return searchableText.includes(searchQuery);
                 });
                 
-                console.log('Filtered items:', filteredItems.length, 'out of', currentMediaItems.length);
+                // Get corresponding optimization data
+                var filteredOptimizationData = currentOptimizationData.filter(function(data, index) {
+                    var item = currentMediaItems[index];
+                    
+                    // First apply type filter
+                    if (currentFilter !== 'all' && item.type !== currentFilter) {
+                        return false;
+                    }
+                    
+                    // Then apply search filter
+                    var searchableText = [
+                        item.filename || '',
+                        item.title || '',
+                        item.caption || '',
+                        item.description || '',
+                        item.alt || '',
+                        item.name || '',
+                        item.slug || ''
+                    ].join(' ').toLowerCase();
+                    
+                    return searchableText.includes(searchQuery);
+                });
                 
-                // Re-render grid with filtered items
-                if (filteredItems.length === 0) {
-                    // Show "No results found" message
-                    $('#tomatillo-media-grid').html('<div class="tomatillo-no-results">No images found matching "' + searchQuery + '"</div>');
-                } else {
-                    renderMediaGridWithOptimization(filteredItems, filteredOptimizationData, options, false);
-                }
+                console.log('Search results:', filteredItems.length, 'of', currentMediaItems.length);
+                
+                // Re-render with filtered items
+                renderMediaGridWithOptimization(filteredItems, filteredOptimizationData, options, false);
             }
         });
         
@@ -1413,17 +1627,17 @@ var isLoading = false; // Track if infinite scroll is currently loading
         var batchSize = window.tomatilloSettings ? window.tomatilloSettings.infinite_scroll_batch : 100;
         var currentOffset = currentMediaItems.length;
         
-        console.log('🔄 Starting background loading of more images from offset:', currentOffset);
+        console.log('🔄 Starting background loading of more media items from offset:', currentOffset);
         console.log('🔄 Current media items length:', currentMediaItems.length);
         console.log('🔄 Batch size:', batchSize);
         
         var data = {
             action: 'query-attachments',
             query: {
-                post_mime_type: 'image',
                 posts_per_page: batchSize,
                 post_status: 'inherit',
                 offset: currentOffset
+                // Remove post_mime_type restriction to load all file types
             }
         };
 
@@ -1442,11 +1656,23 @@ var isLoading = false; // Track if infinite scroll is currently loading
                     console.log('🔄 Background loaded', newItems.length, 'more images');
                     console.log('🔄 New items IDs:', newItems.map(function(item) { return item.id; }));
                     
-                    // Add to current media items
-                    currentMediaItems = currentMediaItems.concat(newItems);
+                    // Check for duplicates before adding
+                    var existingIds = new Set(currentMediaItems.map(function(item) { return item.id; }));
+                    var uniqueNewItems = newItems.filter(function(item) {
+                        return !existingIds.has(item.id);
+                    });
                     
-                    // Load optimization data for new items
-                    loadOptimizationDataForNewItems(newItems);
+                    if (uniqueNewItems.length > 0) {
+                        console.log('🔄 Adding', uniqueNewItems.length, 'unique new items (filtered out', newItems.length - uniqueNewItems.length, 'duplicates)');
+                        
+                        // Add to current media items
+                        currentMediaItems = currentMediaItems.concat(uniqueNewItems);
+                        
+                        // Load optimization data for new items
+                        loadOptimizationDataForNewItems(uniqueNewItems);
+                    } else {
+                        console.log('🔄 All new items were duplicates, skipping');
+                    }
                 } else {
                     console.log('🔄 No more images available for background loading');
                 }
@@ -1751,8 +1977,18 @@ var isLoading = false; // Track if infinite scroll is currently loading
     function renderMediaGridWithOptimization(mediaItems, optimizationDataArray, options, skipImageWait) {
         console.log('Rendering filtered media grid with', mediaItems.length, 'items');
         
-        // Pre-calculate masonry positions for instant layout
-        var preCalculatedPositions = preCalculateMasonryPositions(mediaItems, optimizationDataArray);
+        // Determine layout type based on content
+        var hasImages = mediaItems.some(function(item) { return item.type === 'image'; });
+        var layoutType = hasImages ? 'masonry' : 'grid';
+        console.log('🔍 DEBUG: Layout type:', layoutType, '(hasImages:', hasImages, ')');
+        
+        // Update grid container class
+        var $grid = $('#tomatillo-media-grid');
+        $grid.removeClass('tomatillo-masonry-grid tomatillo-grid-layout');
+        $grid.addClass(layoutType === 'masonry' ? 'tomatillo-masonry-grid' : 'tomatillo-grid-layout');
+        
+        // Pre-calculate masonry positions for instant layout (only for masonry)
+        var preCalculatedPositions = layoutType === 'masonry' ? preCalculateMasonryPositions(mediaItems, optimizationDataArray) : [];
         
         var gridHtml = '';
         
@@ -1770,18 +2006,42 @@ var isLoading = false; // Track if infinite scroll is currently loading
             
             var orientation = item.width > item.height ? 'Landscape' : 'Portrait';
             
-            var itemHtml = `
-                <div class="tomatillo-media-item" data-id="${item.id}" style="position: absolute; left: ${position.left}px; top: ${position.top}px; width: ${position.width}px;">
-                    ${item.type === 'image' ? 
-                        `<img src="${hiResImage.url}" alt="${filename}" loading="lazy" style="width: 100%; height: auto;">` :
-                        `<div style="width: 100%; height: 200px; background: #f5f5f5; display: flex; align-items: center; justify-content: center; font-size: 48px; color: #666;">📄</div>`
-                    }
-                    
-                    <div class="tomatillo-hover-info">
-                        <div class="filename">${filename}</div>
-                        <div class="dimensions">${orientation} • ${hiResImage.width}×${hiResImage.height}</div>
-                        <div class="details">${hiResImage.filesize} • ${hiResImage.format}</div>
+            // Generate different HTML based on layout type
+            var itemStyle, itemContent;
+            
+            if (layoutType === 'masonry') {
+                // Masonry layout - use absolute positioning for images
+                itemStyle = `position: absolute; left: ${position.left}px; top: ${position.top}px; width: ${position.width}px;`;
+                itemContent = `<img src="${hiResImage.url}" alt="${filename}" loading="lazy" style="width: 100%; height: auto;">`;
+            } else {
+                // Grid layout - use flexbox for non-image files
+                itemStyle = `width: 200px; height: 200px; margin: 8px;`;
+                
+                // Show file info at a glance for non-image files
+                var fileIcon = getFileIcon(item.type);
+                var fileSize = formatFileSize(item.filesizeInBytes || 0);
+                
+                itemContent = `
+                    <div style="width: 100%; height: 100%; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; text-align: center;">
+                        <div style="font-size: 32px; margin-bottom: 8px;">${fileIcon}</div>
+                        <div style="font-size: 12px; font-weight: 600; color: #333; margin-bottom: 4px; word-break: break-all; line-height: 1.2;">${filename}</div>
+                        <div style="font-size: 10px; color: #666; text-transform: uppercase; margin-bottom: 2px;">${item.type}</div>
+                        <div style="font-size: 10px; color: #888;">${fileSize}</div>
                     </div>
+                `;
+            }
+            
+            var itemHtml = `
+                <div class="tomatillo-media-item" data-id="${item.id}" style="${itemStyle}">
+                    ${itemContent}
+                    
+                    ${layoutType === 'masonry' ? `
+                        <div class="tomatillo-hover-info">
+                            <div class="filename">${filename}</div>
+                            <div class="dimensions">${orientation} • ${hiResImage.width}×${hiResImage.height}</div>
+                            <div class="details">${hiResImage.filesize} • ${hiResImage.format}</div>
+                        </div>
+                    ` : ''}
                 </div>
             `;
             
@@ -1831,40 +2091,52 @@ var isLoading = false; // Track if infinite scroll is currently loading
             }
         });
         
-        // Add hover effects
-        $('.tomatillo-media-item').hover(
-            function() {
-                if (!$(this).hasClass('selected')) {
-                    $(this).css({
-                        'transform': 'translateY(-2px)',
-                        'box-shadow': '0 4px 12px rgba(0,0,0,0.12)'
-                    });
+        // Add hover effects (only for masonry layout - images)
+        if (layoutType === 'masonry') {
+            // Remove any existing hover effects first
+            $('.tomatillo-media-item').off('mouseenter mouseleave');
+            
+            $('.tomatillo-media-item').hover(
+                function() {
+                    if (!$(this).hasClass('selected')) {
+                        $(this).css({
+                            'transform': 'translateY(-2px)',
+                            'box-shadow': '0 4px 12px rgba(0,0,0,0.12)'
+                        });
+                    }
+                    $(this).find('.tomatillo-hover-info').css('opacity', '1');
+                },
+                function() {
+                    if (!$(this).hasClass('selected')) {
+                        $(this).css({
+                            'transform': 'translateY(0)',
+                            'box-shadow': '0 1px 3px rgba(0,0,0,0.08)'
+                        });
+                    } else {
+                        // For selected items, maintain selection styles
+                        $(this).css({
+                            'transform': 'translateY(0)',
+                            'box-shadow': '0 4px 12px rgba(40, 167, 69, 0.3)'
+                        });
+                    }
+                    $(this).find('.tomatillo-hover-info').css('opacity', '0');
                 }
-                $(this).find('.tomatillo-hover-info').css('opacity', '1');
-            },
-            function() {
-                if (!$(this).hasClass('selected')) {
-                    $(this).css({
-                        'transform': 'translateY(0)',
-                        'box-shadow': '0 1px 3px rgba(0,0,0,0.08)'
-                    });
-                } else {
-                    // For selected items, maintain selection styles
-                    $(this).css({
-                        'transform': 'translateY(0)',
-                        'box-shadow': '0 4px 12px rgba(40, 167, 69, 0.3)'
-                    });
-                }
-                $(this).find('.tomatillo-hover-info').css('opacity', '0');
-            }
-        );
+            );
+        }
         
-        // Set container height based on pre-calculated positions
-        var maxHeight = Math.max.apply(Math, preCalculatedPositions.map(function(pos) {
-            return pos.top + pos.height;
-        }));
-        console.log('🔍 DEBUG: Setting container height to:', maxHeight + 'px');
-        $('#tomatillo-media-grid').css('height', maxHeight + 'px');
+        // Set container height based on layout type
+        if (layoutType === 'masonry') {
+            // For masonry, set height based on pre-calculated positions
+            var maxHeight = Math.max.apply(Math, preCalculatedPositions.map(function(pos) {
+                return pos.top + pos.height;
+            }));
+            console.log('🔍 DEBUG: Setting masonry container height to:', maxHeight + 'px');
+            $('#tomatillo-media-grid').css('height', maxHeight + 'px');
+        } else {
+            // For grid layout, let it size naturally
+            console.log('🔍 DEBUG: Grid layout - letting container size naturally');
+            $('#tomatillo-media-grid').css('height', 'auto');
+        }
         
         console.log('🎨 Pre-calculated masonry layout applied - NO LAYOUT SHIFT!');
         console.log('🔍 DEBUG: Final container height:', $('#tomatillo-media-grid').css('height'));

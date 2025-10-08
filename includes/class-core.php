@@ -41,8 +41,35 @@ class Tomatillo_Media_Core {
         add_action('wp_ajax_tomatillo_delete_images', array($this, 'ajax_delete_images'));
         add_action('wp_ajax_tomatillo_download_file', array($this, 'ajax_download_file'));
         
+        // Modify attachment data to ensure proper type property
+        add_filter('wp_prepare_attachment_for_js', array($this, 'modify_attachment_data'), 10, 2);
+        
         // Scheduled conversion hook
         add_action('tomatillo_auto_convert_image', array($this, 'handle_scheduled_conversion'));
+    }
+    
+    /**
+     * Modify attachment data to ensure proper type property
+     */
+    public function modify_attachment_data($response, $attachment) {
+        // Ensure the 'type' property is set correctly based on MIME type
+        if (isset($response['mime'])) {
+            $mime = $response['mime'];
+            
+            if (strpos($mime, 'image/') === 0) {
+                $response['type'] = 'image';
+            } elseif (strpos($mime, 'video/') === 0) {
+                $response['type'] = 'video';
+            } elseif (strpos($mime, 'audio/') === 0) {
+                $response['type'] = 'audio';
+            } elseif (strpos($mime, 'application/') === 0 || strpos($mime, 'text/') === 0) {
+                $response['type'] = 'application';
+            } else {
+                $response['type'] = 'application'; // Default fallback
+            }
+        }
+        
+        return $response;
     }
     
     /**
@@ -798,10 +825,53 @@ class Tomatillo_Media_Core {
             wp_send_json_error('File upload error: ' . $file['error']);
         }
         
-        // Check file type
-        $allowed_types = array('image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/avif');
-        if (!in_array($file['type'], $allowed_types)) {
-            wp_send_json_error('Invalid file type. Only images are allowed.');
+        // Check file type - allow all WordPress-safe file types
+        $allowed_types = array(
+            // Images
+            'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/avif', 
+            'image/svg+xml', 'image/bmp', 'image/tiff', 'image/tif', 'image/ico', 'image/x-icon',
+            
+            // Documents
+            'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'application/vnd.apple.pages', 'application/vnd.apple.numbers', 'application/vnd.apple.keynote',
+            'application/vnd.oasis.opendocument.text', 'application/vnd.oasis.opendocument.spreadsheet',
+            'application/vnd.oasis.opendocument.presentation', 'text/plain', 'text/csv', 'application/rtf',
+            'text/html', 'text/css', 'text/javascript', 'application/javascript', 'application/json',
+            'application/xml', 'text/xml',
+            
+            // Archives
+            'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed',
+            'application/x-tar', 'application/gzip',
+            
+            // Audio
+            'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/aac', 'audio/m4a',
+            'audio/x-m4a', 'audio/flac', 'audio/x-flac',
+            
+            // Video
+            'video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/webm', 'video/ogg',
+            'video/quicktime', 'video/x-msvideo', 'video/3gpp', 'video/3gpp2', 'video/x-ms-wmv',
+            'video/x-flv',
+            
+            // Other common formats
+            'application/epub+zip', 'application/vnd.amazon.ebook'
+        );
+        
+        // Also check file extension as fallback
+        $file_extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $allowed_extensions = array(
+            'jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'svg', 'bmp', 'tiff', 'tif', 'ico',
+            'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pages', 'numbers', 'key',
+            'odt', 'ods', 'odp', 'txt', 'csv', 'rtf', 'html', 'htm', 'css', 'js', 'json', 'xml',
+            'zip', 'rar', '7z', 'tar', 'gz',
+            'mp3', 'wav', 'ogg', 'mp4', 'aac', 'm4a', 'flac',
+            'avi', 'mov', 'wmv', 'webm', 'qt', '3gp', 'flv',
+            'epub', 'azw', 'azw3'
+        );
+        
+        if (!in_array($file['type'], $allowed_types) && !in_array($file_extension, $allowed_extensions)) {
+            wp_send_json_error('Invalid file type. Please upload a supported file format (images, documents, PDFs, archives, audio, video).');
         }
         
         // Check file size (20MB limit)
@@ -830,8 +900,10 @@ class Tomatillo_Media_Core {
                     $attachment_data = wp_generate_attachment_metadata($attachment_id, $upload_result['file']);
                     wp_update_attachment_metadata($attachment_id, $attachment_data);
                     
-                    // Trigger automatic conversion
-                    $this->trigger_auto_conversion($attachment_id);
+                    // Trigger automatic conversion only for images
+                    if (strpos($upload_result['type'], 'image/') === 0) {
+                        $this->trigger_auto_conversion($attachment_id);
+                    }
                     
                     // Get file info for response
                     $file_size = filesize($upload_result['file']);
