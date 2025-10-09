@@ -112,7 +112,84 @@ var isLoading = false; // Track if infinite scroll is currently loading
                     // Intercept ACF's specific media popup function
                     this.interceptACFMediaPopup();
                     
+                    // Listen for ACF remove button clicks to ensure proper state management
+                    this.setupACFRemoveListener();
+                    
                     console.log('CLEAN Tomatillo Media Frame initialized');
+                },
+                
+                /**
+                 * Setup listener for ACF remove button clicks
+                 */
+                setupACFRemoveListener: function() {
+                    console.log('ACF Bridge: Setting up remove button listener');
+                    
+                    // Use event delegation to catch remove button clicks
+                    $(document).on('click', '.acf-icon.-cancel', function(e) {
+                        console.log('ACF Bridge: Remove button clicked');
+                        
+                        // Find the field wrapper
+                        var $fieldWrapper = $(this).closest('.acf-field-image, .acf-field, [data-key][data-type="image"]');
+                        if ($fieldWrapper.length) {
+                            console.log('ACF Bridge: Found field wrapper for remove:', $fieldWrapper);
+                            
+                            // Ensure the field is properly reset
+                            TomatilloMediaFrame.resetACFField($fieldWrapper);
+                        }
+                    });
+                },
+                
+                /**
+                 * Reset ACF field to empty state
+                 */
+                resetACFField: function($fieldWrapper) {
+                    console.log('ACF Bridge: Resetting ACF field');
+                    
+                    try {
+                        // Clear the hidden input value
+                        var $hiddenInput = $fieldWrapper.find('input[type="hidden"]');
+                        if ($hiddenInput.length) {
+                            $hiddenInput.val('');
+                            console.log('ACF Bridge: Cleared hidden input value');
+                        }
+                        
+                        // Hide the preview container
+                        var $previewContainer = $fieldWrapper.find('.show-if-value');
+                        if ($previewContainer.length) {
+                            $previewContainer.hide();
+                            console.log('ACF Bridge: Hid preview container');
+                        }
+                        
+                        // Show the "Add Image" button
+                        var $addButton = $fieldWrapper.find('.hide-if-value');
+                        if ($addButton.length) {
+                            $addButton.show();
+                            console.log('ACF Bridge: Showed add button');
+                        }
+                        
+                        // Update field state classes
+                        var $uploader = $fieldWrapper.find('.acf-image-uploader');
+                        if ($uploader.length) {
+                            $uploader.removeClass('has-value');
+                            $uploader.addClass('no-value');
+                            console.log('ACF Bridge: Updated uploader state classes to no-value');
+                        }
+                        
+                        // Try to use ACF's own field reset if available
+                        var acfField = $uploader.data('acf-field');
+                        if (acfField && acfField.val) {
+                            acfField.val('');
+                            console.log('ACF Bridge: Used ACF field.val() to reset field');
+                        }
+                        
+                        // Trigger change events
+                        this.triggerACFChange($fieldWrapper);
+                        
+                        console.log('ACF Bridge: Field reset completed');
+                        
+                    } catch (error) {
+                        console.error('ACF Bridge: Error resetting field:', error);
+                    }
                 },
                 
                 /**
@@ -303,8 +380,10 @@ var isLoading = false; // Track if infinite scroll is currently loading
                         sizes: media.sizes || {}
                     };
                     
-                    // Ensure we have a thumbnail URL
-                    if (attachment.sizes && attachment.sizes.thumbnail) {
+                    // Ensure we have a thumbnail URL - prefer medium size for ACF previews
+                    if (attachment.sizes && attachment.sizes.medium) {
+                        attachment.thumbnail = attachment.sizes.medium.url;
+                    } else if (attachment.sizes && attachment.sizes.thumbnail) {
                         attachment.thumbnail = attachment.sizes.thumbnail.url;
                     } else {
                         attachment.thumbnail = attachment.url;
@@ -315,7 +394,7 @@ var isLoading = false; // Track if infinite scroll is currently loading
                 },
                 
                 /**
-                 * Set ACF field value by directly manipulating DOM elements
+                 * Set ACF field value by working with ACF's field management
                  */
                 setACFFieldValue: function(fieldInstance, attachment) {
                     console.log('ACF Bridge: Setting field value:', attachment);
@@ -343,40 +422,24 @@ var isLoading = false; // Track if infinite scroll is currently loading
                             console.log('ACF Bridge: Available inputs:', $fieldWrapper.find('input'));
                         }
                         
-                        // Update the preview image
-                        var $previewImg = $fieldWrapper.find('.acf-image-value img');
-                        if ($previewImg.length) {
-                            $previewImg.attr('src', attachment.thumbnail);
-                            $previewImg.attr('alt', attachment.alt);
-                            console.log('ACF Bridge: Updated preview image');
+                        // Instead of directly manipulating DOM, trigger ACF's own field update
+                        // This ensures ACF handles all the state management properly
+                        var $uploader = $fieldWrapper.find('.acf-image-uploader');
+                        if ($uploader.length) {
+                            // Trigger ACF's internal field update by simulating the selection
+                            var acfField = $uploader.data('acf-field');
+                            if (acfField && acfField.val) {
+                                // Use ACF's own val() method to set the value
+                                acfField.val(attachment.id);
+                                console.log('ACF Bridge: Used ACF field.val() method');
+                            } else {
+                                // Fallback: manually update the preview but let ACF handle the rest
+                                this.updateACFPreview($fieldWrapper, attachment);
+                            }
                         } else {
-                            console.log('ACF Bridge: No preview image found');
-                            console.log('ACF Bridge: Available images:', $fieldWrapper.find('img'));
+                            console.log('ACF Bridge: No uploader found, using fallback');
+                            this.updateACFPreview($fieldWrapper, attachment);
                         }
-                        
-                        // Show the preview container
-                        var $previewContainer = $fieldWrapper.find('.acf-image-value');
-                        if ($previewContainer.length) {
-                            $previewContainer.show();
-                            console.log('ACF Bridge: Showed preview container');
-                        } else {
-                            console.log('ACF Bridge: No preview container found');
-                        }
-                        
-                        // Hide the "Add Image" button
-                        var $addButton = $fieldWrapper.find('.acf-button');
-                        if ($addButton.length) {
-                            $addButton.hide();
-                            console.log('ACF Bridge: Hid add button');
-                        } else {
-                            console.log('ACF Bridge: No add button found');
-                        }
-                        
-                        // Update field state classes
-                        $fieldWrapper.addClass('has-value');
-                        $fieldWrapper.removeClass('no-value');
-                        
-                        console.log('ACF Bridge: Updated field state classes');
                         
                     } catch (error) {
                         console.error('ACF Bridge: Error setting field value:', error);
@@ -384,7 +447,53 @@ var isLoading = false; // Track if infinite scroll is currently loading
                 },
                 
                 /**
-                 * Trigger ACF change events
+                 * Update ACF preview manually (fallback method)
+                 */
+                updateACFPreview: function($fieldWrapper, attachment) {
+                    console.log('ACF Bridge: Using fallback preview update');
+                    
+                    // Update the preview image - ACF uses .show-if-value img
+                    var $previewImg = $fieldWrapper.find('.show-if-value img');
+                    if ($previewImg.length) {
+                        $previewImg.attr('src', attachment.thumbnail);
+                        $previewImg.attr('alt', attachment.alt);
+                        console.log('ACF Bridge: Updated preview image');
+                    } else {
+                        console.log('ACF Bridge: No preview image found');
+                        console.log('ACF Bridge: Available images:', $fieldWrapper.find('img'));
+                    }
+                    
+                    // Show the preview container - ACF uses .show-if-value
+                    var $previewContainer = $fieldWrapper.find('.show-if-value');
+                    if ($previewContainer.length) {
+                        $previewContainer.show();
+                        console.log('ACF Bridge: Showed preview container');
+                    } else {
+                        console.log('ACF Bridge: No preview container found');
+                    }
+                    
+                    // Hide the "Add Image" button - ACF uses .hide-if-value
+                    var $addButton = $fieldWrapper.find('.hide-if-value');
+                    if ($addButton.length) {
+                        $addButton.hide();
+                        console.log('ACF Bridge: Hid add button');
+                    } else {
+                        console.log('ACF Bridge: No add button found');
+                    }
+                    
+                    // Update field state classes - ACF uses .acf-image-uploader.has-value
+                    var $uploader = $fieldWrapper.find('.acf-image-uploader');
+                    if ($uploader.length) {
+                        $uploader.addClass('has-value');
+                        $uploader.removeClass('no-value');
+                        console.log('ACF Bridge: Updated uploader state classes');
+                    } else {
+                        console.log('ACF Bridge: No uploader found');
+                    }
+                },
+                
+                /**
+                 * Trigger ACF change events properly
                  */
                 triggerACFChange: function(fieldInstance) {
                     console.log('ACF Bridge: Triggering change events');
@@ -404,6 +513,16 @@ var isLoading = false; // Track if infinite scroll is currently loading
                             console.log('ACF Bridge: Triggered input/change events on input:', $input);
                         } else {
                             console.log('ACF Bridge: No input found for change events');
+                        }
+                        
+                        // Try to trigger ACF's own field change event
+                        var $uploader = $fieldWrapper.find('.acf-image-uploader');
+                        if ($uploader.length) {
+                            var acfField = $uploader.data('acf-field');
+                            if (acfField && acfField.trigger) {
+                                acfField.trigger('change');
+                                console.log('ACF Bridge: Triggered ACF field change event');
+                            }
                         }
                         
                         // Trigger ACF action if available
