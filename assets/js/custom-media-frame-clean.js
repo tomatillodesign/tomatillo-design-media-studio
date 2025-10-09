@@ -115,6 +115,9 @@ var isLoading = false; // Track if infinite scroll is currently loading
                     // Listen for ACF remove button clicks to ensure proper state management
                     this.setupACFRemoveListener();
                     
+                    // Upgrade existing ACF image previews on page load
+                    this.upgradeACFPreviewsOnLoad();
+                    
                     console.log('CLEAN Tomatillo Media Frame initialized');
                 },
                 
@@ -193,6 +196,206 @@ var isLoading = false; // Track if infinite scroll is currently loading
                 },
                 
                 /**
+                 * Upgrade existing ACF image previews on page load
+                 */
+                upgradeACFPreviewsOnLoad: function() {
+                    console.log('🔍 ACF Bridge: Starting ACF preview upgrade process...');
+                    console.log('🔍 ACF Bridge: jQuery version:', $.fn.jquery);
+                    console.log('🔍 ACF Bridge: Document ready state:', document.readyState);
+                    
+                    // Wait a bit for ACF to fully initialize
+                    setTimeout(function() {
+                        console.log('🔍 ACF Bridge: Running delayed upgrade after ACF initialization...');
+                        
+                        // Find all ACF image previews
+                        var $acfImages = $('.acf-image-uploader .show-if-value img');
+                        console.log('🔍 ACF Bridge: Found', $acfImages.length, 'ACF image previews to upgrade');
+                        
+                        if ($acfImages.length === 0) {
+                            console.log('🔍 ACF Bridge: No ACF images found, trying alternative selectors...');
+                            $acfImages = $('.acf-field-image img, [data-type="image"] img');
+                            console.log('🔍 ACF Bridge: Alternative selector found', $acfImages.length, 'images');
+                        }
+                        
+                        $acfImages.each(function(index) {
+                            var $img = $(this);
+                            var currentSrc = $img.attr('src');
+                            
+                            console.log('🔍 ACF Bridge: Processing image', index + 1, ':', currentSrc);
+                            
+                            if (currentSrc && currentSrc.includes('-')) {
+                                console.log('🔍 ACF Bridge: Image has size suffix, attempting upgrade...');
+                                
+                                // Extract attachment ID from the field
+                                var $fieldWrapper = $img.closest('.acf-field-image, .acf-field, [data-key][data-type="image"]');
+                                console.log('🔍 ACF Bridge: Field wrapper found:', $fieldWrapper.length > 0);
+                                
+                                var $hiddenInput = $fieldWrapper.find('input[type="hidden"]');
+                                var attachmentId = $hiddenInput.val();
+                                
+                                console.log('🔍 ACF Bridge: Hidden input found:', $hiddenInput.length > 0);
+                                console.log('🔍 ACF Bridge: Attachment ID:', attachmentId);
+                                
+                                if (attachmentId) {
+                                    console.log('🔍 ACF Bridge: Getting high-res version for attachment:', attachmentId);
+                                    
+                                    // Try AJAX approach first
+                                    TomatilloMediaFrame.getHighResImageForACF(attachmentId, function(highResUrl) {
+                                        console.log('🔍 ACF Bridge: Callback received high-res URL:', highResUrl);
+                                        console.log('🔍 ACF Bridge: Current URL:', currentSrc);
+                                        console.log('🔍 ACF Bridge: URLs different?', highResUrl !== currentSrc);
+                                        
+                                        if (highResUrl && highResUrl !== currentSrc) {
+                                            console.log('🔍 ACF Bridge: Upgrading to high-res URL:', highResUrl);
+                                            
+                                            // Update the image source
+                                            $img.attr('src', highResUrl);
+                                            
+                                            // Apply high-quality styling
+                                            $img.css({
+                                                'max-width': '300px',
+                                                'max-height': '300px',
+                                                'width': 'auto',
+                                                'height': 'auto',
+                                                'object-fit': 'contain',
+                                                'image-rendering': 'high-quality'
+                                            });
+                                            
+                                            console.log('🔍 ACF Bridge: Successfully upgraded ACF preview');
+                                        } else {
+                                            console.log('🔍 ACF Bridge: AJAX approach failed, trying direct URL cleanup...');
+                                            
+                                            // Fallback: Direct URL cleanup
+                                            var cleanUrl = TomatilloMediaFrame.removeImageSizeSuffix(currentSrc);
+                                            if (cleanUrl !== currentSrc) {
+                                                console.log('🔍 ACF Bridge: Using direct URL cleanup:', cleanUrl);
+                                                $img.attr('src', cleanUrl);
+                                                
+                                                // Apply high-quality styling
+                                                $img.css({
+                                                    'max-width': '300px',
+                                                    'max-height': '300px',
+                                                    'width': 'auto',
+                                                    'height': 'auto',
+                                                    'object-fit': 'contain',
+                                                    'image-rendering': 'high-quality'
+                                                });
+                                                
+                                                console.log('🔍 ACF Bridge: Successfully upgraded with direct cleanup');
+                                            }
+                                        }
+                                    });
+                                } else {
+                                    console.log('🔍 ACF Bridge: No attachment ID found, trying direct URL cleanup...');
+                                    
+                                    // Fallback: Direct URL cleanup without attachment ID
+                                    var cleanUrl = TomatilloMediaFrame.removeImageSizeSuffix(currentSrc);
+                                    if (cleanUrl !== currentSrc) {
+                                        console.log('🔍 ACF Bridge: Using direct URL cleanup (no ID):', cleanUrl);
+                                        $img.attr('src', cleanUrl);
+                                        
+                                        // Apply high-quality styling
+                                        $img.css({
+                                            'max-width': '300px',
+                                            'max-height': '300px',
+                                            'width': 'auto',
+                                            'height': 'auto',
+                                            'object-fit': 'contain',
+                                            'image-rendering': 'high-quality'
+                                        });
+                                        
+                                        console.log('🔍 ACF Bridge: Successfully upgraded with direct cleanup (no ID)');
+                                    }
+                                }
+                            } else {
+                                console.log('🔍 ACF Bridge: Image has no size suffix, skipping');
+                            }
+                        });
+                    }, 1000); // Wait 1 second for ACF to initialize
+                },
+                
+                /**
+                 * Get high-resolution image URL for ACF preview
+                 */
+                getHighResImageForACF: function(attachmentId, callback) {
+                    console.log('🔍 ACF Bridge: Getting high-res image for attachment:', attachmentId);
+                    console.log('🔍 ACF Bridge: AJAX URL:', ajaxurl || '/wp-admin/admin-ajax.php');
+                    console.log('🔍 ACF Bridge: Nonce:', tomatillo_nonce || 'test');
+                    
+                    // Use WordPress AJAX to get image data
+                    $.ajax({
+                        url: ajaxurl || '/wp-admin/admin-ajax.php',
+                        type: 'POST',
+                        data: {
+                            action: 'tomatillo_get_image_data',
+                            image_id: attachmentId,
+                            nonce: tomatillo_nonce || 'test'
+                        },
+                        success: function(response) {
+                            console.log('🔍 ACF Bridge: AJAX success for attachment', attachmentId);
+                            console.log('🔍 ACF Bridge: Full response:', response);
+                            
+                            if (response.success && response.data) {
+                                var data = response.data;
+                                console.log('🔍 ACF Bridge: Response data:', data);
+                                
+                                var bestUrl = null;
+                                
+                                // Priority: AVIF → WebP → Scaled → Large → Original
+                                if (data.avif_url) {
+                                    bestUrl = data.avif_url;
+                                    console.log('🔍 ACF Bridge: Using AVIF URL:', bestUrl);
+                                } else if (data.webp_url) {
+                                    bestUrl = data.webp_url;
+                                    console.log('🔍 ACF Bridge: Using WebP URL:', bestUrl);
+                                } else if (data.scaled_url) {
+                                    bestUrl = data.scaled_url;
+                                    console.log('🔍 ACF Bridge: Using scaled URL:', bestUrl);
+                                } else if (data.large_url) {
+                                    bestUrl = data.large_url;
+                                    console.log('🔍 ACF Bridge: Using large URL:', bestUrl);
+                                } else {
+                                    // Fallback: remove size suffix from current URL
+                                    bestUrl = TomatilloMediaFrame.removeImageSizeSuffix(data.url || '');
+                                    console.log('🔍 ACF Bridge: Using fallback URL:', bestUrl);
+                                }
+                                
+                                console.log('🔍 ACF Bridge: Final best URL:', bestUrl);
+                                callback(bestUrl);
+                            } else {
+                                console.log('🔍 ACF Bridge: AJAX response not successful or no data');
+                                console.log('🔍 ACF Bridge: Response success:', response.success);
+                                console.log('🔍 ACF Bridge: Response data:', response.data);
+                                callback(null);
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            console.error('🔍 ACF Bridge: AJAX error for attachment', attachmentId);
+                            console.error('🔍 ACF Bridge: Status:', status);
+                            console.error('🔍 ACF Bridge: Error:', error);
+                            console.error('🔍 ACF Bridge: XHR:', xhr);
+                            callback(null);
+                        }
+                    });
+                },
+                
+                /**
+                 * Remove WordPress image size suffix from URL
+                 */
+                removeImageSizeSuffix: function(url) {
+                    if (!url) return url;
+                    
+                    // Remove WordPress size suffixes like -300x200, -1024x683, etc.
+                    var cleanUrl = url.replace(/-\d+x\d+(?=\.[^.]+$)/, '');
+                    
+                    // Also remove -scaled suffix if present
+                    cleanUrl = cleanUrl.replace(/-scaled(?=\.[^.]+$)/, '');
+                    
+                    console.log('ACF Bridge: Cleaned URL:', url, '→', cleanUrl);
+                    return cleanUrl;
+                },
+                
+                /**
                  * Intercept wp.media() calls (ACF might use this)
                  */
                 interceptWpMedia: function() {
@@ -254,21 +457,42 @@ var isLoading = false; // Track if infinite scroll is currently loading
                                 var $activeElement = $(document.activeElement);
                                 console.log('ACF Bridge: Active element:', $activeElement);
                                 
-                                var $fallbackField = $activeElement.closest('.acf-field-image, .acf-field, [data-key][data-type="image"]');
+                                var $fallbackField = $activeElement.closest('.acf-field-image, .acf-field, [data-key][data-type="image"], [data-key][data-type="gallery"]');
                                 if ($fallbackField.length) {
                                     console.log('ACF Bridge: Found fallback field:', $fallbackField);
                                     
+                                    // Detect field type to determine selection mode
+                                    var fieldType = TomatilloMediaFrame.detectACFFieldType($fallbackField);
+                                    var isMultiple = (fieldType === 'gallery');
+                                    
+                                    console.log('ACF Bridge: Field type:', fieldType, 'Multiple selection:', isMultiple);
+                                    
                                     var modifiedOptions = Object.assign({}, options, {
+                                        multiple: isMultiple,
                                         onSelect: function(selection) {
                                             console.log('ACF Bridge Fallback: Processing selection:', selection);
+                                            console.log('ACF Bridge Fallback: Field type:', fieldType, 'Selection count:', selection.length);
                                             
-                                            var acfAttachment = TomatilloMediaFrame.normalizeToACFAttachment(selection, $fallbackField);
-                                            console.log('ACF Bridge Fallback: Normalized attachment:', acfAttachment);
-                                            
-                                            TomatilloMediaFrame.setACFFieldValue($fallbackField, acfAttachment);
-                                            TomatilloMediaFrame.triggerACFChange($fallbackField);
-                                            
-                                            console.log('ACF Bridge Fallback: Field updated successfully');
+                                            if (fieldType === 'gallery') {
+                                                // Handle gallery field - multiple selection
+                                                console.log('ACF Bridge Fallback: Processing gallery field with multiple selection');
+                                                console.log('ACF Bridge Fallback: Selection count:', selection.length);
+                                                
+                                                TomatilloMediaFrame.setACFGalleryValue($fallbackField, selection);
+                                                TomatilloMediaFrame.triggerACFChange($fallbackField);
+                                                
+                                                console.log('ACF Bridge Fallback: Gallery field updated successfully');
+                                            } else {
+                                                // Handle image field - single selection
+                                                console.log('ACF Bridge Fallback: Processing image field with single selection');
+                                                var acfAttachment = TomatilloMediaFrame.normalizeToACFAttachment(selection, $fallbackField);
+                                                console.log('ACF Bridge Fallback: Normalized attachment:', acfAttachment);
+                                                
+                                                TomatilloMediaFrame.setACFFieldValue($fallbackField, acfAttachment);
+                                                TomatilloMediaFrame.triggerACFChange($fallbackField);
+                                                
+                                                console.log('ACF Bridge Fallback: Field updated successfully');
+                                            }
                                         }
                                     });
                                     
@@ -360,10 +584,46 @@ var isLoading = false; // Track if infinite scroll is currently loading
                 },
                 
                 /**
-                 * Normalize media selection to ACF attachment format
+                 * Detect ACF field type (single image vs gallery)
+                 */
+                detectACFFieldType: function(fieldInstance) {
+                    console.log('ACF Bridge: Detecting ACF field type for:', fieldInstance);
+                    
+                    var $fieldWrapper = $(fieldInstance);
+                    var fieldType = 'image'; // Default to single image
+                    
+                    // Check data-type attribute
+                    var dataType = $fieldWrapper.attr('data-type');
+                    if (dataType) {
+                        fieldType = dataType;
+                        console.log('ACF Bridge: Field type from data-type:', fieldType);
+                    }
+                    
+                    // Check for gallery-specific classes or attributes
+                    if ($fieldWrapper.hasClass('acf-field-gallery') || 
+                        $fieldWrapper.find('.acf-gallery').length > 0 ||
+                        dataType === 'gallery') {
+                        fieldType = 'gallery';
+                        console.log('ACF Bridge: Detected gallery field');
+                    }
+                    
+                    // Check for image-specific classes
+                    if ($fieldWrapper.hasClass('acf-field-image') || 
+                        $fieldWrapper.find('.acf-image-uploader').length > 0 ||
+                        dataType === 'image') {
+                        fieldType = 'image';
+                        console.log('ACF Bridge: Detected image field');
+                    }
+                    
+                    console.log('ACF Bridge: Final field type:', fieldType);
+                    return fieldType;
+                },
+                
+                /**
+                 * Normalize media selection to ACF attachment format with high-res optimization
                  */
                 normalizeToACFAttachment: function(selection, fieldInstance) {
-                    console.log('ACF Bridge: Normalizing selection:', selection);
+                    console.log('ACF Bridge: Normalizing selection with high-res optimization:', selection);
                     
                     // Handle single vs multiple
                     var media = Array.isArray(selection) ? selection[0] : selection;
@@ -380,17 +640,77 @@ var isLoading = false; // Track if infinite scroll is currently loading
                         sizes: media.sizes || {}
                     };
                     
-                    // Ensure we have a thumbnail URL - prefer medium size for ACF previews
-                    if (attachment.sizes && attachment.sizes.medium) {
-                        attachment.thumbnail = attachment.sizes.medium.url;
-                    } else if (attachment.sizes && attachment.sizes.thumbnail) {
-                        attachment.thumbnail = attachment.sizes.thumbnail.url;
-                    } else {
-                        attachment.thumbnail = attachment.url;
+                    // Get the best high-resolution image URL for ACF preview
+                    attachment.thumbnail = this.getBestACFPreviewUrl(attachment);
+                    
+                    console.log('ACF Bridge: Normalized attachment with high-res preview:', attachment);
+                    return attachment;
+                },
+                
+                /**
+                 * Get the best high-resolution image URL for ACF preview
+                 */
+                getBestACFPreviewUrl: function(attachment) {
+                    console.log('ACF Bridge: Getting best preview URL for attachment:', attachment.id);
+                    
+                    // Priority order: AVIF → WebP → Scaled → Large → Medium → Original
+                    var sizes = attachment.sizes || {};
+                    var bestUrl = null;
+                    var maxWidth = 0;
+                    
+                    // 1. Check for AVIF versions (best compression, modern browsers)
+                    for (var sizeName in sizes) {
+                        if (sizeName.includes('avif') && sizes[sizeName].url) {
+                            var width = sizes[sizeName].width || 0;
+                            if (width > maxWidth && width <= 1200) { // Cap at reasonable size for admin
+                                maxWidth = width;
+                                bestUrl = sizes[sizeName].url;
+                                console.log('ACF Bridge: Found AVIF preview:', sizeName, bestUrl, width + 'px');
+                            }
+                        }
                     }
                     
-                    console.log('ACF Bridge: Normalized attachment:', attachment);
-                    return attachment;
+                    // 2. Check for WebP versions (good compression, wide support)
+                    if (!bestUrl) {
+                        maxWidth = 0;
+                        for (var sizeName in sizes) {
+                            if (sizeName.includes('webp') && sizes[sizeName].url) {
+                                var width = sizes[sizeName].width || 0;
+                                if (width > maxWidth && width <= 1200) {
+                                    maxWidth = width;
+                                    bestUrl = sizes[sizeName].url;
+                                    console.log('ACF Bridge: Found WebP preview:', sizeName, bestUrl, width + 'px');
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 3. Check for scaled versions (WordPress's high-res fallback)
+                    if (!bestUrl && sizes.scaled && sizes.scaled.url) {
+                        bestUrl = sizes.scaled.url;
+                        console.log('ACF Bridge: Using scaled preview:', bestUrl);
+                    }
+                    
+                    // 4. Check for large size
+                    if (!bestUrl && sizes.large && sizes.large.url) {
+                        bestUrl = sizes.large.url;
+                        console.log('ACF Bridge: Using large preview:', bestUrl);
+                    }
+                    
+                    // 5. Check for medium size
+                    if (!bestUrl && sizes.medium && sizes.medium.url) {
+                        bestUrl = sizes.medium.url;
+                        console.log('ACF Bridge: Using medium preview:', bestUrl);
+                    }
+                    
+                    // 6. Fallback to original URL
+                    if (!bestUrl) {
+                        bestUrl = attachment.url;
+                        console.log('ACF Bridge: Using original URL as fallback:', bestUrl);
+                    }
+                    
+                    console.log('ACF Bridge: Final preview URL:', bestUrl);
+                    return bestUrl;
                 },
                 
                 /**
@@ -447,17 +767,30 @@ var isLoading = false; // Track if infinite scroll is currently loading
                 },
                 
                 /**
-                 * Update ACF preview manually (fallback method)
+                 * Update ACF preview manually (fallback method) with high-res optimization
                  */
                 updateACFPreview: function($fieldWrapper, attachment) {
-                    console.log('ACF Bridge: Using fallback preview update');
+                    console.log('ACF Bridge: Using fallback preview update with high-res optimization');
                     
                     // Update the preview image - ACF uses .show-if-value img
                     var $previewImg = $fieldWrapper.find('.show-if-value img');
                     if ($previewImg.length) {
+                        // Set the high-resolution image URL
                         $previewImg.attr('src', attachment.thumbnail);
                         $previewImg.attr('alt', attachment.alt);
-                        console.log('ACF Bridge: Updated preview image');
+                        
+                        // Add CSS to ensure the image displays at high quality but restricted size
+                        $previewImg.css({
+                            'max-width': '300px',
+                            'max-height': '300px',
+                            'width': 'auto',
+                            'height': 'auto',
+                            'object-fit': 'contain',
+                            'image-rendering': 'high-quality'
+                        });
+                        
+                        console.log('ACF Bridge: Updated preview image with high-res URL:', attachment.thumbnail);
+                        console.log('ACF Bridge: Image dimensions:', attachment.width + 'x' + attachment.height);
                     } else {
                         console.log('ACF Bridge: No preview image found');
                         console.log('ACF Bridge: Available images:', $fieldWrapper.find('img'));
@@ -489,6 +822,231 @@ var isLoading = false; // Track if infinite scroll is currently loading
                         console.log('ACF Bridge: Updated uploader state classes');
                     } else {
                         console.log('ACF Bridge: No uploader found');
+                    }
+                },
+                
+                /**
+                 * Set ACF gallery field value with multiple images
+                 */
+                setACFGalleryValue: function(fieldInstance, selection) {
+                    console.log('ACF Bridge: Setting gallery field value:', selection);
+                    console.log('ACF Bridge: Field instance:', fieldInstance);
+                    
+                    try {
+                        var $fieldWrapper = $(fieldInstance);
+                        console.log('ACF Bridge: Gallery field wrapper:', $fieldWrapper);
+                        
+                        if ($fieldWrapper.length === 0) {
+                            console.log('ACF Bridge: No gallery field wrapper found');
+                            return;
+                        }
+                        
+                        // Get the gallery container
+                        var $galleryContainer = $fieldWrapper.find('.acf-gallery');
+                        if ($galleryContainer.length === 0) {
+                            console.log('ACF Bridge: No gallery container found');
+                            return;
+                        }
+                        
+                        console.log('ACF Bridge: Gallery container found:', $galleryContainer);
+                        
+                        // Get the hidden input for storing attachment IDs
+                        var $hiddenInput = $galleryContainer.find('input[type="hidden"]');
+                        if ($hiddenInput.length === 0) {
+                            console.log('ACF Bridge: No hidden input found for gallery');
+                            return;
+                        }
+                        
+                        console.log('ACF Bridge: Hidden input found:', $hiddenInput);
+                        
+                        // Extract attachment IDs from selection
+                        var attachmentIds = [];
+                        selection.forEach(function(item, index) {
+                            var attachmentId = item.id || item.ID;
+                            if (attachmentId) {
+                                attachmentIds.push(attachmentId);
+                                console.log('ACF Bridge: Added attachment ID:', attachmentId, 'from item:', index);
+                            }
+                        });
+                        
+                        console.log('ACF Bridge: All attachment IDs:', attachmentIds);
+                        
+                        // Set the hidden input value (comma-separated IDs)
+                        var idsString = attachmentIds.join(',');
+                        $hiddenInput.val(idsString);
+                        console.log('ACF Bridge: Set hidden input value to:', idsString);
+                        
+                        // Trigger change event on the hidden input to notify ACF
+                        $hiddenInput.trigger('change');
+                        $hiddenInput.trigger('input');
+                        console.log('ACF Bridge: Triggered change events on hidden input');
+                        
+                        // Get the attachments container
+                        var $attachmentsContainer = $galleryContainer.find('.acf-gallery-attachments');
+                        if ($attachmentsContainer.length === 0) {
+                            console.log('ACF Bridge: No attachments container found');
+                            return;
+                        }
+                        
+                        console.log('ACF Bridge: Attachments container found:', $attachmentsContainer);
+                        
+                        // Clear existing attachments
+                        $attachmentsContainer.empty();
+                        console.log('ACF Bridge: Cleared existing attachments');
+                        
+                        // Add new attachments to the gallery
+                        selection.forEach(function(item, index) {
+                            var attachmentId = item.id || item.ID;
+                            if (attachmentId) {
+                                TomatilloMediaFrame.addAttachmentToGallery($attachmentsContainer, item, attachmentId);
+                                console.log('ACF Bridge: Added attachment to gallery:', attachmentId);
+                            }
+                        });
+                        
+                        console.log('ACF Bridge: Gallery field updated successfully');
+                        
+                        // Try to use ACF's own gallery management if available
+                        var acfGallery = $galleryContainer.data('acf-gallery');
+                        if (acfGallery && acfGallery.val) {
+                            console.log('ACF Bridge: Using ACF gallery.val() method for bulk update');
+                            acfGallery.val(attachmentIds);
+                            console.log('ACF Bridge: Updated ACF gallery val to:', attachmentIds);
+                        }
+                        
+                        // Trigger ACF change action if available
+                        if (typeof acf !== 'undefined' && acf.doAction) {
+                            acf.doAction('change', $galleryContainer[0]);
+                            console.log('ACF Bridge: Triggered ACF change action for gallery field');
+                        }
+                        
+                        // Also trigger change on the field wrapper
+                        $fieldWrapper.trigger('change');
+                        console.log('ACF Bridge: Triggered change on gallery field wrapper');
+                        
+                    } catch (error) {
+                        console.error('ACF Bridge: Error setting gallery field value:', error);
+                    }
+                },
+                
+                /**
+                 * Add a single attachment to the ACF gallery
+                 */
+                addAttachmentToGallery: function($container, attachment, attachmentId) {
+                    console.log('ACF Bridge: Adding attachment to gallery:', attachmentId);
+                    
+                    try {
+                        // Get the best image URL for the attachment
+                        var imageUrl = this.getBestACFPreviewUrl(attachment);
+                        console.log('ACF Bridge: Using image URL for gallery:', imageUrl);
+                        
+                        // Create the attachment HTML structure (matching ACF's format)
+                        var attachmentHtml = `
+                            <div class="acf-gallery-attachment ui-state-default" data-id="${attachmentId}">
+                                <input type="hidden" name="acf-gallery-attachment-${attachmentId}" value="${attachmentId}">
+                                <div class="acf-gallery-attachment-inner">
+                                    <img src="${imageUrl}" alt="${attachment.alt || ''}" style="max-width: 150px; max-height: 150px;">
+                                    <div class="acf-gallery-attachment-info">
+                                        <div class="acf-gallery-attachment-filename">${attachment.filename || attachment.title || 'Untitled'}</div>
+                                    </div>
+                                </div>
+                                <div class="acf-gallery-attachment-actions">
+                                    <a href="#" class="acf-icon -cancel dark acf-gallery-remove" data-id="${attachmentId}" title="Remove" aria-label="Remove image"></a>
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Add to container
+                        $container.append(attachmentHtml);
+                        console.log('ACF Bridge: Attachment HTML added to gallery');
+                        
+                        // Try to use ACF's own gallery management if available
+                        var $galleryContainer = $container.closest('.acf-gallery');
+                        var acfGallery = $galleryContainer.data('acf-gallery');
+                        if (acfGallery && acfGallery.val) {
+                            console.log('ACF Bridge: Using ACF gallery.val() method');
+                            // Update ACF's internal state
+                            var currentIds = acfGallery.val() || [];
+                            if (!Array.isArray(currentIds)) {
+                                currentIds = currentIds ? currentIds.split(',') : [];
+                            }
+                            if (currentIds.indexOf(attachmentId.toString()) === -1) {
+                                currentIds.push(attachmentId.toString());
+                                acfGallery.val(currentIds);
+                                console.log('ACF Bridge: Updated ACF gallery val to:', currentIds);
+                            }
+                        }
+                        
+                        // Setup remove button handler
+                        $container.find('.acf-gallery-remove[data-id="' + attachmentId + '"]').on('click', function(e) {
+                            e.preventDefault();
+                            console.log('ACF Bridge: Remove button clicked for attachment:', attachmentId);
+                            
+                            // Remove from DOM
+                            $(this).closest('.acf-gallery-attachment').remove();
+                            
+                            // Update hidden input
+                            TomatilloMediaFrame.updateGalleryHiddenInput($container);
+                            
+                            console.log('ACF Bridge: Attachment removed from gallery');
+                        });
+                        
+                    } catch (error) {
+                        console.error('ACF Bridge: Error adding attachment to gallery:', error);
+                    }
+                },
+                
+                /**
+                 * Update the gallery hidden input with current attachment IDs
+                 */
+                updateGalleryHiddenInput: function($container) {
+                    console.log('ACF Bridge: Updating gallery hidden input');
+                    
+                    try {
+                        var $galleryContainer = $container.closest('.acf-gallery');
+                        var $hiddenInput = $galleryContainer.find('input[type="hidden"]');
+                        
+                        if ($hiddenInput.length === 0) {
+                            console.log('ACF Bridge: No hidden input found for gallery update');
+                            return;
+                        }
+                        
+                        // Get all current attachment IDs
+                        var attachmentIds = [];
+                        $container.find('.acf-gallery-attachment').each(function() {
+                            var attachmentId = $(this).data('id');
+                            if (attachmentId) {
+                                attachmentIds.push(attachmentId);
+                            }
+                        });
+                        
+                        // Update hidden input
+                        var idsString = attachmentIds.join(',');
+                        $hiddenInput.val(idsString);
+                        
+                        console.log('ACF Bridge: Updated gallery hidden input to:', idsString);
+                        
+                        // Trigger change events to notify ACF
+                        $hiddenInput.trigger('change');
+                        $hiddenInput.trigger('input');
+                        console.log('ACF Bridge: Triggered change events on gallery hidden input');
+                        
+                        // Try to update ACF's internal state
+                        var $galleryContainer = $container.closest('.acf-gallery');
+                        var acfGallery = $galleryContainer.data('acf-gallery');
+                        if (acfGallery && acfGallery.val) {
+                            console.log('ACF Bridge: Updating ACF gallery internal state');
+                            acfGallery.val(attachmentIds);
+                            console.log('ACF Bridge: Updated ACF gallery val to:', attachmentIds);
+                        }
+                        
+                        // Trigger ACF change action if available
+                        if (typeof acf !== 'undefined' && acf.doAction) {
+                            acf.doAction('change', $galleryContainer[0]);
+                            console.log('ACF Bridge: Triggered ACF change action for gallery');
+                        }
+                        
+                    } catch (error) {
+                        console.error('ACF Bridge: Error updating gallery hidden input:', error);
                     }
                 },
                 
