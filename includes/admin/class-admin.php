@@ -176,9 +176,12 @@ class Tomatillo_Media_Admin {
         // Enqueue React Media Upload override for block editor
         $this->enqueue_block_editor_assets();
         
-        // Add custom menu icon styling (Font Awesome 7 duotone light fa-images)
+        // Add custom menu icon styling (Font Awesome 6 Duotone light fa-images)
         // This needs to load on ALL admin pages so the icon shows in the menu
         $menu_icon_css = "
+            #adminmenu #toplevel_page_tomatillo-media-studio-library {
+                margin-top: 0 !important;
+            }
             #adminmenu #toplevel_page_tomatillo-media-studio-library .wp-menu-image:before {
                 content: '\\f302';
                 font-family: 'Font Awesome 6 Duotone';
@@ -332,13 +335,6 @@ class Tomatillo_Media_Admin {
 
         // Localize script with AJAX URL for uploads
         wp_localize_script('tomatillo-react-media-upload', 'ajaxurl', admin_url('admin-ajax.php'));
-        
-        error_log('Tomatillo: React Media Upload component enqueued successfully');
-        
-        // Add a notice to the parent window for easy debugging
-        add_action('admin_notices', function() {
-            echo '<div class="notice notice-success"><p>🚀 Tomatillo: React Media Upload component enqueued for block editor!</p></div>';
-        });
     }
     
     /**

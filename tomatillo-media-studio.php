@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name:       Tomatillo Design ~ Media Studio Oct 7 Work 10:10am
+ * Plugin Name:       Tomatillo Design ~ Media Studio
  * Plugin URI:        https://github.com/tomatillodesign/tomatillo-design-media-studio
  * Description:       A comprehensive WordPress media solution featuring automatic AVIF/WebP optimization and a beautiful, modern media library interface.
  * Version:           1.0.1
@@ -10,9 +10,9 @@
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       tomatillo-media-studio
  * Domain Path:       /languages
- * Requires at least: 5.8
- * Tested up to:      6.4
- * Requires PHP:      7.4
+ * Requires at least: 6.4
+ * Tested up to:      6.7
+ * Requires PHP:      8.1
  * Network:           false
  */
 

@@ -61,23 +61,30 @@ var isLoading = false; // Track if infinite scroll is currently loading
                     
                     console.log('CLEAN custom modal added to page');
                     
-                    // Initialize the media grid
-                    initializeMediaGrid(options);
-                    
-                    // Handle events
-                    console.log('🚀 Setting up event handlers for modal');
-                    setupEventHandlers(options);
-                    
-                    // Add window resize handler for masonry
-                    $(window).off('resize.tomatillo-masonry').on('resize.tomatillo-masonry', function() {
-                        setTimeout(function() {
-                            waitForImagesAndLayout();
-                        }, 150);
-                    });
-                    
-                    // Note: Auto-selection is now handled in real-time during upload
-                    
-                    console.log('CLEAN custom media frame opened');
+                    // CRITICAL: Set default filter to 'image' BEFORE initializing grid
+                    // This ensures files are hidden by default
+                    setTimeout(function() {
+                        $('#tomatillo-filter').val('image');
+                        console.log('✅ Default filter explicitly set to: image');
+                        
+                        // Initialize the media grid AFTER filter is set
+                        initializeMediaGrid(options);
+                        
+                        // Handle events
+                        console.log('🚀 Setting up event handlers for modal');
+                        setupEventHandlers(options);
+                        
+                        // Add window resize handler for masonry
+                        $(window).off('resize.tomatillo-masonry').on('resize.tomatillo-masonry', function() {
+                            setTimeout(function() {
+                                waitForImagesAndLayout();
+                            }, 150);
+                        });
+                        
+                        // Note: Auto-selection is now handled in real-time during upload
+                        
+                        console.log('CLEAN custom media frame opened');
+                    }, 10);
                     
                 },
                 
@@ -2319,9 +2326,9 @@ var isLoading = false; // Track if infinite scroll is currently loading
             // Test: Auto-trigger infinite scroll after 2 seconds to see if it works
             setTimeout(function() {
                 console.log('🧪 TEST: Auto-triggering infinite scroll after 2 seconds');
-                console.log('🧪 Current media items:', currentMediaItems.length);
+                console.log('🧪 Total filtered items:', filteredItems.length);
                 console.log('🧪 Rendered items:', renderedItemsCount);
-                if (currentMediaItems.length > renderedItemsCount) {
+                if (filteredItems.length > renderedItemsCount) {
                     console.log('🧪 Triggering loadMoreImages...');
                     loadMoreImages(renderedItemsCount, 100, options);
                 }
@@ -3667,14 +3674,50 @@ var isLoading = false; // Track if infinite scroll is currently loading
         console.log('🔄 Infinite scroll triggered - rendering preloaded images from offset:', offset);
         console.log('🔄 Options multiple:', options.multiple);
 
-        // Calculate how many items to render
-        var itemsToRender = Math.min(batchSize, currentMediaItems.length - offset);
+        // IMPORTANT: Apply current filter before loading more items
+        var currentFilter = $('#tomatillo-filter').val() || 'image';
+        console.log('🔍 Current filter for infinite scroll:', currentFilter);
+        
+        // Filter currentMediaItems based on current filter
+        var filteredItems = currentMediaItems.filter(function(item) {
+            if (currentFilter === 'all') return true;
+            
+            if (currentFilter === 'image') {
+                return item.type === 'image' || (item.mime && item.mime.startsWith('image/'));
+            } else if (currentFilter === 'video') {
+                return item.type === 'video' || (item.mime && item.mime.startsWith('video/'));
+            } else if (currentFilter === 'audio') {
+                return item.type === 'audio' || (item.mime && item.mime.startsWith('audio/'));
+            } else if (currentFilter === 'application') {
+                return item.type === 'application' || (item.mime && item.mime.startsWith('application/'));
+            }
+            
+            return item.type === currentFilter;
+        });
+        
+        // Get corresponding optimization data for filtered items
+        var filteredOptimizationData = [];
+        filteredItems.forEach(function(filteredItem) {
+            var originalIndex = currentMediaItems.findIndex(function(item) {
+                return item.id === filteredItem.id;
+            });
+            if (originalIndex >= 0 && currentOptimizationData[originalIndex]) {
+                filteredOptimizationData.push(currentOptimizationData[originalIndex]);
+            } else {
+                filteredOptimizationData.push(null);
+            }
+        });
+        
+        console.log('🔍 Filtered items:', filteredItems.length, 'of', currentMediaItems.length);
+
+        // Calculate how many items to render from FILTERED items
+        var itemsToRender = Math.min(batchSize, filteredItems.length - offset);
         
         if (itemsToRender > 0) {
-            var newItems = currentMediaItems.slice(offset, offset + itemsToRender);
-            var newOptimizationData = currentOptimizationData.slice(offset, offset + itemsToRender);
+            var newItems = filteredItems.slice(offset, offset + itemsToRender);
+            var newOptimizationData = filteredOptimizationData.slice(offset, offset + itemsToRender);
             
-            console.log('🔄 Rendering', newItems.length, 'preloaded images');
+            console.log('🔄 Rendering', newItems.length, 'filtered preloaded images');
             
             // Render additional items using preloaded optimization data
             renderAdditionalItemsWithOptimization(newItems, newOptimizationData, options);
@@ -3683,7 +3726,7 @@ var isLoading = false; // Track if infinite scroll is currently loading
             renderedItemsCount += newItems.length;
             console.log('🔄 Total rendered items:', renderedItemsCount);
         } else {
-            console.log('🔄 No more preloaded images to render');
+            console.log('🔄 No more filtered images to render');
         }
         
         isLoading = false;
