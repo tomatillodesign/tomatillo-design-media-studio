@@ -102,26 +102,6 @@ class Tomatillo_Media_Admin {
             array($this, 'tools_page')
         );
         
-        // Test page for custom media frame (admin only)
-        add_submenu_page(
-            'tomatillo-media-studio-library',
-            __('Test Media Frame', 'tomatillo-media-studio'),
-            __('Test Media Frame', 'tomatillo-media-studio'),
-            'manage_options', // Admin only
-            'tomatillo-media-studio-test',
-            array($this, 'test_media_frame_page')
-        );
-        
-        // Test page for React integration (admin only)
-        add_submenu_page(
-            'tomatillo-media-studio-library',
-            __('Test React Integration', 'tomatillo-media-studio'),
-            __('Test React Integration', 'tomatillo-media-studio'),
-            'manage_options', // Admin only
-            'tomatillo-media-studio-react-test',
-            array($this, 'test_react_integration_page')
-        );
-        
         // Conditionally add "View Files" submenu link if setting is enabled
         // This runs at the END after all submenu items are added
         $plugin = tomatillo_media_studio();

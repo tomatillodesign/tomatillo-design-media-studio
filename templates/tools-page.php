@@ -83,7 +83,7 @@ $memory_percentage = ($memory_usage / $memory_limit) * 100;
                     <div style="text-align: center; padding: 25px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
                         <h3 style="margin: 0; font-size: 2.5em; font-weight: bold; color: #2c3e50;"><?php echo size_format($space_saved); ?></h3>
                         <p style="margin: 10px 0 0 0; font-size: 1.1em; color: #495057; font-weight: 500;">Bandwidth Saved</p>
-                        <p style="margin: 5px 0 0 0; color: #6c757d; font-size: 0.9em;">Per optimized image served</p>
+                        <p style="margin: 5px 0 0 0; color: #6c757d; font-size: 0.9em;">Across all images served</p>
                     </div>
                     
                     <div style="text-align: center; padding: 25px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
