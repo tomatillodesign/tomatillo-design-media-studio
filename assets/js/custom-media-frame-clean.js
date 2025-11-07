@@ -118,6 +118,7 @@ var isLoading = false; // Track if infinite scroll is currently loading
                     // Upgrade existing ACF image previews on page load
                     this.upgradeACFPreviewsOnLoad();
                     
+                    
                     console.log('CLEAN Tomatillo Media Frame initialized');
                 },
                 
@@ -474,24 +475,45 @@ var isLoading = false; // Track if infinite scroll is currently loading
                                             console.log('ACF Bridge Fallback: Field type:', fieldType, 'Selection count:', selection.length);
                                             
                                             if (fieldType === 'gallery') {
-                                                // Handle gallery field - multiple selection
+                                                // Handle gallery field using the SAME approach that works for single images
                                                 console.log('ACF Bridge Fallback: Processing gallery field with multiple selection');
                                                 console.log('ACF Bridge Fallback: Selection count:', selection.length);
                                                 
-                                                TomatilloMediaFrame.setACFGalleryValue($fallbackField, selection);
-                                                TomatilloMediaFrame.triggerACFChange($fallbackField);
+                                                // Convert each selection item to ACF format (same as single image)
+                                                var acfAttachments = selection.map(function(item) {
+                                                    return TomatilloMediaFrame.normalizeToACFAttachment([item], $fallbackField);
+                                                });
+                                                console.log('ACF Bridge Fallback: Normalized attachments:', acfAttachments);
+                                                
+                                                // Use the enhanced gallery handler for comprehensive debugging and persistence
+                                                if (window.ACFGalleryHandler && typeof window.ACFGalleryHandler.setGalleryIds === 'function') {
+                                                    console.log('🎯 Using ACFGalleryHandler for gallery field');
+                                                    var field = acf.getField($fallbackField);
+                                                    if (field) {
+                                                        window.ACFGalleryHandler.setGalleryIds(field, acfAttachments.map(function(att) { return att.id; }));
+                                                    } else {
+                                                        console.log('❌ Could not get ACF field object, falling back to legacy method');
+                                                        TomatilloMediaFrame.setACFGalleryValue($fallbackField, acfAttachments);
+                                                        TomatilloMediaFrame.triggerACFChange($fallbackField);
+                                                    }
+                                                } else {
+                                                    console.log('❌ ACFGalleryHandler not available, using legacy method');
+                                                    TomatilloMediaFrame.setACFGalleryValue($fallbackField, acfAttachments);
+                                                    TomatilloMediaFrame.triggerACFChange($fallbackField);
+                                                }
                                                 
                                                 console.log('ACF Bridge Fallback: Gallery field updated successfully');
+                                                
                                             } else {
                                                 // Handle image field - single selection
                                                 console.log('ACF Bridge Fallback: Processing image field with single selection');
-                                                var acfAttachment = TomatilloMediaFrame.normalizeToACFAttachment(selection, $fallbackField);
-                                                console.log('ACF Bridge Fallback: Normalized attachment:', acfAttachment);
-                                                
-                                                TomatilloMediaFrame.setACFFieldValue($fallbackField, acfAttachment);
-                                                TomatilloMediaFrame.triggerACFChange($fallbackField);
-                                                
-                                                console.log('ACF Bridge Fallback: Field updated successfully');
+                                            var acfAttachment = TomatilloMediaFrame.normalizeToACFAttachment(selection, $fallbackField);
+                                            console.log('ACF Bridge Fallback: Normalized attachment:', acfAttachment);
+                                            
+                                            TomatilloMediaFrame.setACFFieldValue($fallbackField, acfAttachment);
+                                            TomatilloMediaFrame.triggerACFChange($fallbackField);
+                                            
+                                            console.log('ACF Bridge Fallback: Field updated successfully');
                                             }
                                         }
                                     });
@@ -774,10 +796,10 @@ var isLoading = false; // Track if infinite scroll is currently loading
                     
                     // Update the preview image - ACF uses .show-if-value img
                     var $previewImg = $fieldWrapper.find('.show-if-value img');
-                    if ($previewImg.length) {
+                        if ($previewImg.length) {
                         // Set the high-resolution image URL
-                        $previewImg.attr('src', attachment.thumbnail);
-                        $previewImg.attr('alt', attachment.alt);
+                            $previewImg.attr('src', attachment.thumbnail);
+                            $previewImg.attr('alt', attachment.alt);
                         
                         // Add CSS to ensure the image displays at high quality but restricted size
                         $previewImg.css({
@@ -791,29 +813,29 @@ var isLoading = false; // Track if infinite scroll is currently loading
                         
                         console.log('ACF Bridge: Updated preview image with high-res URL:', attachment.thumbnail);
                         console.log('ACF Bridge: Image dimensions:', attachment.width + 'x' + attachment.height);
-                    } else {
-                        console.log('ACF Bridge: No preview image found');
-                        console.log('ACF Bridge: Available images:', $fieldWrapper.find('img'));
-                    }
-                    
+                        } else {
+                            console.log('ACF Bridge: No preview image found');
+                            console.log('ACF Bridge: Available images:', $fieldWrapper.find('img'));
+                        }
+                        
                     // Show the preview container - ACF uses .show-if-value
                     var $previewContainer = $fieldWrapper.find('.show-if-value');
-                    if ($previewContainer.length) {
-                        $previewContainer.show();
-                        console.log('ACF Bridge: Showed preview container');
-                    } else {
-                        console.log('ACF Bridge: No preview container found');
-                    }
-                    
+                        if ($previewContainer.length) {
+                            $previewContainer.show();
+                            console.log('ACF Bridge: Showed preview container');
+                        } else {
+                            console.log('ACF Bridge: No preview container found');
+                        }
+                        
                     // Hide the "Add Image" button - ACF uses .hide-if-value
                     var $addButton = $fieldWrapper.find('.hide-if-value');
-                    if ($addButton.length) {
-                        $addButton.hide();
-                        console.log('ACF Bridge: Hid add button');
-                    } else {
-                        console.log('ACF Bridge: No add button found');
-                    }
-                    
+                        if ($addButton.length) {
+                            $addButton.hide();
+                            console.log('ACF Bridge: Hid add button');
+                        } else {
+                            console.log('ACF Bridge: No add button found');
+                        }
+                        
                     // Update field state classes - ACF uses .acf-image-uploader.has-value
                     var $uploader = $fieldWrapper.find('.acf-image-uploader');
                     if ($uploader.length) {
@@ -826,227 +848,324 @@ var isLoading = false; // Track if infinite scroll is currently loading
                 },
                 
                 /**
-                 * Set ACF gallery field value with multiple images
+                 * Set ACF gallery field value using the same pattern as single image
                  */
-                setACFGalleryValue: function(fieldInstance, selection) {
-                    console.log('ACF Bridge: Setting gallery field value:', selection);
-                    console.log('ACF Bridge: Field instance:', fieldInstance);
-                    
+                setACFGalleryValue: function($fieldWrapper, attachments) {
+                    console.log('🎯 GALLERY UPDATE: Starting gallery update for', attachments.length, 'attachments');
+
                     try {
-                        var $fieldWrapper = $(fieldInstance);
-                        console.log('ACF Bridge: Gallery field wrapper:', $fieldWrapper);
-                        
-                        if ($fieldWrapper.length === 0) {
-                            console.log('ACF Bridge: No gallery field wrapper found');
-                            return;
-                        }
-                        
-                        // Get the gallery container
+                        // =================== ACF GALLERY DEBUGGING ===================
+                        console.log('🔍 ANALYZING ACF GALLERY STRUCTURE');
                         var $galleryContainer = $fieldWrapper.find('.acf-gallery');
-                        if ($galleryContainer.length === 0) {
-                            console.log('ACF Bridge: No gallery container found');
+                        if (!$galleryContainer.length) {
+                            console.log('❌ GALLERY UPDATE: No gallery container found');
                             return;
                         }
-                        
-                        console.log('ACF Bridge: Gallery container found:', $galleryContainer);
-                        
-                        // Get the hidden input for storing attachment IDs
-                        var $hiddenInput = $galleryContainer.find('input[type="hidden"]');
-                        if ($hiddenInput.length === 0) {
-                            console.log('ACF Bridge: No hidden input found for gallery');
-                            return;
-                        }
-                        
-                        console.log('ACF Bridge: Hidden input found:', $hiddenInput);
-                        
-                        // Extract attachment IDs from selection
-                        var attachmentIds = [];
-                        selection.forEach(function(item, index) {
-                            var attachmentId = item.id || item.ID;
-                            if (attachmentId) {
-                                attachmentIds.push(attachmentId);
-                                console.log('ACF Bridge: Added attachment ID:', attachmentId, 'from item:', index);
-                            }
+
+                        console.log('✅ GALLERY UPDATE: Found gallery container');
+
+                        // Extract attachment IDs
+                        var attachmentIds = attachments.map(function(attachment) {
+                            return attachment.id;
                         });
-                        
-                        console.log('ACF Bridge: All attachment IDs:', attachmentIds);
-                        
-                        // Set the hidden input value (comma-separated IDs)
-                        var idsString = attachmentIds.join(',');
-                        $hiddenInput.val(idsString);
-                        console.log('ACF Bridge: Set hidden input value to:', idsString);
-                        
-                        // Trigger change event on the hidden input to notify ACF
-                        $hiddenInput.trigger('change');
-                        $hiddenInput.trigger('input');
-                        console.log('ACF Bridge: Triggered change events on hidden input');
-                        
-                        // Get the attachments container
+                        console.log('🎯 GALLERY UPDATE: Attachment IDs:', attachmentIds);
+
+                        // =================== STEP 1: ANALYZE CURRENT STATE ===================
+                        var $hiddenInput = $galleryContainer.find('input[type="hidden"]');
+                        console.log('🔍 Hidden input analysis:');
+                        console.log('  - Found:', $hiddenInput.length);
+                        console.log('  - Name:', $hiddenInput.attr('name'));
+                        console.log('  - Current value:', $hiddenInput.val());
+
                         var $attachmentsContainer = $galleryContainer.find('.acf-gallery-attachments');
-                        if ($attachmentsContainer.length === 0) {
-                            console.log('ACF Bridge: No attachments container found');
+                        var existingAttachments = $attachmentsContainer.find('.acf-gallery-attachment:not(.-icon)');
+                        console.log('🔍 Existing attachments:', existingAttachments.length);
+
+                        // Try to get ACF field object for analysis
+                        var fieldKey = $fieldWrapper.attr('data-key');
+                        if (fieldKey && typeof acf !== 'undefined' && acf.getField) {
+                            try {
+                                var field = acf.getField(fieldKey);
+                                if (field) {
+                                    console.log('🔍 ACF Field Model Analysis:');
+                                    console.log('  - Field key:', field.get('key'));
+                                    console.log('  - Field name:', field.get('name'));
+                                    console.log('  - Field type:', field.get('type'));
+                                    console.log('  - Current model value:', field.val());
+                                    console.log('  - Model value type:', typeof field.val());
+                                } else {
+                                    console.log('❌ Could not get ACF field object');
+                                }
+                            } catch(e) {
+                                console.log('❌ Error accessing ACF field model:', e);
+                            }
+                        }
+
+                        // =================== STEP 2: SET HIDDEN INPUT ===================
+                        if ($hiddenInput.length) {
+                            var idsString = attachmentIds.join(',');
+                            $hiddenInput.val(idsString);
+                            console.log('✅ GALLERY UPDATE: Set hidden input to:', idsString);
+                        } else {
+                            console.log('❌ GALLERY UPDATE: No hidden input found');
                             return;
                         }
-                        
-                        console.log('ACF Bridge: Attachments container found:', $attachmentsContainer);
-                        
-                        // Clear existing attachments
-                        $attachmentsContainer.empty();
-                        console.log('ACF Bridge: Cleared existing attachments');
-                        
-                        // Add new attachments to the gallery
-                        selection.forEach(function(item, index) {
-                            var attachmentId = item.id || item.ID;
-                            if (attachmentId) {
-                                TomatilloMediaFrame.addAttachmentToGallery($attachmentsContainer, item, attachmentId);
-                                console.log('ACF Bridge: Added attachment to gallery:', attachmentId);
-                            }
-                        });
-                        
-                        console.log('ACF Bridge: Gallery field updated successfully');
-                        
-                        // Try to use ACF's own gallery management if available
-                        var acfGallery = $galleryContainer.data('acf-gallery');
-                        if (acfGallery && acfGallery.val) {
-                            console.log('ACF Bridge: Using ACF gallery.val() method for bulk update');
-                            acfGallery.val(attachmentIds);
-                            console.log('ACF Bridge: Updated ACF gallery val to:', attachmentIds);
-                        }
-                        
-                        // Trigger ACF change action if available
-                        if (typeof acf !== 'undefined' && acf.doAction) {
-                            acf.doAction('change', $galleryContainer[0]);
-                            console.log('ACF Bridge: Triggered ACF change action for gallery field');
-                        }
-                        
-                        // Also trigger change on the field wrapper
-                        $fieldWrapper.trigger('change');
-                        console.log('ACF Bridge: Triggered change on gallery field wrapper');
-                        
-                    } catch (error) {
-                        console.error('ACF Bridge: Error setting gallery field value:', error);
-                    }
-                },
-                
-                /**
-                 * Add a single attachment to the ACF gallery
-                 */
-                addAttachmentToGallery: function($container, attachment, attachmentId) {
-                    console.log('ACF Bridge: Adding attachment to gallery:', attachmentId);
-                    
-                    try {
-                        // Get the best image URL for the attachment
-                        var imageUrl = this.getBestACFPreviewUrl(attachment);
-                        console.log('ACF Bridge: Using image URL for gallery:', imageUrl);
-                        
-                        // Create the attachment HTML structure (matching ACF's format)
-                        var attachmentHtml = `
-                            <div class="acf-gallery-attachment ui-state-default" data-id="${attachmentId}">
-                                <input type="hidden" name="acf-gallery-attachment-${attachmentId}" value="${attachmentId}">
-                                <div class="acf-gallery-attachment-inner">
-                                    <img src="${imageUrl}" alt="${attachment.alt || ''}" style="max-width: 150px; max-height: 150px;">
-                                    <div class="acf-gallery-attachment-info">
-                                        <div class="acf-gallery-attachment-filename">${attachment.filename || attachment.title || 'Untitled'}</div>
+
+                        // =================== STEP 3: CREATE VISUAL THUMBNAILS ===================
+                        if ($attachmentsContainer.length) {
+                            console.log('✅ GALLERY UPDATE: Found attachments container');
+
+                            // Clear existing attachments (keep placeholder)
+                            $attachmentsContainer.find('.acf-gallery-attachment:not(.-icon)').remove();
+
+                            // Create thumbnails for each attachment
+                            attachments.forEach(function(attachment, index) {
+                                console.log('🎯 GALLERY UPDATE: Creating thumbnail for attachment:', attachment.id);
+
+                                // Get the best image URL
+                                var imageUrl = TomatilloMediaFrame.getBestACFPreviewUrl(attachment);
+
+                                // Create the attachment HTML (matching ACF's exact format)
+                                var attachmentHtml = `
+                                    <div class="acf-gallery-attachment" data-id="${attachment.id}">
+                                        <input type="hidden" value="${attachment.id}" name="acf-gallery-attachment-${attachment.id}">
+                                        <div class="margin" title="${attachment.title || attachment.filename || ''}">
+                                            <div class="thumbnail">
+                                                <img src="${imageUrl}" alt="${attachment.alt || ''}" title="${attachment.title || attachment.filename || ''}" style="max-width: 100%; max-height: 100%; object-fit: cover; image-rendering: -webkit-optimize-contrast;">
+                                            </div>
+                                        </div>
+                                        <div class="actions">
+                                            <a href="#" class="acf-icon -cancel dark acf-gallery-remove" data-id="${attachment.id}"></a>
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="acf-gallery-attachment-actions">
-                                    <a href="#" class="acf-icon -cancel dark acf-gallery-remove" data-id="${attachmentId}" title="Remove" aria-label="Remove image"></a>
-                                </div>
-                            </div>
-                        `;
-                        
-                        // Add to container
-                        $container.append(attachmentHtml);
-                        console.log('ACF Bridge: Attachment HTML added to gallery');
-                        
-                        // Try to use ACF's own gallery management if available
-                        var $galleryContainer = $container.closest('.acf-gallery');
-                        var acfGallery = $galleryContainer.data('acf-gallery');
-                        if (acfGallery && acfGallery.val) {
-                            console.log('ACF Bridge: Using ACF gallery.val() method');
-                            // Update ACF's internal state
-                            var currentIds = acfGallery.val() || [];
-                            if (!Array.isArray(currentIds)) {
-                                currentIds = currentIds ? currentIds.split(',') : [];
-                            }
-                            if (currentIds.indexOf(attachmentId.toString()) === -1) {
-                                currentIds.push(attachmentId.toString());
-                                acfGallery.val(currentIds);
-                                console.log('ACF Bridge: Updated ACF gallery val to:', currentIds);
-                            }
+                                `;
+
+                                // Add to container
+                                $attachmentsContainer.append(attachmentHtml);
+                            });
+
+                            console.log('✅ GALLERY UPDATE: Visual thumbnails created');
                         }
-                        
-                        // Setup remove button handler
-                        $container.find('.acf-gallery-remove[data-id="' + attachmentId + '"]').on('click', function(e) {
-                            e.preventDefault();
-                            console.log('ACF Bridge: Remove button clicked for attachment:', attachmentId);
-                            
-                            // Remove from DOM
-                            $(this).closest('.acf-gallery-attachment').remove();
-                            
-                            // Update hidden input
-                            TomatilloMediaFrame.updateGalleryHiddenInput($container);
-                            
-                            console.log('ACF Bridge: Attachment removed from gallery');
-                        });
-                        
-                    } catch (error) {
-                        console.error('ACF Bridge: Error adding attachment to gallery:', error);
-                    }
-                },
-                
-                /**
-                 * Update the gallery hidden input with current attachment IDs
-                 */
-                updateGalleryHiddenInput: function($container) {
-                    console.log('ACF Bridge: Updating gallery hidden input');
-                    
-                    try {
-                        var $galleryContainer = $container.closest('.acf-gallery');
-                        var $hiddenInput = $galleryContainer.find('input[type="hidden"]');
-                        
-                        if ($hiddenInput.length === 0) {
-                            console.log('ACF Bridge: No hidden input found for gallery update');
-                            return;
-                        }
-                        
-                        // Get all current attachment IDs
-                        var attachmentIds = [];
-                        $container.find('.acf-gallery-attachment').each(function() {
-                            var attachmentId = $(this).data('id');
-                            if (attachmentId) {
-                                attachmentIds.push(attachmentId);
-                            }
-                        });
-                        
-                        // Update hidden input
-                        var idsString = attachmentIds.join(',');
-                        $hiddenInput.val(idsString);
-                        
-                        console.log('ACF Bridge: Updated gallery hidden input to:', idsString);
-                        
-                        // Trigger change events to notify ACF
+
+                        // =================== STEP 4: MULTIPLE PERSISTENCE METHODS ===================
+                        console.log('🎯 GALLERY UPDATE: Attempting multiple persistence methods');
+
+                        // Method 1: Direct hidden input change
                         $hiddenInput.trigger('change');
                         $hiddenInput.trigger('input');
-                        console.log('ACF Bridge: Triggered change events on gallery hidden input');
-                        
-                        // Try to update ACF's internal state
-                        var $galleryContainer = $container.closest('.acf-gallery');
-                        var acfGallery = $galleryContainer.data('acf-gallery');
-                        if (acfGallery && acfGallery.val) {
-                            console.log('ACF Bridge: Updating ACF gallery internal state');
-                            acfGallery.val(attachmentIds);
-                            console.log('ACF Bridge: Updated ACF gallery val to:', attachmentIds);
+                        $hiddenInput.trigger('blur');
+                        console.log('✅ Method 1: Hidden input change events');
+
+                        // Method 2: Field wrapper change
+                        $fieldWrapper.trigger('change');
+                        console.log('✅ Method 2: Field wrapper change event');
+
+                        // Method 3: Try ACF field model if available
+                        if (fieldKey && typeof acf !== 'undefined' && acf.getField) {
+                            try {
+                                var field = acf.getField(fieldKey);
+                                if (field) {
+                                    console.log('🔍 ACF Gallery Model Details:');
+                                    console.log('  - Field object:', field);
+                                    console.log('  - Available methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(field)));
+                                    console.log('  - Field data:', field.get ? field.get('data') : 'no get method');
+
+                                    var beforeVal = field.val();
+                                    console.log('  - Before setting:', beforeVal, typeof beforeVal);
+
+                                    field.val(attachmentIds);
+                                    var afterVal = field.val();
+                                    console.log('  - After setting:', afterVal, typeof afterVal);
+
+                                    if (afterVal && Array.isArray(afterVal) && afterVal.length === attachmentIds.length) {
+                                        console.log('✅ Method 3: ACF field model updated successfully');
+                                    } else {
+                                        console.log('❌ Method 3: ACF field model may not be working correctly');
+                                        console.log('  - Expected:', attachmentIds);
+                                        console.log('  - Got:', afterVal);
+                                    }
+
+                                    field.$el.trigger('change');
+                                }
+                            } catch(e) {
+                                console.log('❌ Method 3: ACF field model failed:', e);
+                            }
                         }
-                        
-                        // Trigger ACF change action if available
-                        if (typeof acf !== 'undefined' && acf.doAction) {
-                            acf.doAction('change', $galleryContainer[0]);
-                            console.log('ACF Bridge: Triggered ACF change action for gallery');
+
+                        // Method 4: Form-level change for WordPress recognition
+                        var $form = $hiddenInput.closest('form');
+                        if ($form.length) {
+                            $form.trigger('change');
+                            console.log('✅ Method 4: Form change triggered');
                         }
+
+                        // Method 5: Block Editor Data Update (CRITICAL FIX)
+                        if (window.wp && wp.data && wp.data.select && wp.data.dispatch) {
+                            try {
+                                var blockEditor = wp.data.select('core/block-editor');
+                                var editorDispatch = wp.data.dispatch('core/block-editor');
+
+                                if (blockEditor && blockEditor.getBlocks && editorDispatch && editorDispatch.updateBlockAttributes) {
+                                    var blocks = blockEditor.getBlocks();
+                                    console.log('🔍 BLOCK EDITOR GALLERY UPDATE:');
+
+                                    if (blocks && blocks.length > 0) {
+                                        var blockUpdated = false;
+
+                                        blocks.forEach(function(block, index) {
+                                            // Look for blocks that might contain our gallery field
+                                            if (block.name && (block.name.includes('acf/') || block.name.includes('yakstretch') || block.name.includes('yak'))) {
+                                                console.log('  - Checking block ' + index + ':', block.name);
+
+                                                if (block.attributes && block.attributes.data) {
+                                                    var blockData = block.attributes.data;
+                                                    console.log('    - Block data keys:', Object.keys(blockData));
+                                                    console.log('    - Field key to find:', fieldKey);
+                                                    
+                                                    // Use the actual ACF field name from the model; fallback to canonical 'gallery'
+                                                    var acfFieldModel = (typeof acf !== 'undefined' && acf.getField) ? acf.getField(fieldKey) : null;
+                                                    var fieldName = (acfFieldModel && acfFieldModel.get) ? acfFieldModel.get('name') : 'gallery';
+                                                    console.log('    - Field name to use:', fieldName);
+                                                    console.log('    - Checking block data for:', fieldName);
+
+                                                    // Check if this block contains our gallery field
+                                                    // ACF may store under field name OR field key depending on config
+                                                    var hasByName = blockData.hasOwnProperty(fieldName);
+                                                    var hasByKey  = blockData.hasOwnProperty(fieldKey);
+                                                    if (hasByName || hasByKey) {
+                                                        console.log('    ✅ Found gallery field in block via', hasByName ? 'name' : 'key');
+
+                                                        // Update the block data with our gallery IDs (write both for safety)
+                                                        var updatedData = Object.assign({}, blockData);
+                                                        updatedData[fieldName] = attachmentIds;
+                                                        updatedData[fieldKey]  = attachmentIds;
+                                                        // Maintain underscore pointer if missing
+                                                        var underscorePtr = '_' + fieldName;
+                                                        if (!updatedData.hasOwnProperty(underscorePtr)) {
+                                                            updatedData[underscorePtr] = fieldKey;
+                                                            console.log('    - Set underscore pointer', underscorePtr, '→', fieldKey);
+                                                        }
+
+                                                        console.log('    - Before update (name):', blockData[fieldName]);
+                                                        console.log('    - Before update (key) :', blockData[fieldKey]);
+                                                        console.log('    - Setting to:', attachmentIds);
+
+                                                        // Update the block attributes
+                                                        var updatedAttributes = Object.assign({}, block.attributes);
+                                                        updatedAttributes.data = updatedData;
+
+                                                        editorDispatch.updateBlockAttributes(block.clientId, updatedAttributes);
+                                                        blockUpdated = true;
+
+                                                        console.log('    ✅ Block updated with gallery data:', attachmentIds);
+
+                                                        // Verify the update
+                                                        setTimeout(function() {
+                                                            var verifyBlocks = blockEditor.getBlocks();
+                                                            var verifyBlock = verifyBlocks.find(function(b) { return b.clientId === block.clientId; });
+                                                            if (verifyBlock && verifyBlock.attributes && verifyBlock.attributes.data) {
+                                                                console.log('    🔍 Verification - Block data after update (name):', verifyBlock.attributes.data[fieldName]);
+                                                                console.log('    🔍 Verification - Block data after update (key) :', verifyBlock.attributes.data[fieldKey]);
+                                                                var ptr = '_' + fieldName;
+                                                                console.log('    🔍 Verification - Underscore pointer:', verifyBlock.attributes.data[ptr]);
+                                                            }
+                                                        }, 50);
+
+                                                    } else {
+                                                        console.log('    ❌ Gallery field not found in this block');
+                                                    }
+                                                } else {
+                                                    console.log('    ❌ Block has no data attribute');
+                                                }
+                                            }
+                                        });
+
+                                        if (blockUpdated) {
+                                            console.log('✅ Method 5: Block data updated successfully');
+                                            wp.data.dispatch('core/editor').editPost({}); // Trigger editor update
+                                        } else {
+                                            console.log('❌ Method 5: No suitable block found for gallery update');
+                                        }
+
+                                    } else {
+                                        console.log('❌ Method 5: No blocks found');
+                                    }
+                                } else {
+                                    console.log('❌ Method 5: Block editor APIs not available');
+                                }
+
+                            } catch(e) {
+                                console.log('❌ Method 5: Block editor update failed:', e);
+                            }
+                        }
+
+                        // Method 6: ACF-specific serialization check
+                        console.log('🎯 Method 6: Checking ACF serialization');
+                        if (typeof acf !== 'undefined') {
+                            try {
+                                // Check if ACF has serialization methods
+                                console.log('🔍 ACF Methods:', Object.getOwnPropertyNames(acf).filter(name => name.includes('serial')));
+                                console.log('🔍 ACF Actions:', Object.getOwnPropertyNames(acf).filter(name => name.includes('save')));
+                            } catch(e) {
+                                console.log('❌ ACF serialization check failed:', e);
+                            }
+                        }
+
+                        // =================== STEP 5: VERIFICATION ===================
+                        setTimeout(function() {
+                            console.log('🔍 VERIFICATION RESULTS:');
+                            console.log('  - Hidden input value:', $hiddenInput.val());
+                            console.log('  - Expected value:', idsString);
+                            console.log('  - Match:', $hiddenInput.val() === idsString ? '✅' : '❌');
+
+                            if (fieldKey && typeof acf !== 'undefined' && acf.getField) {
+                                try {
+                                    var field = acf.getField(fieldKey);
+                                    if (field) {
+                                        console.log('  - Model value:', field.val());
+                                        console.log('  - Model match:', JSON.stringify(field.val()) === JSON.stringify(attachmentIds) ? '✅' : '❌');
+                                    }
+                                } catch(e) {
+                                    console.log('  - Model verification failed:', e);
+                                }
+                            }
+
+                            console.log('🎯 GALLERY UPDATE: Gallery update completed successfully');
+
+                            // Final debugging: Set up form submission monitoring
+                            console.log('🔍 Setting up form submission monitoring...');
+                            setTimeout(function() {
+                                var $form = $hiddenInput.closest('form');
+                                if ($form.length) {
+                                    $form.off('submit.gallery-debug').on('submit.gallery-debug', function(e) {
+                                        console.log('🚨 FORM SUBMISSION INTERCEPTED');
+                                        console.log('Form data being submitted:');
+
+                                        // Get all form data
+                                        var formData = new FormData(this);
+                                        var dataObject = {};
+                                        for (var pair of formData.entries()) {
+                                            if (pair[0].includes('gallery') || pair[0].includes('yakstretch')) {
+                                                dataObject[pair[0]] = pair[1];
+                                            }
+                                        }
+                                        console.log('Gallery-related form fields:', dataObject);
+
+                                        // Also check the hidden input at submission time
+                                        console.log('Hidden input at submission:', $hiddenInput.val());
+                                        console.log('🚨 FORM SUBMISSION DATA CAPTURED');
+                                    });
+
+                                    console.log('✅ Form submission monitoring enabled');
+                                } else {
+                                    console.log('❌ Could not find form for submission monitoring');
+                                }
+                            }, 1000); // Wait 1 second to ensure form is ready
+
+                        }, 100);
                         
                     } catch (error) {
-                        console.error('ACF Bridge: Error updating gallery hidden input:', error);
+                        console.error('❌ GALLERY UPDATE: Error setting gallery value:', error);
                     }
                 },
                 
@@ -4020,6 +4139,7 @@ var isLoading = false; // Track if infinite scroll is currently loading
     // Initialize when DOM is ready
     $(document).ready(function() {
         console.log('DOM ready, initializing CLEAN TomatilloMediaFrame');
+        console.log('✅ Tomatillo Media Frame: ACF Gallery Handler should be available as ACFGalleryHandler');
         TomatilloMediaFrame.init();
     });
 
