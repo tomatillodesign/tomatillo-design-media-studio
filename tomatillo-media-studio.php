@@ -3,7 +3,7 @@
  * Plugin Name:       Tomatillo Design ~ Media Studio
  * Plugin URI:        https://github.com/tomatillodesign/tomatillo-design-media-studio
  * Description:       A comprehensive WordPress media solution featuring automatic AVIF/WebP optimization and a beautiful, modern media library interface.
- * Version:           1.0.1
+ * Version:           1.0.2
  * Author:            Chris Liu-Beers, Tomatillo Design
  * Author URI:        https://tomatillodesign.com
  * License:           GPL v2 or later
