@@ -234,6 +234,14 @@ $has_more = count($images) === $images_per_page;
             <div class="bulk-actions">
                 <div class="bulk-actions-panel" id="bulk-actions-panel">
                     <span class="bulk-count" id="bulk-count">0 selected</span>
+                    <button class="bulk-action-btn bulk-download" id="bulk-download" disabled>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Download ZIP
+                    </button>
                     <button class="bulk-action-btn bulk-delete" id="bulk-delete" disabled>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="3,6 5,6 21,6"></polyline>
@@ -260,7 +268,7 @@ $has_more = count($images) === $images_per_page;
                         id="column-count-slider" 
                         class="column-slider" 
                         min="1" 
-                        max="6" 
+                        max="8" 
                         value="<?php echo esc_attr(get_option('tomatillo_media_column_count', 4)); ?>" 
                         step="1"
                     >
@@ -1226,11 +1234,12 @@ $has_more = count($images) === $images_per_page;
     transition: box-shadow 0.3s ease;
     cursor: pointer;
     position: relative;
-    max-width: 300px;
+    max-width: 100%; /* Allow full width of column */
     break-inside: avoid;
     margin-bottom: 0.25rem;
     display: inline-block;
     width: 100%;
+    min-width: 0; /* Allow shrinking */
 }
 
 .gallery-item:hover {
@@ -1949,10 +1958,11 @@ $has_more = count($images) === $images_per_page;
 /* Files Grid Styles */
 .files-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(4, 1fr); /* Default 4 columns, updated by JavaScript */
     gap: 1rem;
     padding: 0;
     align-items: start; /* Ensure items align to start */
+    grid-auto-flow: dense; /* Fill gaps more efficiently */
 }
 
 .file-item {
@@ -1964,8 +1974,9 @@ $has_more = count($images) === $images_per_page;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    height: 400px; /* Taller cards */
+    height: 400px; /* Fixed height for consistent card sizes */
     padding: 1rem; /* Bring back card padding */
+    min-width: 0; /* Allow shrinking below content width */
 }
 
 .file-item:hover {
@@ -2028,6 +2039,9 @@ $has_more = count($images) === $images_per_page;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    word-wrap: break-word;
+    word-break: break-word;
+    hyphens: auto;
 }
 
 .file-meta {
@@ -2035,6 +2049,9 @@ $has_more = count($images) === $images_per_page;
     color: #6b7280;
     margin: 0 0 0.25rem 0;
     line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .file-uploader {
@@ -2042,6 +2059,9 @@ $has_more = count($images) === $images_per_page;
     color: #6b7280;
     margin: 0 0 0.5rem 0;
     line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .file-actions {
@@ -2049,10 +2069,12 @@ $has_more = count($images) === $images_per_page;
     border-top: 1px solid #f3f4f6;
     display: flex;
     gap: 0.5rem;
+    flex-wrap: wrap; /* Allow buttons to wrap on narrow columns */
 }
 
 .action-btn {
-    flex: 1; /* Each button takes 50% width */
+    flex: 1 1 auto; /* Allow flexible sizing with wrapping */
+    min-width: 0; /* Allow buttons to shrink */
     background: #f3f4f6;
     color: #374151;
     border: 1px solid #e5e7eb;
@@ -2065,6 +2087,9 @@ $has_more = count($images) === $images_per_page;
     justify-content: center;
     font-size: 14px;
     gap: 0.25rem; /* Space between icon and text */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .action-btn:hover {
@@ -2258,6 +2283,98 @@ $has_more = count($images) === $images_per_page;
     position: sticky;
     top: var(--wp-admin-bar-height, 32px); /* Account for WordPress admin bar height */
     z-index: 100;
+    transition: all 0.3s ease;
+}
+
+/* Bulk Mode Active - Eye-catching animated gradient */
+.bulk-mode .action-bar {
+    background: linear-gradient(
+        270deg,
+        #3b82f6,
+        #8b5cf6,
+        #ec4899,
+        #f59e0b,
+        #3b82f6
+    );
+    background-size: 400% 400%;
+    animation: bulkModeGradient 20s ease infinite;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4), 0 0 40px rgba(139, 92, 246, 0.2);
+}
+
+@keyframes bulkModeGradient {
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+/* Make text white and more visible in bulk mode */
+.bulk-mode .action-bar .filter-tab {
+    color: white;
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.bulk-mode .action-bar .filter-tab.active {
+    background: rgba(255, 255, 255, 0.25);
+    color: white;
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.bulk-mode .action-bar .filter-tab:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.bulk-mode .action-bar .search-input {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.bulk-mode .action-bar .search-input::placeholder {
+    color: rgba(0, 0, 0, 0.5);
+}
+
+.bulk-mode .action-bar .search-clear {
+    color: #374151;
+}
+
+.bulk-mode .action-bar .bulk-select-btn.active {
+    background: rgba(255, 255, 255, 0.95);
+    color: #3b82f6;
+    border-color: rgba(255, 255, 255, 0.95);
+    font-weight: 600;
+}
+
+.bulk-mode .action-bar .column-control {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.bulk-mode .action-bar .column-control label {
+    color: white;
+}
+
+.bulk-mode .action-bar .column-control label svg {
+    color: white;
+}
+
+.bulk-mode .action-bar .column-value {
+    color: white;
+}
+
+.bulk-mode .action-bar .bulk-actions-panel {
+    background: rgba(255, 255, 255, 0.95);
+    border-color: rgba(255, 255, 255, 0.95);
+}
+
+.bulk-mode .action-bar .bulk-count {
+    color: #374151;
 }
 
 .action-bar-content {
@@ -2433,6 +2550,21 @@ $has_more = count($images) === $images_per_page;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
+}
+
+.bulk-download {
+    background: #3b82f6;
+    color: white;
+}
+
+.bulk-download:hover:not(:disabled) {
+    background: #2563eb;
+}
+
+.bulk-download:disabled {
+    background: #d1d5db;
+    color: #9ca3af;
+    cursor: not-allowed;
 }
 
 .bulk-delete {
@@ -3066,17 +3198,31 @@ document.addEventListener('DOMContentLoaded', function() {
     function initializeColumnControl() {
         const columnSlider = document.getElementById('column-count-slider');
         const columnValue = document.getElementById('column-value');
+        const filesGrid = document.getElementById('files-grid');
         
         if (!columnSlider || !columnValue) return;
+        
+        // Function to update files grid column count
+        function updateFilesGridColumns(columnCount) {
+            if (filesGrid) {
+                filesGrid.style.gridTemplateColumns = `repeat(${columnCount}, 1fr)`;
+            }
+        }
+        
+        // Initialize files grid with current column count
+        updateFilesGridColumns(columnSlider.value);
         
         // Update the display value when slider changes
         columnSlider.addEventListener('input', function() {
             columnValue.textContent = this.value;
             
-            // Trigger immediate layout update
+            // Trigger immediate layout update for masonry grid
             if (window.layoutMasonry) {
                 window.layoutMasonry();
             }
+            
+            // Update files grid columns
+            updateFilesGridColumns(this.value);
         });
         
         // Save to database when slider is released (on change, not input)
@@ -3981,6 +4127,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const bulkSelectBtn = document.getElementById('bulk-select-btn');
         const bulkActionsPanel = document.getElementById('bulk-actions-panel');
         const bulkCount = document.getElementById('bulk-count');
+        const bulkDownloadBtn = document.getElementById('bulk-download');
         const bulkDeleteBtn = document.getElementById('bulk-delete');
         const bulkCancelBtn = document.getElementById('bulk-cancel');
         
@@ -4008,6 +4155,12 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         bulkCancelBtn.addEventListener('click', exitBulkMode);
+        
+        bulkDownloadBtn.addEventListener('click', function() {
+            if (selectedItems.size === 0) return;
+            
+            downloadSelectedFiles();
+        });
         
         bulkDeleteBtn.addEventListener('click', function() {
             if (selectedItems.size === 0) return;
@@ -4119,6 +4272,7 @@ document.addEventListener('DOMContentLoaded', function() {
         function updateBulkCount() {
             const count = selectedItems.size;
             bulkCount.textContent = `${count} selected`;
+            bulkDownloadBtn.disabled = count === 0;
             bulkDeleteBtn.disabled = count === 0;
         }
         
@@ -4160,6 +4314,53 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => {
                 layoutMasonry();
             }, 50);
+        }
+        
+        function downloadSelectedFiles() {
+            const fileIds = Array.from(selectedItems);
+            
+            // Show loading state
+            bulkDownloadBtn.disabled = true;
+            bulkDownloadBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg> Creating ZIP...';
+            
+            // Create form and submit to download endpoint
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '<?php echo admin_url('admin-ajax.php'); ?>';
+            form.style.display = 'none';
+            
+            // Add action
+            const actionInput = document.createElement('input');
+            actionInput.name = 'action';
+            actionInput.value = 'tomatillo_bulk_download';
+            form.appendChild(actionInput);
+            
+            // Add nonce
+            const nonceInput = document.createElement('input');
+            nonceInput.name = 'nonce';
+            nonceInput.value = '<?php echo wp_create_nonce('tomatillo_bulk_download'); ?>';
+            form.appendChild(nonceInput);
+            
+            // Add file IDs
+            const idsInput = document.createElement('input');
+            idsInput.name = 'file_ids';
+            idsInput.value = JSON.stringify(fileIds);
+            form.appendChild(idsInput);
+            
+            // Submit form
+            document.body.appendChild(form);
+            form.submit();
+            
+            // Remove form after a delay
+            setTimeout(() => {
+                document.body.removeChild(form);
+                
+                // Reset button state
+                bulkDownloadBtn.disabled = false;
+                bulkDownloadBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Download ZIP';
+                
+                showToast(`Downloading ${fileIds.length} file(s) as ZIP...`, 'success');
+            }, 1000);
         }
         
         function deleteSelectedImages() {

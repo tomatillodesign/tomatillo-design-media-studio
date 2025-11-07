@@ -23,6 +23,7 @@ class Tomatillo_Media_Settings {
         // Module Control
         'enable_optimization' => true,
         'enable_media_library' => true,
+        'show_files_menu_link' => false,
         
         // Optimization Settings
         'avif_quality' => 50,
@@ -258,6 +259,7 @@ class Tomatillo_Media_Settings {
         // Module Control
         $sanitized['enable_optimization'] = isset($input['enable_optimization']) ? (bool) $input['enable_optimization'] : false;
         $sanitized['enable_media_library'] = isset($input['enable_media_library']) ? (bool) $input['enable_media_library'] : false;
+        $sanitized['show_files_menu_link'] = isset($input['show_files_menu_link']) ? (bool) $input['show_files_menu_link'] : false;
         
         // Optimization Settings
         $sanitized['avif_quality'] = isset($input['avif_quality']) ? max(1, min(100, (int) $input['avif_quality'])) : 80;

@@ -75,6 +75,18 @@ $stats = tomatillo_media_studio()->core->get_media_stats();
                                 <?php _e('Enable enhanced media library interface', 'tomatillo-media-studio'); ?>
                             </label>
                             <p class="description"><?php _e('Provides a beautiful, modern interface for managing your media files.', 'tomatillo-media-studio'); ?></p>
+                            
+                            <!-- Sub-setting for Files menu link -->
+                            <div style="margin-top: 1rem; padding-left: 2rem; border-left: 3px solid #e5e7eb;">
+                                <label class="tomatillo-toggle-label">
+                                    <div class="tomatillo-toggle">
+                                        <input type="checkbox" name="tomatillo_media_studio_settings[show_files_menu_link]" value="1" <?php checked($settings->get('show_files_menu_link')); ?> <?php disabled(!$settings->is_media_library_enabled()); ?> />
+                                        <span class="tomatillo-toggle-slider"></span>
+                                    </div>
+                                    <?php _e('Show "View Files" menu link', 'tomatillo-media-studio'); ?>
+                                </label>
+                                <p class="description"><?php _e('Adds a quick link to the Files view under the Media Studio menu.', 'tomatillo-media-studio'); ?></p>
+                            </div>
                         </td>
                     </tr>
                 </table>

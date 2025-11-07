@@ -109,6 +109,7 @@ class Tomatillo_Media_Studio {
         // Load core classes
         require_once TOMATILLO_MEDIA_STUDIO_DIR . 'includes/class-core.php';
         require_once TOMATILLO_MEDIA_STUDIO_DIR . 'includes/class-settings.php';
+        require_once TOMATILLO_MEDIA_STUDIO_DIR . 'includes/class-logger.php';
         require_once TOMATILLO_MEDIA_STUDIO_DIR . 'includes/assets/class-assets.php';
         
         // Initialize core components
@@ -280,6 +281,7 @@ class Tomatillo_Media_Studio {
         $defaults = array(
             'enable_optimization' => true,
             'enable_media_library' => true,
+            'show_files_menu_link' => false,
             'avif_quality' => 80,
             'webp_quality' => 85,
             'auto_convert' => true,

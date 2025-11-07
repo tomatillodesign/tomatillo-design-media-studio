@@ -231,6 +231,34 @@ class Tomatillo_Media_Core {
     }
     
     /**
+     * Recursively calculate directory size
+     */
+    private function get_directory_size($directory) {
+        $size = 0;
+        
+        if (!is_dir($directory) || !is_readable($directory)) {
+            return 0;
+        }
+        
+        try {
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS)
+            );
+            
+            foreach ($iterator as $file) {
+                if ($file->isFile() && $file->isReadable()) {
+                    $size += $file->getSize();
+                }
+            }
+        } catch (Exception $e) {
+            // If there's an error, return 0
+            return 0;
+        }
+        
+        return $size;
+    }
+    
+    /**
      * Get media statistics
      */
     public function get_media_stats() {
@@ -255,20 +283,9 @@ class Tomatillo_Media_Core {
             AND post_mime_type NOT LIKE 'image/%'
         ");
         
-        // Total file size (calculate by checking actual files)
-        $total_size = 0;
-        $images = $wpdb->get_results("
-            SELECT ID FROM {$wpdb->posts} 
-            WHERE post_type = 'attachment' 
-            AND post_mime_type LIKE 'image/%'
-        ");
-        
-        foreach ($images as $image) {
-            $file_path = get_attached_file($image->ID);
-            if ($file_path && file_exists($file_path)) {
-                $total_size += filesize($file_path);
-            }
-        }
+        // Total file size (calculate actual directory size of uploads folder - most accurate)
+        $upload_dir = wp_upload_dir();
+        $total_size = $this->get_directory_size($upload_dir['basedir']);
         
         $stats['total_size'] = $total_size;
         
@@ -727,43 +744,43 @@ class Tomatillo_Media_Core {
         }
         
         // Log optimization attempt
-        $plugin->core->log('info', 'Image optimization attempt started');
+        Tomatillo_Media_Logger::info( 'Image optimization attempt started');
         
         // Verify nonce
         if (!wp_verify_nonce($_GET['nonce'], 'tomatillo_optimize_image')) {
-            $plugin->core->log('warning', 'Invalid nonce for optimization request');
+            Tomatillo_Media_Logger::warning( 'Invalid nonce for optimization request');
             wp_send_json_error('Invalid nonce');
         }
         
         // Check permissions
         if (!current_user_can('upload_files')) {
-            $plugin->core->log('warning', 'Insufficient permissions for optimization request');
+            Tomatillo_Media_Logger::warning( 'Insufficient permissions for optimization request');
             wp_send_json_error('Insufficient permissions');
         }
         
         $image_id = intval($_GET['image_id']);
-        $plugin->core->log('info', "Starting optimization for image ID: {$image_id}");
+        Tomatillo_Media_Logger::info( "Starting optimization for image ID: {$image_id}");
         
         if (!$image_id) {
-            $plugin->core->log('warning', 'Invalid image ID provided for optimization');
+            Tomatillo_Media_Logger::warning( 'Invalid image ID provided for optimization');
             wp_send_json_error('Invalid image ID');
         }
         
         // Check if image exists
         $image = get_post($image_id);
         if (!$image || $image->post_type !== 'attachment') {
-            $plugin->core->log('warning', "Image not found or not an attachment: {$image_id}");
+            Tomatillo_Media_Logger::warning( "Image not found or not an attachment: {$image_id}");
             wp_send_json_error('Image not found');
         }
         
         // Get image filename for logging
         $file_path = get_attached_file($image_id);
         $filename = $file_path ? basename($file_path) : 'Unknown';
-        $plugin->core->log('info', "Optimizing image: {$filename} (ID: {$image_id})");
+        Tomatillo_Media_Logger::info( "Optimizing image: {$filename} (ID: {$image_id})");
         
         // Get the optimizer
         if (!$plugin->optimization) {
-            $plugin->core->log('error', 'Optimization module not available');
+            Tomatillo_Media_Logger::error( 'Optimization module not available');
             wp_send_json_error('Optimization module not available');
         }
         
@@ -775,7 +792,7 @@ class Tomatillo_Media_Core {
         
         if ($result && $result['success']) {
             $savings = isset($result['savings']) ? $result['savings'] : 0;
-            $plugin->core->log('info', "✅ Image optimization successful: {$filename} (ID: {$image_id}) - Savings: {$savings}%");
+            Tomatillo_Media_Logger::info( "✅ Image optimization successful: {$filename} (ID: {$image_id}) - Savings: {$savings}%");
             wp_send_json_success(array(
                 'message' => 'Image optimized successfully',
                 'savings' => $savings
@@ -785,9 +802,9 @@ class Tomatillo_Media_Core {
             
             // Check if it's a threshold issue (not a real failure)
             if (strpos($error_message, 'well-optimized') !== false || strpos($error_message, 'additional savings') !== false) {
-                $plugin->core->log('info', "⚠️ Image optimization skipped (threshold): {$filename} (ID: {$image_id}) - {$error_message}");
+                Tomatillo_Media_Logger::info( "⚠️ Image optimization skipped (threshold): {$filename} (ID: {$image_id}) - {$error_message}");
             } else {
-                $plugin->core->log('warning', "❌ Image optimization failed: {$filename} (ID: {$image_id}) - {$error_message}");
+                Tomatillo_Media_Logger::warning( "❌ Image optimization failed: {$filename} (ID: {$image_id}) - {$error_message}");
             }
             
             wp_send_json_error($error_message);
@@ -1430,19 +1447,27 @@ class Tomatillo_Media_Core {
     public function ajax_delete_images() {
         // Check permissions
         if (!current_user_can('delete_posts')) {
+            Tomatillo_Media_Logger::error('Bulk delete: Insufficient permissions', array('action' => 'bulk_delete'));
             wp_send_json_error('Insufficient permissions');
         }
         
         // Verify nonce
         if (!wp_verify_nonce($_POST['nonce'], 'tomatillo_delete_images')) {
+            Tomatillo_Media_Logger::error('Bulk delete: Invalid nonce', array('action' => 'bulk_delete'));
             wp_send_json_error('Invalid nonce');
         }
         
         $image_ids = json_decode(stripslashes($_POST['image_ids']), true);
         
         if (!is_array($image_ids) || empty($image_ids)) {
+            Tomatillo_Media_Logger::warning('Bulk delete: Invalid image IDs', array('action' => 'bulk_delete'));
             wp_send_json_error('Invalid image IDs');
         }
+        
+        Tomatillo_Media_Logger::info('Bulk delete started', array(
+            'action' => 'bulk_delete',
+            'image_count' => count($image_ids)
+        ));
         
         $deleted_count = 0;
         $errors = array();
@@ -1469,10 +1494,10 @@ class Tomatillo_Media_Core {
             
             if ($result) {
                 $deleted_count++;
-                $this->log('info', "Bulk delete: Successfully deleted image ID $image_id");
+                Tomatillo_Media_Logger::debug("Successfully deleted attachment", array('attachment_id' => $image_id, 'action' => 'bulk_delete'));
             } else {
                 $errors[] = "Failed to delete image: $image_id";
-                $this->log('warning', "Bulk delete: Failed to delete image ID $image_id");
+                Tomatillo_Media_Logger::warning("Failed to delete attachment", array('attachment_id' => $image_id, 'action' => 'bulk_delete'));
             }
         }
         
@@ -1481,8 +1506,17 @@ class Tomatillo_Media_Core {
             if (!empty($errors)) {
                 $message .= ". " . count($errors) . " error(s) occurred.";
             }
+            Tomatillo_Media_Logger::info('Bulk delete completed', array(
+                'action' => 'bulk_delete',
+                'deleted_count' => $deleted_count,
+                'error_count' => count($errors)
+            ));
             wp_send_json_success($message);
         } else {
+            Tomatillo_Media_Logger::error('Bulk delete failed - no images deleted', array(
+                'action' => 'bulk_delete',
+                'errors' => $errors
+            ));
             wp_send_json_error('No images were deleted. ' . implode(', ', $errors));
         }
     }

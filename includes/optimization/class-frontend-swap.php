@@ -60,13 +60,7 @@ class Tomatillo_Frontend_Swap {
         $settings = $this->get_settings();
         // Respect Image Processing Engine setting
         if (!$settings || !$settings->is_image_engine_enabled()) {
-            $this->log('Frontend swap disabled (optimization not enabled)');
             return;
-        }
-        
-        // Log initialization
-        if ($settings->is_debug_mode()) {
-            $this->log('Frontend swap initialized');
         }
     }
 
@@ -87,7 +81,6 @@ class Tomatillo_Frontend_Swap {
         } else {
             ob_start(array($this, 'rewrite_final_html'));
         }
-        $this->log('Output buffer rewrite enabled');
     }
 
     /**
@@ -163,9 +156,7 @@ class Tomatillo_Frontend_Swap {
         if ($this->is_debug_on_page()) {
             $html = "<!-- Tomatillo OB processed; swaps={$swaps} -->" . $html;
         }
-        if ($swaps > 0) {
-            $this->log("Output buffer swaps performed: {$swaps}");
-        }
+        // No logging - output buffer runs on every page load
         return $html;
     }
     
@@ -174,14 +165,12 @@ class Tomatillo_Frontend_Swap {
      */
     public function optimize_attachment_src($image, $attachment_id, $size, $icon) {
         if (!$image || $icon || !$this->should_optimize_image($attachment_id)) {
-            $this->log("optimize_attachment_src: skipping (icon or not eligible) id=$attachment_id");
             return $image;
         }
         
         $optimized_url = $this->get_optimized_image_url($image[0], $attachment_id);
         if ($optimized_url) {
             $image[0] = $optimized_url;
-            $this->log("optimize_attachment_src: swapped src to optimized for id=$attachment_id");
         }
         
         return $image;
@@ -192,11 +181,9 @@ class Tomatillo_Frontend_Swap {
      */
     public function optimize_attachment_image($html, $attachment_id, $size, $icon, $attr) {
         if (!$html || $icon || !$this->should_optimize_image($attachment_id)) {
-            $this->log("optimize_attachment_image: leaving original markup (icon or not eligible) id=$attachment_id");
             return $html;
         }
         
-        $this->log("optimize_attachment_image: generating <picture> for id=$attachment_id size=$size");
         return $this->generate_picture_element($attachment_id, $size, $attr);
     }
     
@@ -218,11 +205,7 @@ class Tomatillo_Frontend_Swap {
         $before = $content;
         $this->debug_swaps = 0;
         $content = preg_replace_callback($pattern, array($this, 'optimize_content_image'), $content);
-        if ($before !== $content) {
-            $this->log('optimize_content_images: content images processed and swapped');
-        } else {
-            $this->log('optimize_content_images: no changes to content');
-        }
+        // No logging - runs on every page view
         if ($this->is_debug_on_page()) {
             $content = "<!-- Tomatillo content processed; swaps={$this->debug_swaps} -->" . $content . "<!-- /Tomatillo content -->";
         }
@@ -277,7 +260,6 @@ class Tomatillo_Frontend_Swap {
         if ($srcset !== null) $img_attr['srcset'] = $srcset; // keep original as fallback
         
         // Generate picture element, attempting to transform srcset to optimized where files exist
-        $this->log("optimize_content_image: building <picture> for attachment id=$attachment_id");
         $picture_html = $this->generate_picture_element($attachment_id, 'full', $img_attr, $srcset, $sizes);
         if ($this->is_debug()) {
             $picture_html = "<!-- Tomatillo swapped attachment {$attachment_id} -->" . $picture_html . "<!-- /Tomatillo -->";
@@ -333,11 +315,11 @@ class Tomatillo_Frontend_Swap {
                             'webp_path' => $webp_path,
                         );
                     } else {
-                        $this->log("generate_picture_element: no optimization data or files for id=$attachment_id");
+                        // No optimization data - return standard image
                         return wp_get_attachment_image($attachment_id, $size, false, $attr);
                     }
                 } else {
-                    $this->log("generate_picture_element: missing file path for id=$attachment_id");
+                    // Missing file path - return standard image
                     return wp_get_attachment_image($attachment_id, $size, false, $attr);
                 }
             }
@@ -393,7 +375,6 @@ class Tomatillo_Frontend_Swap {
      */
     public function filter_image_attributes($attr, $attachment, $size) {
         if (!$this->should_optimize_image($attachment->ID)) {
-            $this->log("filter_image_attributes: not eligible id={$attachment->ID}");
             return $attr;
         }
         
@@ -409,7 +390,6 @@ class Tomatillo_Frontend_Swap {
                 $optimized = $this->build_optimized_srcset($attr['srcset'], $preferred, $attachment->ID);
                 if ($optimized) {
                     $attr['srcset'] = $optimized;
-                    $this->log("filter_image_attributes: transformed srcset for id={$attachment->ID} to $preferred");
                 }
             }
         }
@@ -434,7 +414,6 @@ class Tomatillo_Frontend_Swap {
                 $sources[$width]['type'] = 'image/' . $preferred;
             }
         }
-        $this->log("filter_srcset: rewrote srcset candidates for id=$attachment_id format=$preferred");
         return $sources;
     }
 
@@ -488,14 +467,10 @@ class Tomatillo_Frontend_Swap {
      * Lightweight logger honoring debug mode
      */
     private function log($message) {
-        if (!function_exists('tomatillo_media_studio')) return;
-        $plugin = tomatillo_media_studio();
-        if (!$plugin || !$plugin->settings || !$plugin->settings->is_debug_mode()) return;
-        if ($plugin->core) {
-            $plugin->core->log($message, 'info');
-        } else {
-            error_log('[Tomatillo Frontend Swap] ' . $message);
-        }
+        // Use the centralized logger at DEBUG level to reduce noise
+        Tomatillo_Media_Logger::debug($message, array(
+            'component' => 'frontend_swap'
+        ));
     }
     
     /**

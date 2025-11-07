@@ -74,28 +74,28 @@ $memory_percentage = ($memory_usage / $memory_limit) * 100;
                 
                 <!-- Key Metrics Grid -->
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 20px 0;">
-                    <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px;">
-                        <h3 style="margin: 0; font-size: 2.5em; font-weight: bold;"><?php echo number_format($optimized_count); ?></h3>
-                        <p style="margin: 10px 0 0 0; font-size: 1.1em;">Images Optimized</p>
-                        <p style="margin: 5px 0 0 0; opacity: 0.8; font-size: 0.9em;"><?php echo $total_images > 0 ? round(($optimized_count / $total_images) * 100, 1) : 0; ?>% of total</p>
+                    <div style="text-align: center; padding: 25px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
+                        <h3 style="margin: 0; font-size: 2.5em; font-weight: bold; color: #2c3e50;"><?php echo number_format($optimized_count); ?></h3>
+                        <p style="margin: 10px 0 0 0; font-size: 1.1em; color: #495057; font-weight: 500;">Images Optimized</p>
+                        <p style="margin: 5px 0 0 0; color: #6c757d; font-size: 0.9em;"><?php echo $total_images > 0 ? round(($optimized_count / $total_images) * 100, 1) : 0; ?>% of total</p>
                     </div>
                     
-                    <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; border-radius: 12px;">
-                        <h3 style="margin: 0; font-size: 2.5em; font-weight: bold;"><?php echo size_format($space_saved); ?></h3>
-                        <p style="margin: 10px 0 0 0; font-size: 1.1em;">Space Saved</p>
-                        <p style="margin: 5px 0 0 0; opacity: 0.8; font-size: 0.9em;"><?php echo $total_size > 0 ? round(($space_saved / $total_size) * 100, 1) : 0; ?>% reduction</p>
+                    <div style="text-align: center; padding: 25px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
+                        <h3 style="margin: 0; font-size: 2.5em; font-weight: bold; color: #2c3e50;"><?php echo size_format($space_saved); ?></h3>
+                        <p style="margin: 10px 0 0 0; font-size: 1.1em; color: #495057; font-weight: 500;">Bandwidth Saved</p>
+                        <p style="margin: 5px 0 0 0; color: #6c757d; font-size: 0.9em;">Per optimized image served</p>
                     </div>
                     
-                    <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; border-radius: 12px;">
-                        <h3 style="margin: 0; font-size: 2.5em; font-weight: bold;"><?php echo size_format($monthly_bandwidth_saved_bytes); ?></h3>
-                        <p style="margin: 10px 0 0 0; font-size: 1.1em;">Monthly Bandwidth Saved</p>
-                        <p style="margin: 5px 0 0 0; opacity: 0.8; font-size: 0.9em;"><?php echo number_format($estimated_monthly_views); ?> page views</p>
+                    <div style="text-align: center; padding: 25px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
+                        <h3 style="margin: 0; font-size: 2.5em; font-weight: bold; color: #2c3e50;"><?php echo size_format($monthly_bandwidth_saved_bytes); ?></h3>
+                        <p style="margin: 10px 0 0 0; font-size: 1.1em; color: #495057; font-weight: 500;">Monthly Bandwidth Saved</p>
+                        <p style="margin: 5px 0 0 0; color: #6c757d; font-size: 0.9em;"><?php echo number_format($estimated_monthly_views); ?> page views</p>
                     </div>
                     
-                    <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; border-radius: 12px;">
-                        <h3 style="margin: 0; font-size: 2.5em; font-weight: bold;"><?php echo $unoptimized_count; ?></h3>
-                        <p style="margin: 10px 0 0 0; font-size: 1.1em;">Pending Optimization</p>
-                        <p style="margin: 5px 0 0 0; opacity: 0.8; font-size: 0.9em;"><?php echo $unoptimized_count > 0 ? 'Ready to process' : 'All optimized'; ?></p>
+                    <div style="text-align: center; padding: 25px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
+                        <h3 style="margin: 0; font-size: 2.5em; font-weight: bold; color: #2c3e50;"><?php echo $unoptimized_count; ?></h3>
+                        <p style="margin: 10px 0 0 0; font-size: 1.1em; color: #495057; font-weight: 500;">Pending Optimization</p>
+                        <p style="margin: 5px 0 0 0; color: #6c757d; font-size: 0.9em;"><?php echo $unoptimized_count > 0 ? 'Ready to process' : 'All optimized'; ?></p>
                     </div>
                 </div>
                 
@@ -494,91 +494,200 @@ $memory_percentage = ($memory_usage / $memory_limit) * 100;
             <div class="card">
                 <h2>Debug Controls</h2>
                 
-                <form method="post" style="margin-bottom: 20px;">
-                    <?php wp_nonce_field('tomatillo_toggle_debug'); ?>
-                    <p>
-                        <label>
-                            <input type="checkbox" name="debug_mode" value="1" <?php checked($settings->is_debug_mode()); ?>>
-                            Enable debug mode
-                        </label>
-                    </p>
-                    <p class="submit">
-                        <input type="submit" name="toggle_debug" class="button button-secondary" value="Update Debug Mode">
-                    </p>
-                </form>
+                <p>
+                    <label>
+                        <input type="checkbox" id="debug-mode-checkbox" <?php checked($settings->is_debug_mode()); ?>>
+                        Enable debug mode
+                    </label>
+                </p>
+                <p class="submit">
+                    <button id="update-debug-mode" class="button button-primary">Update Debug Mode</button>
+                </p>
                 
-                <form method="post" style="margin-bottom: 20px;">
-                    <?php wp_nonce_field('tomatillo_clear_logs'); ?>
-                    <p class="submit">
-                        <input type="submit" name="clear_logs" class="button button-secondary" value="Clear Plugin Logs">
-                    </p>
-                </form>
+                <p class="submit">
+                    <button id="clear-plugin-logs" class="button button-secondary">Clear Plugin Logs</button>
+                </p>
                 
-                <h3>Plugin Logs</h3>
+                <h3>Plugin Logs <span id="log-count" style="color: #666; font-size: 0.9em;">(<?php echo Tomatillo_Media_Logger::get_log_count(); ?> entries)</span></h3>
+                <p style="margin-bottom: 15px;">
+                    <button id="copy-logs" class="button button-secondary">📋 Copy Logs</button>
+                </p>
+                
                 <?php 
-                $logs = array();
-                if ($plugin && isset($plugin->core) && method_exists($plugin->core, 'get_plugin_logs')) {
-                    try {
-                        $all_logs = $plugin->core->get_plugin_logs();
-                        
-                        // Filter logs to show only recent and important ones
-                        $logs = array_filter($all_logs, function($log) {
-                            if (!is_array($log) || !isset($log['level']) || !isset($log['message'])) {
-                                return false;
-                            }
+                $logs = Tomatillo_Media_Logger::get_logs();
+                
+                if (empty($logs)): ?>
+                    <p>No logs found. Enable debug mode and perform some operations to see detailed logging.</p>
+                <?php else: ?>
+                    <div id="logs-container" style="background: #1e1e1e; color: #d4d4d4; padding: 20px; border-radius: 8px; max-height: 600px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.6;">
+                        <?php 
+                        $prev_attachment_id = null;
+                        $prev_action = null;
+                        foreach ($logs as $index => $log): 
+                            $level_color = array(
+                                'ERROR' => '#f48771',
+                                'WARNING' => '#ffc66d',
+                                'INFO' => '#6ab0f3',
+                                'DEBUG' => '#a9dc76'
+                            );
+                            $color = isset($level_color[$log['level']]) ? $level_color[$log['level']] : '#d4d4d4';
                             
-                            // Always show errors and warnings
-                            if (in_array($log['level'], array('error', 'warning'))) {
-                                return true;
-                            }
+                            // Get attachment ID and action from context
+                            $current_attachment_id = isset($log['context']['attachment_id']) ? $log['context']['attachment_id'] : null;
+                            $current_action = isset($log['context']['action']) ? $log['context']['action'] : null;
+                            $is_start = strpos($log['message'], 'Starting image optimization') !== false;
+                            $is_complete = strpos($log['message'], 'completed successfully') !== false || strpos($log['message'], 'skipped') !== false;
                             
-                            // For info messages, only show important ones
-                            if ($log['level'] === 'info') {
-                                $important_keywords = array('optimization', 'conversion', 'error', 'failed', 'success', 'bulk', 'test');
-                                foreach ($important_keywords as $keyword) {
-                                    if (stripos($log['message'], $keyword) !== false) {
-                                        return true;
-                                    }
+                            // Add visual separator for new optimization sessions
+                            if ($is_start && $current_attachment_id && $current_attachment_id !== $prev_attachment_id) {
+                                if ($prev_attachment_id !== null) {
+                                    echo '<div style="margin: 15px 0; border-top: 2px solid #444; padding-top: 10px;"></div>';
                                 }
                             }
                             
-                            return false;
-                        });
-                        
-                        // Limit to last 20 important logs
-                        $logs = array_slice($logs, -20);
-                        
-                    } catch (Exception $e) {
-                        echo '<div class="notice notice-error"><p>Error loading logs: ' . esc_html($e->getMessage()) . '</p></div>';
-                    } catch (Error $e) {
-                        echo '<div class="notice notice-error"><p>Fatal error loading logs: ' . esc_html($e->getMessage()) . '</p></div>';
-                    }
-                } else {
-                    echo '<div class="notice notice-warning"><p>Core module not available for logging.</p></div>';
-                }
-                
-                if (empty($logs)): ?>
-                    <p>No important logs found. Only errors, warnings, and optimization-related events are shown.</p>
-                <?php else: ?>
-                    <div style="background: #f0f0f1; padding: 15px; border-radius: 4px; max-height: 400px; overflow-y: auto; font-family: monospace; font-size: 12px;">
-                        <?php foreach ($logs as $log): ?>
-                            <?php if (is_array($log) && isset($log['timestamp']) && isset($log['level']) && isset($log['message'])): ?>
-                                <div style="margin-bottom: 5px; padding: 5px; background: #fff; border-left: 3px solid #<?php echo $log['level'] === 'error' ? 'd63638' : ($log['level'] === 'warning' ? 'dba617' : '00a32a'); ?>;">
-                                    <strong>[<?php echo esc_html($log['timestamp']); ?>]</strong> 
-                                    <span style="color: #<?php echo $log['level'] === 'error' ? 'd63638' : ($log['level'] === 'warning' ? 'dba617' : '00a32a'); ?>;"><?php echo strtoupper($log['level']); ?></span>
-                                    <?php echo esc_html($log['message']); ?>
+                            // Determine background highlight
+                            $bg_style = '';
+                            if ($is_start) {
+                                $bg_style = 'background: rgba(106, 176, 243, 0.15); padding: 8px; border-left: 3px solid #6ab0f3; margin-left: -8px;';
+                            } elseif ($is_complete) {
+                                $bg_style = 'background: rgba(169, 220, 118, 0.15); padding: 8px; border-left: 3px solid #a9dc76; margin-left: -8px;';
+                            } elseif ($log['level'] === 'ERROR') {
+                                $bg_style = 'background: rgba(244, 135, 113, 0.15); padding: 8px; border-left: 3px solid #f48771; margin-left: -8px;';
+                            } elseif ($log['level'] === 'WARNING') {
+                                $bg_style = 'background: rgba(255, 198, 109, 0.15); padding: 8px; border-left: 3px solid #ffc66d; margin-left: -8px;';
+                            }
+                            ?>
+                            <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #2a2a2a; <?php echo $bg_style; ?>">
+                                <div style="display: flex; gap: 15px; align-items: baseline;">
+                                    <span style="color: #78dce8; font-size: 11px;"><?php echo esc_html($log['timestamp']); ?></span>
+                                    <span style="color: <?php echo $color; ?>; font-weight: bold; min-width: 70px;"><?php echo esc_html($log['level']); ?></span>
+                                    <span style="flex: 1;"><?php echo esc_html($log['message']); ?></span>
                                 </div>
-                            <?php else: ?>
-                                <div style="margin-bottom: 5px; padding: 5px; background: #fff; border-left: 3px solid #666;">
-                                    <strong>[<?php echo date('Y-m-d H:i:s'); ?>]</strong> 
-                                    <span style="color: #666;">INFO</span>
-                                    <?php echo esc_html(is_string($log) ? $log : print_r($log, true)); ?>
-                                </div>
-                            <?php endif; ?>
-                        <?php endforeach; ?>
+                                <?php if (!empty($log['context'])): ?>
+                                    <div style="margin-top: 5px; padding-left: 100px; font-size: 11px; color: #888;">
+                                        <?php 
+                                        // Display key context info more cleanly
+                                        $context_display = array();
+                                        if (isset($log['context']['attachment_id'])) {
+                                            $context_display[] = 'ID: ' . $log['context']['attachment_id'];
+                                        }
+                                        if (isset($log['context']['filename'])) {
+                                            $context_display[] = 'File: ' . $log['context']['filename'];
+                                        }
+                                        if (isset($log['context']['avif_savings'])) {
+                                            $context_display[] = 'AVIF: ' . $log['context']['avif_savings'];
+                                        }
+                                        if (isset($log['context']['webp_savings'])) {
+                                            $context_display[] = 'WebP: ' . $log['context']['webp_savings'];
+                                        }
+                                        if (isset($log['context']['original_size'])) {
+                                            $context_display[] = 'Size: ' . $log['context']['original_size'];
+                                        }
+                                        if (!empty($context_display)) {
+                                            echo '<span style="color: #aaa;">' . esc_html(implode(' • ', $context_display)) . '</span>';
+                                        }
+                                        ?>
+                                        <?php if (!empty($log['user_name'])): ?>
+                                            <span style="margin-left: 15px; color: #666;">👤 <?php echo esc_html($log['user_name']); ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                            <?php 
+                            $prev_attachment_id = $current_attachment_id;
+                            $prev_action = $current_action;
+                        endforeach; ?>
                     </div>
                 <?php endif; ?>
             </div>
+            
+            <script>
+            jQuery(document).ready(function($) {
+                // Update debug mode
+                $('#update-debug-mode').on('click', function() {
+                    var debugMode = $('#debug-mode-checkbox').is(':checked');
+                    var $btn = $(this);
+                    
+                    $btn.prop('disabled', true).text('Updating...');
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'tomatillo_update_debug_mode',
+                            debug_mode: debugMode,
+                            nonce: '<?php echo wp_create_nonce('tomatillo_debug_mode'); ?>'
+                        },
+                        success: function(response) {
+                            $btn.prop('disabled', false).text('Update Debug Mode');
+                            if (response.success) {
+                                alert(response.data.message);
+                                location.reload();
+                            } else {
+                                alert('Error: ' + response.data);
+                            }
+                        },
+                        error: function() {
+                            $btn.prop('disabled', false).text('Update Debug Mode');
+                            alert('Network error occurred');
+                        }
+                    });
+                });
+                
+                // Clear logs
+                $('#clear-plugin-logs').on('click', function() {
+                    if (!confirm('Are you sure you want to clear all plugin logs?')) {
+                        return;
+                    }
+                    
+                    var $btn = $(this);
+                    $btn.prop('disabled', true).text('Clearing...');
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'tomatillo_clear_logs',
+                            nonce: '<?php echo wp_create_nonce('tomatillo_clear_logs'); ?>'
+                        },
+                        success: function(response) {
+                            $btn.prop('disabled', false).text('Clear Plugin Logs');
+                            if (response.success) {
+                                alert(response.data.message);
+                                location.reload();
+                            } else {
+                                alert('Error: ' + response.data);
+                            }
+                        },
+                        error: function() {
+                            $btn.prop('disabled', false).text('Clear Plugin Logs');
+                            alert('Network error occurred');
+                        }
+                    });
+                });
+                
+                // Copy logs
+                $('#copy-logs').on('click', function() {
+                    var logsText = '';
+                    var $logs = $('#logs-container > div');
+                    
+                    $logs.each(function() {
+                        var $log = $(this);
+                        logsText += $log.text().trim() + '\n\n';
+                    });
+                    
+                    if (logsText) {
+                        navigator.clipboard.writeText(logsText).then(function() {
+                            alert('Logs copied to clipboard!');
+                        }).catch(function() {
+                            alert('Failed to copy logs');
+                        });
+                    } else {
+                        alert('No logs to copy');
+                    }
+                });
+            });
+            </script>
         <?php endif; ?>
     </div>
 </div>

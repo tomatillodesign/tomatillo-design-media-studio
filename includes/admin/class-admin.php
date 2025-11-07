@@ -40,6 +40,13 @@ class Tomatillo_Media_Admin {
         
         // AJAX handler for column count setting
         add_action('wp_ajax_tomatillo_save_column_count', array($this, 'ajax_save_column_count'));
+        
+        // AJAX handler for bulk download
+        add_action('wp_ajax_tomatillo_bulk_download', array($this, 'ajax_bulk_download'));
+        
+        // AJAX handlers for logging
+        add_action('wp_ajax_tomatillo_update_debug_mode', array($this, 'ajax_update_debug_mode'));
+        add_action('wp_ajax_tomatillo_clear_logs', array($this, 'ajax_clear_logs'));
     }
     
     /**
@@ -71,11 +78,11 @@ class Tomatillo_Media_Admin {
             'upload_files', // Allow editors to access media studio
             'tomatillo-media-studio-library',
             array($this, 'media_library_page'),
-            'dashicons-images-alt2',
+            'none', // Using Font Awesome icon via CSS
             30
         );
         
-        // Settings page (admin only, second position)
+        // Settings page (admin only)
         add_submenu_page(
             'tomatillo-media-studio-library',
             __('Settings', 'tomatillo-media-studio'),
@@ -114,6 +121,25 @@ class Tomatillo_Media_Admin {
             'tomatillo-media-studio-react-test',
             array($this, 'test_react_integration_page')
         );
+        
+        // Conditionally add "View Files" submenu link if setting is enabled
+        // This runs at the END after all submenu items are added
+        $plugin = tomatillo_media_studio();
+        $show_files_link = $plugin->settings && $plugin->settings->get('show_files_menu_link');
+        
+        if ($show_files_link) {
+            global $submenu;
+            // WordPress auto-creates first submenu item matching parent, so we insert at position 1 (second in list)
+            if (isset($submenu['tomatillo-media-studio-library'])) {
+                array_splice($submenu['tomatillo-media-studio-library'], 1, 0, array(
+                    array(
+                        __('View Files', 'tomatillo-media-studio'),
+                        'upload_files',
+                        'admin.php?page=tomatillo-media-studio-library#files'
+                    )
+                ));
+            }
+        }
     }
     
     /**
@@ -149,6 +175,41 @@ class Tomatillo_Media_Admin {
         
         // Enqueue React Media Upload override for block editor
         $this->enqueue_block_editor_assets();
+        
+        // Add custom menu icon styling (Font Awesome 7 duotone light fa-images)
+        // This needs to load on ALL admin pages so the icon shows in the menu
+        $menu_icon_css = "
+            #adminmenu #toplevel_page_tomatillo-media-studio-library .wp-menu-image:before {
+                content: '\\f302';
+                font-family: 'Font Awesome 6 Duotone';
+                font-weight: 300;
+                speak: never;
+                font-style: normal;
+                font-variant: normal;
+                text-rendering: auto;
+                -webkit-font-smoothing: antialiased;
+                -moz-osx-font-smoothing: grayscale;
+                font-size: 18px;
+                --fa-primary-color: #ffffff;
+                --fa-primary-opacity: 1;
+                --fa-secondary-color: #ffffff;
+                --fa-secondary-opacity: 0.4;
+            }
+            #adminmenu #toplevel_page_tomatillo-media-studio-library .wp-menu-image {
+                background: none !important;
+            }
+            /* Ensure icon displays properly */
+            #adminmenu #toplevel_page_tomatillo-media-studio-library .wp-menu-image img {
+                display: none;
+            }
+            /* Active/hover state */
+            #adminmenu #toplevel_page_tomatillo-media-studio-library:hover .wp-menu-image:before,
+            #adminmenu #toplevel_page_tomatillo-media-studio-library.current .wp-menu-image:before {
+                --fa-primary-opacity: 1;
+                --fa-secondary-opacity: 0.6;
+            }
+        ";
+        wp_add_inline_style('admin-bar', $menu_icon_css);
         
         // Only load other assets on our plugin pages
         if (strpos($hook, 'tomatillo') === false) {
@@ -691,11 +752,11 @@ class Tomatillo_Media_Admin {
         // Validate column count
         $column_count = isset($_POST['column_count']) ? intval($_POST['column_count']) : 4;
         
-        // Ensure column count is within valid range (1-6)
+        // Ensure column count is within valid range (1-8)
         if ($column_count < 1) {
             $column_count = 1;
-        } elseif ($column_count > 6) {
-            $column_count = 6;
+        } elseif ($column_count > 8) {
+            $column_count = 8;
         }
         
         // Save to database
@@ -709,5 +770,190 @@ class Tomatillo_Media_Admin {
         } else {
             wp_send_json_error('Failed to save column count');
         }
+    }
+    
+    /**
+     * AJAX handler: Bulk download files as ZIP
+     */
+    public function ajax_bulk_download() {
+        // Verify nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'tomatillo_bulk_download')) {
+            Tomatillo_Media_Logger::error('Bulk download: Invalid nonce', array('action' => 'bulk_download'));
+            wp_die('Invalid nonce');
+        }
+        
+        // Check user capabilities
+        if (!current_user_can('upload_files')) {
+            Tomatillo_Media_Logger::error('Bulk download: Insufficient permissions', array('action' => 'bulk_download'));
+            wp_die('Insufficient permissions');
+        }
+        
+        // Get file IDs
+        $file_ids = isset($_POST['file_ids']) ? json_decode(stripslashes($_POST['file_ids']), true) : array();
+        
+        Tomatillo_Media_Logger::info('Bulk download started', array(
+            'action' => 'bulk_download',
+            'file_count' => count($file_ids)
+        ));
+        
+        if (empty($file_ids) || !is_array($file_ids)) {
+            wp_die('No files selected');
+        }
+        
+        // Validate file IDs
+        $file_ids = array_map('intval', $file_ids);
+        $file_ids = array_filter($file_ids, function($id) {
+            return $id > 0 && get_post_type($id) === 'attachment';
+        });
+        
+        if (empty($file_ids)) {
+            wp_die('No valid files selected');
+        }
+        
+        // Create temporary ZIP file
+        $upload_dir = wp_upload_dir();
+        $temp_dir = $upload_dir['basedir'] . '/tomatillo-temp';
+        
+        // Create temp directory if it doesn't exist
+        if (!file_exists($temp_dir)) {
+            wp_mkdir_p($temp_dir);
+        }
+        
+        $zip_filename = 'media-files-' . date('Y-m-d-H-i-s') . '.zip';
+        $zip_filepath = $temp_dir . '/' . $zip_filename;
+        
+        // Create ZIP archive
+        $zip = new ZipArchive();
+        if ($zip->open($zip_filepath, ZipArchive::CREATE) !== true) {
+            wp_die('Failed to create ZIP archive');
+        }
+        
+        // Add files to ZIP
+        $added_count = 0;
+        foreach ($file_ids as $file_id) {
+            $file_path = get_attached_file($file_id);
+            
+            // For images, try to get the original unscaled version
+            if ($file_path && file_exists($file_path)) {
+                $use_path = $file_path;
+                
+                // Check if this is an image and if WordPress created a scaled version
+                $mime_type = get_post_mime_type($file_id);
+                if ($mime_type && strpos($mime_type, 'image/') === 0) {
+                    // Check if current file is a scaled version (ends with -scaled)
+                    if (preg_match('/-scaled\.(jpg|jpeg|png|gif|webp)$/i', $file_path)) {
+                        // Try to find the original file
+                        $original_path = preg_replace('/-scaled(\.(jpg|jpeg|png|gif|webp))$/i', '$1', $file_path);
+                        
+                        if (file_exists($original_path)) {
+                            $use_path = $original_path;
+                        }
+                    }
+                }
+                
+                $filename = basename($use_path);
+                
+                // Handle duplicate filenames by adding a counter
+                $original_filename = $filename;
+                $counter = 1;
+                while ($zip->locateName($filename) !== false) {
+                    $pathinfo = pathinfo($original_filename);
+                    $filename = $pathinfo['filename'] . '-' . $counter . '.' . $pathinfo['extension'];
+                    $counter++;
+                }
+                
+                $zip->addFile($use_path, $filename);
+                $added_count++;
+            }
+        }
+        
+        $zip->close();
+        
+        if ($added_count === 0) {
+            @unlink($zip_filepath);
+            Tomatillo_Media_Logger::warning('Bulk download: No valid files found', array('action' => 'bulk_download', 'file_ids' => count($file_ids)));
+            wp_die('No valid files found to download');
+        }
+        
+        Tomatillo_Media_Logger::info('Bulk download completed', array(
+            'action' => 'bulk_download',
+            'files_included' => $added_count,
+            'zip_filename' => $zip_filename,
+            'zip_size' => filesize($zip_filepath)
+        ));
+        
+        // Send ZIP file to browser
+        header('Content-Type: application/zip');
+        header('Content-Disposition: attachment; filename="' . $zip_filename . '"');
+        header('Content-Length: ' . filesize($zip_filepath));
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        
+        readfile($zip_filepath);
+        
+        // Clean up temporary file
+        @unlink($zip_filepath);
+        
+        exit;
+    }
+    
+    /**
+     * AJAX handler: Update debug mode setting
+     */
+    public function ajax_update_debug_mode() {
+        // Verify nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'tomatillo_debug_mode')) {
+            wp_send_json_error('Invalid nonce');
+        }
+        
+        // Check user capabilities
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+        
+        // Get debug mode value
+        $debug_mode = isset($_POST['debug_mode']) && $_POST['debug_mode'] === 'true';
+        
+        // Get current settings
+        $plugin = tomatillo_media_studio();
+        $settings = $plugin->settings->get_all();
+        
+        // Update debug mode
+        $settings['debug_mode'] = $debug_mode;
+        
+        // Save settings
+        update_option('tomatillo_media_studio_settings', $settings);
+        
+        // Log the change
+        if ($debug_mode) {
+            Tomatillo_Media_Logger::info('Debug mode enabled', array('action' => 'settings_change'));
+        }
+        
+        wp_send_json_success(array(
+            'debug_mode' => $debug_mode,
+            'message' => $debug_mode ? 'Debug mode enabled' : 'Debug mode disabled'
+        ));
+    }
+    
+    /**
+     * AJAX handler: Clear plugin logs
+     */
+    public function ajax_clear_logs() {
+        // Verify nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'tomatillo_clear_logs')) {
+            wp_send_json_error('Invalid nonce');
+        }
+        
+        // Check user capabilities
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+        
+        // Clear logs
+        Tomatillo_Media_Logger::clear_logs();
+        
+        wp_send_json_success(array(
+            'message' => 'Logs cleared successfully'
+        ));
     }
 }
