@@ -245,6 +245,28 @@ $has_more = count($images) === $images_per_page;
                         Cancel
                     </button>
                 </div>
+                
+                <!-- Column Count Control -->
+                <div class="column-control">
+                    <label for="column-count-slider">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="7" height="18"></rect>
+                            <rect x="14" y="3" width="7" height="18"></rect>
+                        </svg>
+                        Columns:
+                    </label>
+                    <input 
+                        type="range" 
+                        id="column-count-slider" 
+                        class="column-slider" 
+                        min="1" 
+                        max="6" 
+                        value="<?php echo esc_attr(get_option('tomatillo_media_column_count', 4)); ?>" 
+                        step="1"
+                    >
+                    <span class="column-value" id="column-value"><?php echo esc_html(get_option('tomatillo_media_column_count', 4)); ?></span>
+                </div>
+                
                 <button class="bulk-select-btn" id="bulk-select-btn">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
@@ -2556,6 +2578,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeActionBar();
     initializeAdminBarHeight();
     initializeMasonry();
+    initializeColumnControl();
     
     function initializeDragDrop() {
         const dragDropTarget = document.getElementById('drag-drop-target');
@@ -2958,15 +2981,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const containerWidth = grid.offsetWidth;
             const gap = 8; // 0.5rem
             
-            // Calculate number of columns based on screen size
-            let columns = 3;
-            if (containerWidth < 768) {
-                columns = 2;
-            } else if (containerWidth < 1200) {
-                columns = 3;
-            } else {
-                columns = 3;
-            }
+            // Get column count from user setting (stored in the slider value)
+            const columnSlider = document.getElementById('column-count-slider');
+            let columns = columnSlider ? parseInt(columnSlider.value) : <?php echo intval(get_option('tomatillo_media_column_count', 4)); ?>;
             
             // Calculate column width
             const columnWidth = (containerWidth - (gap * (columns - 1))) / columns;
@@ -3044,6 +3061,52 @@ document.addEventListener('DOMContentLoaded', function() {
         // Expose layout function globally so other features (search, tab switches, infinite load)
         // can trigger a reflow without reinitializing the whole system
         window.layoutMasonry = layoutMasonry;
+    }
+    
+    function initializeColumnControl() {
+        const columnSlider = document.getElementById('column-count-slider');
+        const columnValue = document.getElementById('column-value');
+        
+        if (!columnSlider || !columnValue) return;
+        
+        // Update the display value when slider changes
+        columnSlider.addEventListener('input', function() {
+            columnValue.textContent = this.value;
+            
+            // Trigger immediate layout update
+            if (window.layoutMasonry) {
+                window.layoutMasonry();
+            }
+        });
+        
+        // Save to database when slider is released (on change, not input)
+        columnSlider.addEventListener('change', function() {
+            const columnCount = this.value;
+            
+            // Save via AJAX
+            fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    action: 'tomatillo_save_column_count',
+                    nonce: '<?php echo wp_create_nonce('tomatillo_column_count'); ?>',
+                    column_count: columnCount
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('Column count saved:', columnCount);
+                } else {
+                    console.error('Failed to save column count:', data.data);
+                }
+            })
+            .catch(error => {
+                console.error('Error saving column count:', error);
+            });
+        });
     }
     
     function initializeHashNavigation() {

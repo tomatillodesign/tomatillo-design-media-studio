@@ -296,6 +296,9 @@ class Tomatillo_Media_Studio {
         );
         
         add_option('tomatillo_media_studio_settings', $defaults);
+        
+        // Set default column count for media library
+        add_option('tomatillo_media_column_count', 4);
     }
     
     /**

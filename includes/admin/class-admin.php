@@ -37,6 +37,9 @@ class Tomatillo_Media_Admin {
         add_action('wp_ajax_tomatillo_get_unoptimized_count', array($this, 'ajax_get_unoptimized_count'));
         add_action('wp_ajax_tomatillo_process_bulk_batch', array($this, 'ajax_process_bulk_batch'));
         add_action('wp_ajax_tomatillo_preview_bulk_optimization', array($this, 'ajax_preview_bulk_optimization'));
+        
+        // AJAX handler for column count setting
+        add_action('wp_ajax_tomatillo_save_column_count', array($this, 'ajax_save_column_count'));
     }
     
     /**
@@ -667,5 +670,44 @@ class Tomatillo_Media_Admin {
         }
         
         return $result;
+    }
+    
+    /**
+     * AJAX handler: Save column count setting
+     */
+    public function ajax_save_column_count() {
+        // Verify nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'tomatillo_column_count')) {
+            wp_send_json_error('Invalid nonce');
+            return;
+        }
+        
+        // Check user capabilities
+        if (!current_user_can('upload_files')) {
+            wp_send_json_error('Insufficient permissions');
+            return;
+        }
+        
+        // Validate column count
+        $column_count = isset($_POST['column_count']) ? intval($_POST['column_count']) : 4;
+        
+        // Ensure column count is within valid range (1-6)
+        if ($column_count < 1) {
+            $column_count = 1;
+        } elseif ($column_count > 6) {
+            $column_count = 6;
+        }
+        
+        // Save to database
+        $updated = update_option('tomatillo_media_column_count', $column_count);
+        
+        if ($updated || get_option('tomatillo_media_column_count') == $column_count) {
+            wp_send_json_success(array(
+                'column_count' => $column_count,
+                'message' => 'Column count saved successfully'
+            ));
+        } else {
+            wp_send_json_error('Failed to save column count');
+        }
     }
 }
