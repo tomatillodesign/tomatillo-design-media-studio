@@ -136,6 +136,10 @@ class Tomatillo_Media_Assets {
     public function load_custom_media_frame_script() {
         $script_url = TOMATILLO_MEDIA_STUDIO_ASSETS_URL . 'js/custom-media-frame-clean.js';
         echo '<script src="' . esc_url($script_url) . '"></script>';
+        
+        // Also load ACF Gallery handler for ACF compatibility
+        $acf_handler_url = TOMATILLO_MEDIA_STUDIO_ASSETS_URL . 'js/acf-gallery-handler.js';
+        echo '<script src="' . esc_url($acf_handler_url) . '?v=' . time() . '"></script>';
     }
     
     /**

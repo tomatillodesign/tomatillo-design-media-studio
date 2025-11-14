@@ -197,7 +197,7 @@ GPL v2 or later. See [LICENSE](LICENSE) for details.
 
 **Developed by**: Chris Liu-Beers  
 **Company**: [Tomatillo Design](https://tomatillodesign.com)  
-**Version**: 1.0.1  
+**Version**: 1.0.3  
 **Last Updated**: January 2025
 
 ---

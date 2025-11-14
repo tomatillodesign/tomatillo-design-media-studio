@@ -35,13 +35,26 @@
     var arr = Array.isArray(selection) ? selection : (selection?.toArray ? selection.toArray() : []);
     var ids = arr.map(function(it){ if (it?.get) return parseInt(it.get('id'),10); if (it && (it.id||it.ID)) return parseInt(it.id||it.ID,10); return NaN; })
                  .filter(Number.isFinite);
-    LOG('Parsed selection → IDs:', ids);
     return ids;
   }
   function mergeIds(newIds, currentIds){
-    var merged = [].concat(newIds, currentIds.filter(function(id){ return newIds.indexOf(id)===-1; }))
-                   .map(function(n){ return parseInt(n,10); }).filter(Number.isFinite);
-    LOG('Merge IDs →', {new:newIds, current:currentIds, merged:merged});
+    // Ensure both are arrays
+    if (!Array.isArray(newIds)) { newIds = []; }
+    if (!Array.isArray(currentIds)) { 
+      if (typeof currentIds === 'string' && currentIds) {
+        currentIds = currentIds.split(',').map(function(v){ return parseInt(v,10); }).filter(Number.isFinite);
+      } else {
+        currentIds = []; 
+      }
+    }
+    
+    // Filter out invalid values from both arrays
+    newIds = newIds.map(function(n){ return parseInt(n,10); }).filter(function(n){ return Number.isFinite(n) && n > 0; });
+    currentIds = currentIds.map(function(n){ return parseInt(n,10); }).filter(function(n){ return Number.isFinite(n) && n > 0; });
+    
+    // Merge: new IDs first, then existing IDs that aren't in new IDs
+    var merged = [].concat(newIds, currentIds.filter(function(id){ return newIds.indexOf(id)===-1; }));
+    
     return merged;
   }
   function eqIds(a,b){
@@ -125,14 +138,40 @@
       if (!changed){ LOG('Block attrs already matched; no patch.'); return true; }
 
       snapBlock('before updateBlockAttributes');
+      
       dis.updateBlockAttributes(cid, attrs);
       nudgeDirty();
 
+      // Verify immediately and after delays
       setTimeout(function(){
         var after = sel.getBlock(cid);
-        LOG('Post-sync attributes keys:', after? Object.keys(after.attributes||{}):'(none)');
-        if (after?.attributes?.data){ LOG('Post-sync attrs.data keys:', Object.keys(after.attributes.data)); LOG('Post-sync attrs.data raw:', after.attributes.data); }
-      }, 0);
+        LOG('Post-sync (50ms) attributes keys:', after? Object.keys(after.attributes||{}):'(none)');
+        if (after?.attributes?.data){ 
+          LOG('Post-sync (50ms) attrs.data keys:', Object.keys(after.attributes.data)); 
+          LOG('Post-sync (50ms) attrs.data[gallery]:', after.attributes.data[fname]);
+          LOG('Post-sync (50ms) attrs.data[field_yakstretch_gallery]:', after.attributes.data[fkey]);
+        }
+      }, 50);
+      
+      // Also check after longer delay to see if ACF overwrites it
+      setTimeout(function(){
+        var after = sel.getBlock(cid);
+        LOG('Post-sync (500ms) - checking if ACF overwrote');
+        if (after?.attributes?.data){ 
+          LOG('Post-sync (500ms) attrs.data[gallery]:', after.attributes.data[fname]);
+          LOG('Post-sync (500ms) attrs.data[field_yakstretch_gallery]:', after.attributes.data[fkey]);
+          // If ACF overwrote it, re-apply
+          var currentGallery = after.attributes.data[fname] || after.attributes.data[fkey];
+          if (currentGallery && Array.isArray(currentGallery) && (currentGallery.length === 0 || currentGallery[0] === 0 || currentGallery[0] === '0')) {
+            // Re-apply
+            var reAttrs = Object.assign({}, after.attributes);
+            reAttrs.data = Object.assign({}, reAttrs.data);
+            reAttrs.data[fname] = ids.slice(0);
+            reAttrs.data[fkey] = ids.slice(0);
+            dis.updateBlockAttributes(cid, reAttrs);
+          }
+        }
+      }, 500);
 
       return true;
     } catch(e){ ERR('forceSyncAttrs', e); return false; } finally { GE(); }
@@ -214,107 +253,83 @@
 
   // =================== CORE WRITE ===================
   function setGalleryIds(field, ids){
-    G('SET via DIRECT ACF GALLERY APPROACH');
     try{
-      LOG('=== GALLERY SET ATTEMPT ===');
-      LOG('IDs to write:', ids);
-
-      // First, let's understand the current state
-      LOG('=== BEFORE DEBUG ANALYSIS ===');
-      debugACFGalleryStructure(field);
-
       var $galleryContainer = field.$el.find('.acf-gallery');
       var $hiddenInput = $galleryContainer.find('input[type="hidden"]');
-
-      // =================== METHOD 1: DIRECT HIDDEN INPUT ===================
-      LOG('Method 1: Direct hidden input manipulation');
       var idsString = ids.join(',');
+      
+      // CRITICAL: Update hidden input FIRST - ACF reads from this during save!
+      // If this is wrong, ACF will overwrite block attributes with wrong data
       $hiddenInput.val(idsString);
-      LOG('✅ Hidden input set to:', idsString);
+      
+      // Also trigger input event so ACF knows it changed
+      $hiddenInput.trigger('input').trigger('change');
 
-      // =================== METHOD 2: ACF MODEL (IF WORKING) ===================
-      LOG('Method 2: ACF model attempt');
-      try {
-        var beforeModel = field.val() || [];
-        LOG('Model before:', beforeModel);
-
-        field.val(ids);
-        var afterModel = field.val() || [];
-        LOG('Model after:', afterModel);
-
-        if (eqIds(afterModel, ids)) {
-          LOG('✅ ACF model working correctly');
-        } else {
-          LOG('❌ ACF model not working as expected');
-        }
-      } catch (modelError) {
-        LOG('❌ ACF model error:', modelError);
+      // =================== METHOD 2: ACF MODEL (CRITICAL - MUST UPDATE FIRST) ===================
+      // CRITICAL: ACF Gallery expects array of IDs, not objects
+      // Must update field model FIRST before updating block attributes
+      // This ensures ACF's internal state matches what we're saving
+      // ALSO: This updates the hidden input that ACF reads during save!
+      field.val(ids);
+      
+      // Verify the hidden input was updated by field.val()
+      var hiddenAfterVal = $hiddenInput.val();
+      if (hiddenAfterVal !== idsString) {
+        $hiddenInput.val(idsString);
+        $hiddenInput.trigger('input').trigger('change');
       }
+      
+      // Wait a tick for ACF to process the value change
+      setTimeout(function() {
+        // CRITICAL: Trigger ACF Gallery to render/update the UI
+        if (typeof field.render === 'function') {
+          try {
+            field.render();
+          } catch(renderErr) {
+            // Silent fail
+          }
+        }
+        
+        // Also try triggering the gallery's internal update
+        if (field.$el && field.$el.find('.acf-gallery').length) {
+          try {
+            acf.doAction('render', field.$el);
+          } catch(renderErr) {
+            // Silent fail
+          }
+        }
+      }, 10);
 
       // =================== METHOD 3: FORCE FIELD RECOGNITION ===================
-      LOG('Method 3: Force field recognition');
-
       // Try to trigger ACF's internal field change
       try {
         field.$el.trigger('change');
         field.$input && field.$input.trigger('change');
         acf.doAction('change', field.$el);
-        LOG('✅ ACF field change triggered');
       } catch(e) {
-        LOG('❌ ACF change trigger failed:', e);
+        // Silent fail
       }
 
-      // =================== METHOD 4: FORM SUBMISSION PREP ===================
-      LOG('Method 4: Form submission preparation');
+      // =================== METHOD 4: BLOCK ATTRIBUTE SYNC ===================
+      // CRITICAL: Do this AFTER ACF field model is updated (in setTimeout above)
+      // This ensures ACF's internal state matches before we sync to block attributes
+      var storageMode = detectStorageMode(field);
+      if (storageMode === 'block') {
+        // Wait for ACF model to be updated first (from Method 2 setTimeout)
+        setTimeout(function() {
+          forceSyncAttrs(field, ids);
+        }, 50); // Wait for ACF model update to complete
+      }
 
+      // =================== METHOD 5: FORM SUBMISSION PREP ===================
       // Force form to recognize the field
       var $form = $hiddenInput.closest('form');
       if ($form.length) {
         $form.trigger('change');
-        LOG('✅ Form change triggered');
       }
 
-      // =================== METHOD 5: WORDPRESS EDITOR SYNC ===================
-      LOG('Method 5: WordPress editor sync');
+      // =================== METHOD 6: WORDPRESS EDITOR SYNC ===================
       nudgeDirty();
-
-      // =================== FINAL VERIFICATION ===================
-      setTimeout(function(){
-        LOG('=== FINAL VERIFICATION ===');
-        LOG('Hidden input value:', $hiddenInput.val());
-        LOG('Model value:', field.val());
-        LOG('Expected IDs:', ids);
-
-        var hiddenMatch = $hiddenInput.val() === idsString;
-        var modelMatch = eqIds(field.val() || [], ids);
-
-        LOG('Hidden input correct:', hiddenMatch ? '✅' : '❌');
-        LOG('Model correct:', modelMatch ? '✅' : '❌');
-
-        if (!hiddenMatch || !modelMatch) {
-          LOG('❌ PERSISTENCE FAILURE - Data not properly stored');
-          LOG('This suggests ACF Gallery uses a different storage mechanism');
-        } else {
-          LOG('✅ Data appears to be stored correctly');
-        }
-
-        // Try one more approach - direct meta update if in block editor
-        if (window.wp && wp.data && wp.data.dispatch && detectStorageMode(field) === 'block') {
-          LOG('Attempting direct meta update...');
-          try {
-            var fieldName = field.get('name');
-            wp.data.dispatch('core/editor').editPost({
-              meta: {
-                [fieldName]: idsString
-              }
-            });
-            LOG('✅ Direct meta update attempted');
-          } catch(e) {
-            LOG('❌ Direct meta update failed:', e);
-          }
-        }
-
-      }, 200);
 
     } finally { GE(); }
   }
@@ -383,28 +398,79 @@
                        (window.TomatilloMediaFrame && typeof window.TomatilloMediaFrame.open === 'function');
 
     function openWithTomatillo(current){
+      LOG('🎯 Opening Tomatillo Media Frame');
+      LOG('Current gallery IDs:', current);
+      
       var opts = {
         multiple:true, library:{type:'image'}, title:'Select images', selected: current,
         onSelect: function(selection){
+          LOG('🎯 Media Frame onSelect callback fired!');
+          LOG('Selection received:', selection);
           var newIds = idsFromSelection(selection);
-          if (!newIds.length){ WARN('No valid IDs from selection.'); return; }
-          var merged = mergeIds(newIds, current);
-          setGalleryIds(field, merged);
-          installTamperRepair(field, merged);
+          LOG('Parsed IDs from selection:', newIds);
+          
+          if (!newIds.length){ 
+            WARN('No valid IDs from selection.'); 
+            return; 
+          }
+          
+          // CRITICAL: For gallery fields, we should REPLACE, not merge, when selecting multiple
+          // The user is selecting NEW images, not adding to existing
+          // Only merge if we want to ADD to existing (which we don't for gallery)
+          var idsToSet = newIds; // Replace with new selection
+          
+          // BUT: If current has valid IDs and user might want to keep them, merge instead
+          // Actually, let's check: if current is empty or just ['0'], replace. Otherwise merge.
+          var hasValidCurrent = current && Array.isArray(current) && current.length > 0 && 
+                                current.some(function(id){ return id && id !== 0 && id !== '0'; });
+          
+          if (hasValidCurrent) {
+            // Merge: add new to existing
+            var merged = mergeIds(newIds, current);
+            LOG('Merged IDs (new + current):', merged);
+            idsToSet = merged;
+          } else {
+            // Replace: use only new selection
+            LOG('Replacing gallery with new selection (no valid current)');
+            idsToSet = newIds;
+          }
+          
+          setGalleryIds(field, idsToSet);
+          installTamperRepair(field, idsToSet);
         },
-        onCancel: function(){ LOG('Modal cancelled.'); },
-        onError:  function(m){ ERR('Modal error:', m); }
+        onCancel: function(){ 
+          LOG('Modal cancelled.'); 
+        },
+        onError:  function(m){ 
+          ERR('Modal error:', m); 
+        }
       };
       if (typeof window.TomatilloMediaFrame === 'function'){
-        var frame = new window.TomatilloMediaFrame(opts); frame.open && frame.open();
-      } else { window.TomatilloMediaFrame.open(opts); }
+        LOG('TomatilloMediaFrame is a function, creating new instance');
+        var frame = new window.TomatilloMediaFrame(opts); 
+        frame.open && frame.open();
+      } else if (window.TomatilloMediaFrame && window.TomatilloMediaFrame.open) {
+        LOG('TomatilloMediaFrame.open exists, calling it');
+        window.TomatilloMediaFrame.open(opts);
+      } else {
+        ERR('TomatilloMediaFrame not available!');
+      }
     }
 
     if (hasTomatillo){
       $add.off('.tdPersist').on('click.tdPersist', function(e){
         e.preventDefault(); e.stopPropagation();
         var current = field.val() || [];
-        if (!Array.isArray(current)){ current = String(current).split(',').map(function(v){ return parseInt(v,10); }).filter(Number.isFinite); }
+        LOG('Current gallery value from field.val():', current);
+        if (!Array.isArray(current)){ 
+          current = String(current).split(',').map(function(v){ return parseInt(v,10); }).filter(Number.isFinite); 
+          LOG('Converted current to array:', current);
+        }
+        
+        // Filter out invalid values
+        current = current.filter(function(id){ return id && id !== 0 && id !== '0'; });
+        LOG('Filtered current:', current);
+        
         openWithTomatillo(current);
       });
       $el.find('.acf-gallery-attachments .acf-gallery-attachment.-icon .upload')
@@ -428,10 +494,152 @@
 
   // =================== SAVE-TIME SAFETY NET ===================
   function installSaveSync(){
-    // REMOVED: wp.data subscription was causing conflicts with ACF validation during save
-    // The hybrid approach in setGalleryIds() should be sufficient for persistence
-    LOG('Save-time sync removed - relying on hybrid approach in setGalleryIds()');
+    // Monitor for save events and ensure gallery data persists
+    if (wp?.data?.subscribe) {
+      var lastSaveCheck = 0;
+      var saveCheckThrottle = 100; // Only check every 100ms
+      
+      var unsubscribe = wp.data.subscribe(function(){
+        try {
+          var now = Date.now();
+          if (now - lastSaveCheck < saveCheckThrottle) return; // Throttle
+          lastSaveCheck = now;
+          
+          var isSavingPost = wp.data.select('core/editor').isSavingPost();
+          var isAutosavingPost = wp.data.select('core/editor').isAutosavingPost();
+          
+          if (isSavingPost || isAutosavingPost) {
+            
+            // Find all gallery fields and verify their block data
+            $('.acf-field[data-type="gallery"]').each(function(){
+              var $field = $(this);
+              var field = getFieldFromEl($field);
+              if (!field) return;
+              
+              var fieldName = field.get('name');
+              var fieldKey = field.get('key');
+              var currentIds = field.val() || [];
+              
+              // Filter out invalid values
+              currentIds = currentIds.filter(function(id){ return id && id !== 0 && id !== '0'; });
+              
+              if (currentIds.length > 0) {
+                var cid = getClientId(field);
+                if (cid) {
+                  var blk = wp.data.select('core/block-editor').getBlock(cid);
+                  if (blk && blk.attributes && blk.attributes.data) {
+                    var blockGallery = blk.attributes.data[fieldName] || blk.attributes.data[fieldKey];
+                    var blockIds = Array.isArray(blockGallery) ? blockGallery : [];
+                    blockIds = blockIds.filter(function(id){ return id && id !== 0 && id !== '0'; });
+                    
+                    // If block data doesn't match field model, sync it
+                    if (!eqIds(currentIds, blockIds)) {
+                      forceSyncAttrs(field, currentIds);
+                    }
+                  }
+                }
+              }
+            });
+          }
+        } catch(e) {
+          ERR('Save-time sync error:', e);
+        }
+      });
+      
+      LOG('Save-time sync installed');
+    } else {
+      LOG('Save-time sync unavailable - wp.data.subscribe not found');
+    }
   }
+
+  // =================== ACF SAVE HOOKS ===================
+  // Hook into ACF's save process to prevent overwriting block data
+  acf.addAction('prepare', function($el){
+    try {
+      // $el might be undefined or not a jQuery object in some contexts
+      if (!$el || !$el.find) {
+        // Try to find gallery fields globally
+        $('.acf-field[data-type="gallery"]').each(function(){
+          var field = getFieldFromEl($(this));
+          if (!field) return;
+          
+          var currentIds = field.val() || [];
+          currentIds = currentIds.filter(function(id){ return id && id !== 0 && id !== '0'; });
+          
+          if (currentIds.length > 0) {
+            var cid = getClientId(field);
+            if (cid) {
+              LOG('ACF prepare: Syncing gallery before save', {field:currentIds});
+              console.log('🎯 YAKSTRETCH DEBUG: ACF prepare - syncing gallery:', currentIds);
+              forceSyncAttrs(field, currentIds);
+            }
+          }
+        });
+        return;
+      }
+      
+      // This fires before ACF prepares data for save
+      // Find gallery fields and ensure block attributes match field model
+      $el.find('.acf-field[data-type="gallery"]').each(function(){
+        var field = getFieldFromEl($(this));
+        if (!field) return;
+        
+        var currentIds = field.val() || [];
+        currentIds = currentIds.filter(function(id){ return id && id !== 0 && id !== '0'; });
+        
+        if (currentIds.length > 0) {
+          var cid = getClientId(field);
+          if (cid) {
+            forceSyncAttrs(field, currentIds);
+          }
+        }
+      });
+    } catch(e) {
+      ERR('ACF prepare hook error:', e);
+    }
+  });
+  
+  // Also hook into validation to ensure data is synced before validation
+  acf.addAction('validation_begin', function($el){
+    try {
+      if (!$el || !$el.find) {
+        $('.acf-field[data-type="gallery"]').each(function(){
+          var field = getFieldFromEl($(this));
+          if (!field) return;
+          
+          var currentIds = field.val() || [];
+          currentIds = currentIds.filter(function(id){ return id && id !== 0 && id !== '0'; });
+          
+          if (currentIds.length > 0) {
+            var cid = getClientId(field);
+            if (cid) {
+              LOG('ACF validation_begin: Syncing gallery before validation', {field:currentIds});
+              console.log('🎯 YAKSTRETCH DEBUG: ACF validation_begin - syncing gallery:', currentIds);
+              forceSyncAttrs(field, currentIds);
+            }
+          }
+        });
+        return;
+      }
+      
+      $el.find('.acf-field[data-type="gallery"]').each(function(){
+        var field = getFieldFromEl($(this));
+        if (!field) return;
+        
+        var currentIds = field.val() || [];
+        currentIds = currentIds.filter(function(id){ return id && id !== 0 && id !== '0'; });
+        
+        if (currentIds.length > 0) {
+          var cid = getClientId(field);
+          if (cid) {
+            forceSyncAttrs(field, currentIds);
+          }
+        }
+      });
+    } catch(e) {
+      ERR('ACF validation_begin hook error:', e);
+    }
+  });
 
   // =================== ACF LIFECYCLE ===================
   acf.addAction('ready', function(){ LOG('ACF ready'); bindAll(); installSaveSync(); });
