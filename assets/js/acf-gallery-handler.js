@@ -14,18 +14,21 @@
 (function ($) {
   'use strict';
 
+  // =================== DEBUG MODE ===================
+  var tomatilloDebugMode = (window.tomatilloSettings && window.tomatilloSettings.debug_mode) || false;
+
   // =================== LOGGING ===================
   var NS = '🎯 ACF Gallery Persist';
-  var VERBOSE = true;
+  var VERBOSE = tomatilloDebugMode;
   var MONITOR_ONLY = true; // Diagnostics-only; do not mutate unless explicitly called
   function now(){ try { return new Date().toISOString().replace('T',' ').replace('Z',''); } catch(e){ return ''; } }
   function lp(){ return '['+now()+'] '+NS; }
-  function LOG(){ console.log.apply(console, [lp()].concat([].slice.call(arguments))); }
-  function WARN(){ console.warn.apply(console, [lp()].concat([].slice.call(arguments))); }
-  function ERR(){ console.error.apply(console, [lp()].concat([].slice.call(arguments))); }
-  function G(t){ if (VERBOSE) try{ console.group(lp()+' '+t); }catch(e){} }
-  function GE(){ if (VERBOSE) try{ console.groupEnd(); }catch(e){} }
-  function GC(t){ if (VERBOSE) try{ console.groupCollapsed(lp()+' '+t); }catch(e){} }
+  function LOG(){ if (tomatilloDebugMode && console && console.log) { console.log.apply(console, [lp()].concat([].slice.call(arguments))); } }
+  function WARN(){ if (tomatilloDebugMode && console && console.warn) { console.warn.apply(console, [lp()].concat([].slice.call(arguments))); } }
+  function ERR(){ if (tomatilloDebugMode && console && console.error) { console.error.apply(console, [lp()].concat([].slice.call(arguments))); } }
+  function G(t){ if (VERBOSE && console && console.group) try{ console.group(lp()+' '+t); }catch(e){} }
+  function GE(){ if (VERBOSE && console && console.groupEnd) try{ console.groupEnd(); }catch(e){} }
+  function GC(t){ if (VERBOSE && console && console.groupCollapsed) try{ console.groupCollapsed(lp()+' '+t); }catch(e){} }
 
   // =================== UTILS ===================
   function to$(ctx){ if (!ctx) return $(document); if (ctx.jquery) return ctx; if (ctx.$el) return to$(ctx.$el); return $(ctx); }
@@ -570,7 +573,6 @@
             var cid = getClientId(field);
             if (cid) {
               LOG('ACF prepare: Syncing gallery before save', {field:currentIds});
-              console.log('🎯 YAKSTRETCH DEBUG: ACF prepare - syncing gallery:', currentIds);
               forceSyncAttrs(field, currentIds);
             }
           }
@@ -614,7 +616,6 @@
             var cid = getClientId(field);
             if (cid) {
               LOG('ACF validation_begin: Syncing gallery before validation', {field:currentIds});
-              console.log('🎯 YAKSTRETCH DEBUG: ACF validation_begin - syncing gallery:', currentIds);
               forceSyncAttrs(field, currentIds);
             }
           }

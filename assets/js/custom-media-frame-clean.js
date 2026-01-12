@@ -17,13 +17,37 @@ var lastUploadTime = 0; // Track last upload to prevent duplicates
 var uploadDebounceDelay = 500; // Milliseconds to wait between uploads
 var hasMoreItemsOnServer = true; // Track if there are more items available on server
 
+// Debug mode: Check if debugging is enabled via settings
+var tomatilloDebugMode = (window.tomatilloSettings && window.tomatilloSettings.debug_mode) || false;
+
+// Conditional logging helper
+function debugLog() {
+    if (tomatilloDebugMode && console && console.log) {
+        console.log.apply(console, arguments);
+    }
+}
+
+// Conditional error logging helper
+function debugError() {
+    if (tomatilloDebugMode && console && console.error) {
+        console.error.apply(console, arguments);
+    }
+}
+
+// Conditional warning logging helper
+function debugWarn() {
+    if (tomatilloDebugMode && console && console.warn) {
+        console.warn.apply(console, arguments);
+    }
+}
+
     // Wait for wp.media to be available
     function waitForWpMedia(callback) {
         if (typeof wp !== 'undefined' && wp.media && wp.media.view) {
-            console.log('wp.media is ready');
+            debugLog('wp.media is ready');
             callback();
         } else {
-            console.log('Waiting for wp.media...');
+            debugLog('Waiting for wp.media...');
             setTimeout(function() {
                 waitForWpMedia(callback);
             }, 100);
@@ -32,14 +56,14 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
 
     // Initialize when wp.media is ready
     waitForWpMedia(function() {
-        console.log('Tomatillo Media Studio: Initializing CLEAN custom media frame');
+        debugLog('Tomatillo Media Studio: Initializing CLEAN custom media frame');
         initializeCustomMediaFrame();
     });
 
     function initializeCustomMediaFrame() {
         
         try {
-            console.log('Starting CLEAN custom media frame initialization...');
+            debugLog('Starting CLEAN custom media frame initialization...');
             
             /**
              * Clean Media Frame Manager
@@ -50,7 +74,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                  * Open our custom media frame
                  */
                 open: function(options) {
-                    console.log('CLEAN TomatilloMediaFrame.open called with options:', options);
+                    debugLog('CLEAN TomatilloMediaFrame.open called with options:', options);
                     
                     options = options || {};
                     
@@ -63,19 +87,19 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                     // Add responsive CSS
                     addResponsiveCSS();
                     
-                    console.log('CLEAN custom modal added to page');
+                    debugLog('CLEAN custom modal added to page');
                     
                     // CRITICAL: Set default filter to 'image' BEFORE initializing grid
                     // This ensures files are hidden by default
                     setTimeout(function() {
                         $('#tomatillo-filter').val('image');
-                        console.log('✅ Default filter explicitly set to: image');
+                        debugLog('✅ Default filter explicitly set to: image');
                         
                         // Initialize the media grid AFTER filter is set
                         initializeMediaGrid(options);
                         
                         // Handle events
-                        console.log('🚀 Setting up event handlers for modal');
+                        debugLog('🚀 Setting up event handlers for modal');
                         setupEventHandlers(options);
                         
                         // Add window resize handler for masonry
@@ -87,7 +111,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                         
                         // Note: Auto-selection is now handled in real-time during upload
                         
-                        console.log('CLEAN custom media frame opened');
+                        debugLog('CLEAN custom media frame opened');
                     }, 10);
                     
                 },
@@ -265,9 +289,9 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                  * Get high-resolution image URL for ACF preview
                  */
                 getHighResImageForACF: function(attachmentId, callback) {
-                    console.log('🔍 ACF Bridge: Getting high-res image for attachment:', attachmentId);
-                    console.log('🔍 ACF Bridge: AJAX URL:', ajaxurl || '/wp-admin/admin-ajax.php');
-                    console.log('🔍 ACF Bridge: Nonce:', tomatillo_nonce || 'test');
+                    debugLog('🔍 ACF Bridge: Getting high-res image for attachment:', attachmentId);
+                    debugLog('🔍 ACF Bridge: AJAX URL:', ajaxurl || '/wp-admin/admin-ajax.php');
+                    debugLog('🔍 ACF Bridge: Nonce:', tomatillo_nonce || 'test');
                     
                     // Use WordPress AJAX to get image data
                     $.ajax({
@@ -279,48 +303,48 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                             nonce: tomatillo_nonce || 'test'
                         },
                         success: function(response) {
-                            console.log('🔍 ACF Bridge: AJAX success for attachment', attachmentId);
-                            console.log('🔍 ACF Bridge: Full response:', response);
+                            debugLog('🔍 ACF Bridge: AJAX success for attachment', attachmentId);
+                            debugLog('🔍 ACF Bridge: Full response:', response);
                             
                             if (response.success && response.data) {
                                 var data = response.data;
-                                console.log('🔍 ACF Bridge: Response data:', data);
+                                debugLog('🔍 ACF Bridge: Response data:', data);
                                 
                                 var bestUrl = null;
                                 
                                 // Priority: AVIF → WebP → Scaled → Large → Original
                                 if (data.avif_url) {
                                     bestUrl = data.avif_url;
-                                    console.log('🔍 ACF Bridge: Using AVIF URL:', bestUrl);
+                                    debugLog('🔍 ACF Bridge: Using AVIF URL:', bestUrl);
                                 } else if (data.webp_url) {
                                     bestUrl = data.webp_url;
-                                    console.log('🔍 ACF Bridge: Using WebP URL:', bestUrl);
+                                    debugLog('🔍 ACF Bridge: Using WebP URL:', bestUrl);
                                 } else if (data.scaled_url) {
                                     bestUrl = data.scaled_url;
-                                    console.log('🔍 ACF Bridge: Using scaled URL:', bestUrl);
+                                    debugLog('🔍 ACF Bridge: Using scaled URL:', bestUrl);
                                 } else if (data.large_url) {
                                     bestUrl = data.large_url;
-                                    console.log('🔍 ACF Bridge: Using large URL:', bestUrl);
+                                    debugLog('🔍 ACF Bridge: Using large URL:', bestUrl);
                                 } else {
                                     // Fallback: remove size suffix from current URL
                                     bestUrl = TomatilloMediaFrame.removeImageSizeSuffix(data.url || '');
-                                    console.log('🔍 ACF Bridge: Using fallback URL:', bestUrl);
+                                    debugLog('🔍 ACF Bridge: Using fallback URL:', bestUrl);
                                 }
                                 
-                                console.log('🔍 ACF Bridge: Final best URL:', bestUrl);
+                                debugLog('🔍 ACF Bridge: Final best URL:', bestUrl);
                                 callback(bestUrl);
                             } else {
-                                console.log('🔍 ACF Bridge: AJAX response not successful or no data');
-                                console.log('🔍 ACF Bridge: Response success:', response.success);
-                                console.log('🔍 ACF Bridge: Response data:', response.data);
+                                debugLog('🔍 ACF Bridge: AJAX response not successful or no data');
+                                debugLog('🔍 ACF Bridge: Response success:', response.success);
+                                debugLog('🔍 ACF Bridge: Response data:', response.data);
                                 callback(null);
                             }
                         },
                         error: function(xhr, status, error) {
-                            console.error('🔍 ACF Bridge: AJAX error for attachment', attachmentId);
-                            console.error('🔍 ACF Bridge: Status:', status);
-                            console.error('🔍 ACF Bridge: Error:', error);
-                            console.error('🔍 ACF Bridge: XHR:', xhr);
+                            debugError('🔍 ACF Bridge: AJAX error for attachment', attachmentId);
+                            debugError('🔍 ACF Bridge: Status:', status);
+                            debugError('🔍 ACF Bridge: Error:', error);
+                            debugError('🔍 ACF Bridge: XHR:', xhr);
                             callback(null);
                         }
                     });
@@ -338,7 +362,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                     // Also remove -scaled suffix if present
                     cleanUrl = cleanUrl.replace(/-scaled(?=\.[^.]+$)/, '');
                     
-                    console.log('ACF Bridge: Cleaned URL:', url, '→', cleanUrl);
+                    debugLog('ACF Bridge: Cleaned URL:', url, '→', cleanUrl);
                     return cleanUrl;
                 },
                 
@@ -346,17 +370,17 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                  * Intercept wp.media() calls (ACF might use this)
                  */
                 interceptWpMedia: function() {
-                    console.log('Intercepting wp.media() calls');
+                    debugLog('Intercepting wp.media() calls');
                     var originalWpMedia = wp.media;
                     
                     wp.media = function(options) {
-                        console.log('wp.media() intercepted');
-                        console.log('ACF/wp.media Call - Options:', options);
-                        console.log('Stack trace:', new Error().stack);
+                        debugLog('wp.media() intercepted');
+                        debugLog('ACF/wp.media Call - Options:', options);
+                        debugLog('Stack trace:', new Error().stack);
                         
                         // Check if this looks like a media picker call
                         if (options && (options.title || options.button || options.multiple !== undefined)) {
-                            console.log('This looks like a media picker - using custom frame');
+                            debugLog('This looks like a media picker - using custom frame');
                             return TomatilloMediaFrame.open(options);
                         }
                         
@@ -706,35 +730,35 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                  * Set ACF gallery field value using the same pattern as single image
                  */
                 setACFGalleryValue: function($fieldWrapper, attachments) {
-                    console.log('🎯 GALLERY UPDATE: Starting gallery update for', attachments.length, 'attachments');
+                    debugLog('🎯 GALLERY UPDATE: Starting gallery update for', attachments.length, 'attachments');
 
                     try {
                         // =================== ACF GALLERY DEBUGGING ===================
-                        console.log('🔍 ANALYZING ACF GALLERY STRUCTURE');
+                        debugLog('🔍 ANALYZING ACF GALLERY STRUCTURE');
                         var $galleryContainer = $fieldWrapper.find('.acf-gallery');
                         if (!$galleryContainer.length) {
-                            console.log('❌ GALLERY UPDATE: No gallery container found');
+                            debugLog('❌ GALLERY UPDATE: No gallery container found');
                             return;
                         }
 
-                        console.log('✅ GALLERY UPDATE: Found gallery container');
+                        debugLog('✅ GALLERY UPDATE: Found gallery container');
 
                         // Extract attachment IDs
                         var attachmentIds = attachments.map(function(attachment) {
                             return attachment.id;
                         });
-                        console.log('🎯 GALLERY UPDATE: Attachment IDs:', attachmentIds);
+                        debugLog('🎯 GALLERY UPDATE: Attachment IDs:', attachmentIds);
 
                         // =================== STEP 1: ANALYZE CURRENT STATE ===================
                         var $hiddenInput = $galleryContainer.find('input[type="hidden"]');
-                        console.log('🔍 Hidden input analysis:');
-                        console.log('  - Found:', $hiddenInput.length);
-                        console.log('  - Name:', $hiddenInput.attr('name'));
-                        console.log('  - Current value:', $hiddenInput.val());
+                        debugLog('🔍 Hidden input analysis:');
+                        debugLog('  - Found:', $hiddenInput.length);
+                        debugLog('  - Name:', $hiddenInput.attr('name'));
+                        debugLog('  - Current value:', $hiddenInput.val());
 
                         var $attachmentsContainer = $galleryContainer.find('.acf-gallery-attachments');
                         var existingAttachments = $attachmentsContainer.find('.acf-gallery-attachment:not(.-icon)');
-                        console.log('🔍 Existing attachments:', existingAttachments.length);
+                        debugLog('🔍 Existing attachments:', existingAttachments.length);
 
                         // Try to get ACF field object for analysis
                         var fieldKey = $fieldWrapper.attr('data-key');
@@ -742,17 +766,17 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                             try {
                                 var field = acf.getField(fieldKey);
                                 if (field) {
-                                    console.log('🔍 ACF Field Model Analysis:');
-                                    console.log('  - Field key:', field.get('key'));
-                                    console.log('  - Field name:', field.get('name'));
-                                    console.log('  - Field type:', field.get('type'));
-                                    console.log('  - Current model value:', field.val());
-                                    console.log('  - Model value type:', typeof field.val());
+                                    debugLog('🔍 ACF Field Model Analysis:');
+                                    debugLog('  - Field key:', field.get('key'));
+                                    debugLog('  - Field name:', field.get('name'));
+                                    debugLog('  - Field type:', field.get('type'));
+                                    debugLog('  - Current model value:', field.val());
+                                    debugLog('  - Model value type:', typeof field.val());
                                 } else {
-                                    console.log('❌ Could not get ACF field object');
+                                    debugLog('❌ Could not get ACF field object');
                                 }
                             } catch(e) {
-                                console.log('❌ Error accessing ACF field model:', e);
+                                debugLog('❌ Error accessing ACF field model:', e);
                             }
                         }
 
@@ -760,22 +784,22 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                         if ($hiddenInput.length) {
                             var idsString = attachmentIds.join(',');
                             $hiddenInput.val(idsString);
-                            console.log('✅ GALLERY UPDATE: Set hidden input to:', idsString);
+                            debugLog('✅ GALLERY UPDATE: Set hidden input to:', idsString);
                         } else {
-                            console.log('❌ GALLERY UPDATE: No hidden input found');
+                            debugLog('❌ GALLERY UPDATE: No hidden input found');
                             return;
                         }
 
                         // =================== STEP 3: CREATE VISUAL THUMBNAILS ===================
                         if ($attachmentsContainer.length) {
-                            console.log('✅ GALLERY UPDATE: Found attachments container');
+                            debugLog('✅ GALLERY UPDATE: Found attachments container');
 
                             // Clear existing attachments (keep placeholder)
                             $attachmentsContainer.find('.acf-gallery-attachment:not(.-icon)').remove();
 
                             // Create thumbnails for each attachment
                             attachments.forEach(function(attachment, index) {
-                                console.log('🎯 GALLERY UPDATE: Creating thumbnail for attachment:', attachment.id);
+                                debugLog('🎯 GALLERY UPDATE: Creating thumbnail for attachment:', attachment.id);
 
                                 // Get the best image URL
                                 var imageUrl = TomatilloMediaFrame.getBestACFPreviewUrl(attachment);
@@ -799,51 +823,51 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                                 $attachmentsContainer.append(attachmentHtml);
                             });
 
-                            console.log('✅ GALLERY UPDATE: Visual thumbnails created');
+                            debugLog('✅ GALLERY UPDATE: Visual thumbnails created');
                         }
 
                         // =================== STEP 4: MULTIPLE PERSISTENCE METHODS ===================
-                        console.log('🎯 GALLERY UPDATE: Attempting multiple persistence methods');
+                        debugLog('🎯 GALLERY UPDATE: Attempting multiple persistence methods');
 
                         // Method 1: Direct hidden input change
                         $hiddenInput.trigger('change');
                         $hiddenInput.trigger('input');
                         $hiddenInput.trigger('blur');
-                        console.log('✅ Method 1: Hidden input change events');
+                        debugLog('✅ Method 1: Hidden input change events');
 
                         // Method 2: Field wrapper change
                         $fieldWrapper.trigger('change');
-                        console.log('✅ Method 2: Field wrapper change event');
+                        debugLog('✅ Method 2: Field wrapper change event');
 
                         // Method 3: Try ACF field model if available
                         if (fieldKey && typeof acf !== 'undefined' && acf.getField) {
                             try {
                                 var field = acf.getField(fieldKey);
                                 if (field) {
-                                    console.log('🔍 ACF Gallery Model Details:');
-                                    console.log('  - Field object:', field);
-                                    console.log('  - Available methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(field)));
-                                    console.log('  - Field data:', field.get ? field.get('data') : 'no get method');
+                                    debugLog('🔍 ACF Gallery Model Details:');
+                                    debugLog('  - Field object:', field);
+                                    debugLog('  - Available methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(field)));
+                                    debugLog('  - Field data:', field.get ? field.get('data') : 'no get method');
 
                                     var beforeVal = field.val();
-                                    console.log('  - Before setting:', beforeVal, typeof beforeVal);
+                                    debugLog('  - Before setting:', beforeVal, typeof beforeVal);
 
                                     field.val(attachmentIds);
                                     var afterVal = field.val();
-                                    console.log('  - After setting:', afterVal, typeof afterVal);
+                                    debugLog('  - After setting:', afterVal, typeof afterVal);
 
                                     if (afterVal && Array.isArray(afterVal) && afterVal.length === attachmentIds.length) {
-                                        console.log('✅ Method 3: ACF field model updated successfully');
+                                        debugLog('✅ Method 3: ACF field model updated successfully');
                                     } else {
-                                        console.log('❌ Method 3: ACF field model may not be working correctly');
-                                        console.log('  - Expected:', attachmentIds);
-                                        console.log('  - Got:', afterVal);
+                                        debugLog('❌ Method 3: ACF field model may not be working correctly');
+                                        debugLog('  - Expected:', attachmentIds);
+                                        debugLog('  - Got:', afterVal);
                                     }
 
                                     field.$el.trigger('change');
                                 }
                             } catch(e) {
-                                console.log('❌ Method 3: ACF field model failed:', e);
+                                debugLog('❌ Method 3: ACF field model failed:', e);
                             }
                         }
 
@@ -851,7 +875,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                         var $form = $hiddenInput.closest('form');
                         if ($form.length) {
                             $form.trigger('change');
-                            console.log('✅ Method 4: Form change triggered');
+                            debugLog('✅ Method 4: Form change triggered');
                         }
 
                         // Method 5: Block Editor Data Update (CRITICAL FIX)
@@ -862,7 +886,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
 
                                 if (blockEditor && blockEditor.getBlocks && editorDispatch && editorDispatch.updateBlockAttributes) {
                                     var blocks = blockEditor.getBlocks();
-                                    console.log('🔍 BLOCK EDITOR GALLERY UPDATE:');
+                                    debugLog('🔍 BLOCK EDITOR GALLERY UPDATE:');
 
                                     if (blocks && blocks.length > 0) {
                                         var blockUpdated = false;
@@ -870,25 +894,25 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                                         blocks.forEach(function(block, index) {
                                             // Look for blocks that might contain our gallery field
                                             if (block.name && (block.name.includes('acf/') || block.name.includes('yakstretch') || block.name.includes('yak'))) {
-                                                console.log('  - Checking block ' + index + ':', block.name);
+                                                debugLog('  - Checking block ' + index + ':', block.name);
 
                                                 if (block.attributes && block.attributes.data) {
                                                     var blockData = block.attributes.data;
-                                                    console.log('    - Block data keys:', Object.keys(blockData));
-                                                    console.log('    - Field key to find:', fieldKey);
+                                                    debugLog('    - Block data keys:', Object.keys(blockData));
+                                                    debugLog('    - Field key to find:', fieldKey);
                                                     
                                                     // Use the actual ACF field name from the model; fallback to canonical 'gallery'
                                                     var acfFieldModel = (typeof acf !== 'undefined' && acf.getField) ? acf.getField(fieldKey) : null;
                                                     var fieldName = (acfFieldModel && acfFieldModel.get) ? acfFieldModel.get('name') : 'gallery';
-                                                    console.log('    - Field name to use:', fieldName);
-                                                    console.log('    - Checking block data for:', fieldName);
+                                                    debugLog('    - Field name to use:', fieldName);
+                                                    debugLog('    - Checking block data for:', fieldName);
 
                                                     // Check if this block contains our gallery field
                                                     // ACF may store under field name OR field key depending on config
                                                     var hasByName = blockData.hasOwnProperty(fieldName);
                                                     var hasByKey  = blockData.hasOwnProperty(fieldKey);
                                                     if (hasByName || hasByKey) {
-                                                        console.log('    ✅ Found gallery field in block via', hasByName ? 'name' : 'key');
+                                                        debugLog('    ✅ Found gallery field in block via', hasByName ? 'name' : 'key');
 
                                                         // Update the block data with our gallery IDs (write both for safety)
                                                         var updatedData = Object.assign({}, blockData);
@@ -898,12 +922,12 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                                                         var underscorePtr = '_' + fieldName;
                                                         if (!updatedData.hasOwnProperty(underscorePtr)) {
                                                             updatedData[underscorePtr] = fieldKey;
-                                                            console.log('    - Set underscore pointer', underscorePtr, '→', fieldKey);
+                                                            debugLog('    - Set underscore pointer', underscorePtr, '→', fieldKey);
                                                         }
 
-                                                        console.log('    - Before update (name):', blockData[fieldName]);
-                                                        console.log('    - Before update (key) :', blockData[fieldKey]);
-                                                        console.log('    - Setting to:', attachmentIds);
+                                                        debugLog('    - Before update (name):', blockData[fieldName]);
+                                                        debugLog('    - Before update (key) :', blockData[fieldKey]);
+                                                        debugLog('    - Setting to:', attachmentIds);
 
                                                         // Update the block attributes
                                                         var updatedAttributes = Object.assign({}, block.attributes);
@@ -912,89 +936,89 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                                                         editorDispatch.updateBlockAttributes(block.clientId, updatedAttributes);
                                                         blockUpdated = true;
 
-                                                        console.log('    ✅ Block updated with gallery data:', attachmentIds);
+                                                        debugLog('    ✅ Block updated with gallery data:', attachmentIds);
 
                                                         // Verify the update
                                                         setTimeout(function() {
                                                             var verifyBlocks = blockEditor.getBlocks();
                                                             var verifyBlock = verifyBlocks.find(function(b) { return b.clientId === block.clientId; });
                                                             if (verifyBlock && verifyBlock.attributes && verifyBlock.attributes.data) {
-                                                                console.log('    🔍 Verification - Block data after update (name):', verifyBlock.attributes.data[fieldName]);
-                                                                console.log('    🔍 Verification - Block data after update (key) :', verifyBlock.attributes.data[fieldKey]);
+                                                                debugLog('    🔍 Verification - Block data after update (name):', verifyBlock.attributes.data[fieldName]);
+                                                                debugLog('    🔍 Verification - Block data after update (key) :', verifyBlock.attributes.data[fieldKey]);
                                                                 var ptr = '_' + fieldName;
-                                                                console.log('    🔍 Verification - Underscore pointer:', verifyBlock.attributes.data[ptr]);
+                                                                debugLog('    🔍 Verification - Underscore pointer:', verifyBlock.attributes.data[ptr]);
                                                             }
                                                         }, 50);
 
                                                     } else {
-                                                        console.log('    ❌ Gallery field not found in this block');
+                                                        debugLog('    ❌ Gallery field not found in this block');
                                                     }
                                                 } else {
-                                                    console.log('    ❌ Block has no data attribute');
+                                                    debugLog('    ❌ Block has no data attribute');
                                                 }
                                             }
                                         });
 
                                         if (blockUpdated) {
-                                            console.log('✅ Method 5: Block data updated successfully');
+                                            debugLog('✅ Method 5: Block data updated successfully');
                                             wp.data.dispatch('core/editor').editPost({}); // Trigger editor update
                                         } else {
-                                            console.log('❌ Method 5: No suitable block found for gallery update');
+                                            debugLog('❌ Method 5: No suitable block found for gallery update');
                                         }
 
                                     } else {
-                                        console.log('❌ Method 5: No blocks found');
+                                        debugLog('❌ Method 5: No blocks found');
                                     }
                                 } else {
-                                    console.log('❌ Method 5: Block editor APIs not available');
+                                    debugLog('❌ Method 5: Block editor APIs not available');
                                 }
 
                             } catch(e) {
-                                console.log('❌ Method 5: Block editor update failed:', e);
+                                debugLog('❌ Method 5: Block editor update failed:', e);
                             }
                         }
 
                         // Method 6: ACF-specific serialization check
-                        console.log('🎯 Method 6: Checking ACF serialization');
+                        debugLog('🎯 Method 6: Checking ACF serialization');
                         if (typeof acf !== 'undefined') {
                             try {
                                 // Check if ACF has serialization methods
-                                console.log('🔍 ACF Methods:', Object.getOwnPropertyNames(acf).filter(name => name.includes('serial')));
-                                console.log('🔍 ACF Actions:', Object.getOwnPropertyNames(acf).filter(name => name.includes('save')));
+                                debugLog('🔍 ACF Methods:', Object.getOwnPropertyNames(acf).filter(name => name.includes('serial')));
+                                debugLog('🔍 ACF Actions:', Object.getOwnPropertyNames(acf).filter(name => name.includes('save')));
                             } catch(e) {
-                                console.log('❌ ACF serialization check failed:', e);
+                                debugLog('❌ ACF serialization check failed:', e);
                             }
                         }
 
                         // =================== STEP 5: VERIFICATION ===================
                         setTimeout(function() {
-                            console.log('🔍 VERIFICATION RESULTS:');
-                            console.log('  - Hidden input value:', $hiddenInput.val());
-                            console.log('  - Expected value:', idsString);
-                            console.log('  - Match:', $hiddenInput.val() === idsString ? '✅' : '❌');
+                            debugLog('🔍 VERIFICATION RESULTS:');
+                            debugLog('  - Hidden input value:', $hiddenInput.val());
+                            debugLog('  - Expected value:', idsString);
+                            debugLog('  - Match:', $hiddenInput.val() === idsString ? '✅' : '❌');
 
                             if (fieldKey && typeof acf !== 'undefined' && acf.getField) {
                                 try {
                                     var field = acf.getField(fieldKey);
                                     if (field) {
-                                        console.log('  - Model value:', field.val());
-                                        console.log('  - Model match:', JSON.stringify(field.val()) === JSON.stringify(attachmentIds) ? '✅' : '❌');
+                                        debugLog('  - Model value:', field.val());
+                                        debugLog('  - Model match:', JSON.stringify(field.val()) === JSON.stringify(attachmentIds) ? '✅' : '❌');
                                     }
                                 } catch(e) {
-                                    console.log('  - Model verification failed:', e);
+                                    debugLog('  - Model verification failed:', e);
                                 }
                             }
 
-                            console.log('🎯 GALLERY UPDATE: Gallery update completed successfully');
+                            debugLog('🎯 GALLERY UPDATE: Gallery update completed successfully');
 
                             // Final debugging: Set up form submission monitoring
-                            console.log('🔍 Setting up form submission monitoring...');
+                            debugLog('🔍 Setting up form submission monitoring...');
                             setTimeout(function() {
                                 var $form = $hiddenInput.closest('form');
                                 if ($form.length) {
                                     $form.off('submit.gallery-debug').on('submit.gallery-debug', function(e) {
-                                        console.log('🚨 FORM SUBMISSION INTERCEPTED');
-                                        console.log('Form data being submitted:');
+                                        debugLog('🚨 FORM SUBMISSION INTERCEPTED');
+                                        debugLog('Form data being submitted:');
 
                                         // Get all form data
                                         var formData = new FormData(this);
@@ -1004,23 +1028,23 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                                                 dataObject[pair[0]] = pair[1];
                                             }
                                         }
-                                        console.log('Gallery-related form fields:', dataObject);
+                                        debugLog('Gallery-related form fields:', dataObject);
 
                                         // Also check the hidden input at submission time
-                                        console.log('Hidden input at submission:', $hiddenInput.val());
-                                        console.log('🚨 FORM SUBMISSION DATA CAPTURED');
+                                        debugLog('Hidden input at submission:', $hiddenInput.val());
+                                        debugLog('🚨 FORM SUBMISSION DATA CAPTURED');
                                     });
 
-                                    console.log('✅ Form submission monitoring enabled');
+                                    debugLog('✅ Form submission monitoring enabled');
                                 } else {
-                                    console.log('❌ Could not find form for submission monitoring');
+                                    debugLog('❌ Could not find form for submission monitoring');
                                 }
                             }, 1000); // Wait 1 second to ensure form is ready
 
                         }, 100);
                         
                     } catch (error) {
-                        console.error('❌ GALLERY UPDATE: Error setting gallery value:', error);
+                        debugError('❌ GALLERY UPDATE: Error setting gallery value:', error);
                     }
                 },
                 
@@ -1028,7 +1052,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                  * Trigger ACF change events properly
                  */
                 triggerACFChange: function(fieldInstance) {
-                    console.log('ACF Bridge: Triggering change events');
+                    debugLog('ACF Bridge: Triggering change events');
                     
                     try {
                         // Find the field wrapper and input
@@ -1042,9 +1066,9 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                             // Dispatch input and change events
                             $input.trigger('input');
                             $input.trigger('change');
-                            console.log('ACF Bridge: Triggered input/change events on input:', $input);
+                            debugLog('ACF Bridge: Triggered input/change events on input:', $input);
                         } else {
-                            console.log('ACF Bridge: No input found for change events');
+                            debugLog('ACF Bridge: No input found for change events');
                         }
                         
                         // Try to trigger ACF's own field change event
@@ -1053,31 +1077,31 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                             var acfField = $uploader.data('acf-field');
                             if (acfField && acfField.trigger) {
                                 acfField.trigger('change');
-                                console.log('ACF Bridge: Triggered ACF field change event');
+                                debugLog('ACF Bridge: Triggered ACF field change event');
                             }
                         }
                         
                         // Trigger ACF action if available
                         if (typeof acf !== 'undefined' && acf.doAction) {
                             acf.doAction('change', fieldInstance);
-                            console.log('ACF Bridge: Triggered ACF change action');
+                            debugLog('ACF Bridge: Triggered ACF change action');
                         }
                         
                         // Also trigger change on the field wrapper
                         $fieldWrapper.trigger('change');
-                        console.log('ACF Bridge: Triggered change on field wrapper');
+                        debugLog('ACF Bridge: Triggered change on field wrapper');
                         
                     } catch (error) {
-                        console.error('ACF Bridge: Error triggering change events:', error);
+                        debugError('ACF Bridge: Error triggering change events:', error);
                     }
                 }
             };
 
-            console.log('CLEAN TomatilloMediaFrame created successfully');
+            debugLog('CLEAN TomatilloMediaFrame created successfully');
             
         } catch (error) {
-            console.error('Error creating CLEAN TomatilloMediaFrame:', error);
-            console.error('Stack trace:', error.stack);
+            debugError('Error creating CLEAN TomatilloMediaFrame:', error);
+            debugError('Stack trace:', error.stack);
         }
     }
 
@@ -1834,7 +1858,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
             columnHeights[columnIndex] = Math.max(columnHeights[columnIndex], itemBottom);
         });
         
-        console.log('🔍 DEBUG: Current column heights from DOM:', columnHeights);
+        debugLog('🔍 DEBUG: Current column heights from DOM:', columnHeights);
         return columnHeights;
     }
 
@@ -1878,12 +1902,12 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
      * Pre-calculate masonry positions using known dimensions
      */
     function preCalculateMasonryPositions(mediaItems, optimizationDataArray, startColumnHeights) {
-        console.log('🔍 DEBUG: preCalculateMasonryPositions called with', mediaItems.length, 'items');
-        console.log('🔍 DEBUG: optimizationDataArray length:', optimizationDataArray ? optimizationDataArray.length : 'null');
-        console.log('🔍 DEBUG: startColumnHeights:', startColumnHeights);
+        debugLog('🔍 DEBUG: preCalculateMasonryPositions called with', mediaItems.length, 'items');
+        debugLog('🔍 DEBUG: optimizationDataArray length:', optimizationDataArray ? optimizationDataArray.length : 'null');
+        debugLog('🔍 DEBUG: startColumnHeights:', startColumnHeights);
         
         if (mediaItems.length === 0) {
-            console.log('🔍 DEBUG: No items to calculate positions for');
+            debugLog('🔍 DEBUG: No items to calculate positions for');
             return [];
         }
         
@@ -1903,11 +1927,11 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
         
         var gap = 16;
         
-        console.log('🔍 DEBUG: Grid element exists:', !!gridElement);
-        console.log('🔍 DEBUG: Grid element offsetWidth:', gridElement ? gridElement.offsetWidth : 'N/A');
-        console.log('🔍 DEBUG: Modal element exists:', !!modalElement);
-        console.log('🔍 DEBUG: Modal element offsetWidth:', modalElement ? modalElement.offsetWidth : 'N/A');
-        console.log('🔍 DEBUG: Using container width:', containerWidth, 'px');
+        debugLog('🔍 DEBUG: Grid element exists:', !!gridElement);
+        debugLog('🔍 DEBUG: Grid element offsetWidth:', gridElement ? gridElement.offsetWidth : 'N/A');
+        debugLog('🔍 DEBUG: Modal element exists:', !!modalElement);
+        debugLog('🔍 DEBUG: Modal element offsetWidth:', modalElement ? modalElement.offsetWidth : 'N/A');
+        debugLog('🔍 DEBUG: Using container width:', containerWidth, 'px');
         
         // Calculate number of columns
         var columns = 4; // Increased from 3 to 4 for better modal filling
@@ -1924,16 +1948,16 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
         // Calculate column width
         var columnWidth = (containerWidth - (gap * (columns - 1))) / columns;
         
-        console.log('🔍 DEBUG: Container width:', containerWidth, 'Columns:', columns, 'Column width:', columnWidth);
+        debugLog('🔍 DEBUG: Container width:', containerWidth, 'Columns:', columns, 'Column width:', columnWidth);
         
         // Initialize column heights
         var columnHeights;
         if (startColumnHeights && Array.isArray(startColumnHeights)) {
             columnHeights = startColumnHeights.slice(); // Copy the array
-            console.log('🔍 DEBUG: Using provided startColumnHeights:', columnHeights);
+            debugLog('🔍 DEBUG: Using provided startColumnHeights:', columnHeights);
         } else {
             columnHeights = new Array(columns).fill(0);
-            console.log('🔍 DEBUG: Starting with fresh column heights:', columnHeights);
+            debugLog('🔍 DEBUG: Starting with fresh column heights:', columnHeights);
         }
         
         var positions = [];
@@ -1951,23 +1975,23 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
             
             // Validate dimensions
             if (!width || !height || width <= 0 || height <= 0) {
-                console.error('🚨 INVALID DIMENSIONS for item', index, 'ID:', item.id, 'Width:', width, 'Height:', height);
-                console.error('🚨 HiRes image:', hiResImage);
-                console.error('🚨 Item:', item);
-                console.error('🚨 Optimization data:', optimizationData);
+                debugError('🚨 INVALID DIMENSIONS for item', index, 'ID:', item.id, 'Width:', width, 'Height:', height);
+                debugError('🚨 HiRes image:', hiResImage);
+                debugError('🚨 Item:', item);
+                debugError('🚨 Optimization data:', optimizationData);
                 // Use fallback dimensions
                 width = width || 400;
                 height = height || 300;
             }
             
-            console.log('🔍 DEBUG: Item', index, 'ID:', item.id, 'Dimensions:', width, 'x', height);
+            debugLog('🔍 DEBUG: Item', index, 'ID:', item.id, 'Dimensions:', width, 'x', height);
             
             // Calculate aspect ratio and scaled dimensions
             var aspectRatio = height / width;
             var scaledWidth = columnWidth;
             var scaledHeight = columnWidth * aspectRatio;
             
-            console.log('🔍 DEBUG: Aspect ratio:', aspectRatio, 'Scaled:', scaledWidth, 'x', scaledHeight);
+            debugLog('🔍 DEBUG: Aspect ratio:', aspectRatio, 'Scaled:', scaledWidth, 'x', scaledHeight);
             
             // Find shortest column
             var shortestColumnIndex = columnHeights.indexOf(Math.min.apply(Math, columnHeights));
@@ -1976,8 +2000,8 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
             var left = shortestColumnIndex * (columnWidth + gap);
             var top = columnHeights[shortestColumnIndex];
             
-            console.log('🔍 DEBUG: Column heights:', columnHeights, 'Shortest:', shortestColumnIndex);
-            console.log('🔍 DEBUG: Position:', left, ',', top);
+            debugLog('🔍 DEBUG: Column heights:', columnHeights, 'Shortest:', shortestColumnIndex);
+            debugLog('🔍 DEBUG: Position:', left, ',', top);
             
             positions.push({
                 left: left,
@@ -1989,11 +2013,11 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
             // Update column height
             columnHeights[shortestColumnIndex] += scaledHeight + gap;
             
-            console.log('🔍 DEBUG: Updated column heights:', columnHeights);
+            debugLog('🔍 DEBUG: Updated column heights:', columnHeights);
         });
         
-        console.log('🎨 Pre-calculated masonry positions for', positions.length, 'items');
-        console.log('🔍 DEBUG: Final positions:', positions);
+        debugLog('🎨 Pre-calculated masonry positions for', positions.length, 'items');
+        debugLog('🔍 DEBUG: Final positions:', positions);
         return positions;
     }
 
@@ -2060,7 +2084,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
         // Set container height
         grid.style.height = Math.max.apply(Math, columnHeights) + 'px';
         
-        console.log('🎨 Masonry layout applied:', items.length, 'items in', columns, 'columns');
+        debugLog('🎨 Masonry layout applied:', items.length, 'items in', columns, 'columns');
     }
 
     /**
@@ -2097,7 +2121,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
      * Initialize the media grid with real WordPress media
      */
     function initializeMediaGrid(options) {
-        console.log('Initializing media grid...');
+        debugLog('Initializing media grid...');
         
         // Clear any existing selections to start fresh
         selectedItems = [];
@@ -2108,19 +2132,19 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
         hasMoreItemsOnServer = true;
         
         // Check if we have preloaded media
-        console.log('🔍 Checking for preloaded media...');
-        console.log('🔍 window.TomatilloBackgroundLoader exists:', !!window.TomatilloBackgroundLoader);
+        debugLog('🔍 Checking for preloaded media...');
+        debugLog('🔍 window.TomatilloBackgroundLoader exists:', !!window.TomatilloBackgroundLoader);
         
         if (window.TomatilloBackgroundLoader && window.TomatilloBackgroundLoader.isMediaPreloaded()) {
             var preloadStartTime = performance.now();
-            console.log('🚀 Using preloaded media data - INSTANT LOADING!');
+            debugLog('🚀 Using preloaded media data - INSTANT LOADING!');
             var preloadedData = window.TomatilloBackgroundLoader.getPreloadedMedia();
-            console.log('🔍 Preloaded data:', preloadedData);
+            debugLog('🔍 Preloaded data:', preloadedData);
             currentMediaItems = preloadedData.items;
             currentOptimizationData = preloadedData.optimizationData;
             
             // Debug: Check what types we actually have
-            console.log('🔍 DEBUG: All media item types:', currentMediaItems.map(function(item) {
+            debugLog('🔍 DEBUG: All media item types:', currentMediaItems.map(function(item) {
                 return {id: item.id, type: item.type, mime: item.mime, filename: item.filename};
             }));
             
@@ -2128,12 +2152,12 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
             var allIds = currentMediaItems.map(function(item) { return item.id; });
             var uniqueIds = [...new Set(allIds)];
             if (allIds.length !== uniqueIds.length) {
-                console.error('🚨 DUPLICATES IN SOURCE DATA!', allIds.length, 'items,', uniqueIds.length, 'unique');
+                debugError('🚨 DUPLICATES IN SOURCE DATA!', allIds.length, 'items,', uniqueIds.length, 'unique');
                 var duplicates = allIds.filter(function(id, index) { return allIds.indexOf(id) !== index; });
-                console.error('🚨 Duplicate IDs in source:', duplicates);
+                debugError('🚨 Duplicate IDs in source:', duplicates);
                 
                 // Remove duplicates from source data
-                console.log('🔧 Removing duplicates from source data...');
+                debugLog('🔧 Removing duplicates from source data...');
                 var seenIds = new Set();
                 var deduplicatedItems = [];
                 var deduplicatedOptimizationData = [];
@@ -2148,21 +2172,21 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                     }
                 });
                 
-                console.log('🔧 Deduplicated:', currentMediaItems.length, '→', deduplicatedItems.length);
+                debugLog('🔧 Deduplicated:', currentMediaItems.length, '→', deduplicatedItems.length);
                 currentMediaItems = deduplicatedItems;
                 currentOptimizationData = deduplicatedOptimizationData;
             }
             
             // Apply current filter (defaults to "image" if not set)
             var currentFilter = $('#tomatillo-filter').val() || 'image';
-            console.log('🔍 Applying initial filter:', currentFilter);
+            debugLog('🔍 Applying initial filter:', currentFilter);
             
             var filteredItems = currentMediaItems.filter(function(item) {
                 if (currentFilter === 'all') return true;
                 
                 if (currentFilter === 'image') {
                     var isImage = item.type === 'image' || (item.mime && item.mime.startsWith('image/'));
-                    console.log('🔍 DEBUG: Item', item.id, 'type:', item.type, 'mime:', item.mime, 'isImage:', isImage);
+                    debugLog('🔍 DEBUG: Item', item.id, 'type:', item.type, 'mime:', item.mime, 'isImage:', isImage);
                     return isImage;
                 } else if (currentFilter === 'video') {
                     return item.type === 'video' || (item.mime && item.mime.startsWith('video/'));
@@ -2192,23 +2216,23 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                 return item.type === currentFilter;
             });
             
-            console.log('🔍 Filtered to', currentFilter + ':', filteredItems.length, 'of', currentMediaItems.length);
+            debugLog('🔍 Filtered to', currentFilter + ':', filteredItems.length, 'of', currentMediaItems.length);
             
             // Render only initial batch for better performance and to enable infinite scroll
             var initialBatchSize = window.tomatilloSettings ? (window.tomatilloSettings.infinite_scroll_batch || 100) : 100;
             var initialItems = filteredItems.slice(0, initialBatchSize);
             var initialOptimizationData = filteredOptimizationData.slice(0, initialBatchSize);
             
-            console.log('');
-            console.log('┌─────────────────────────────────────────────┐');
-            console.log('│ 🎨 INITIAL RENDER                          │');
-            console.log('├─────────────────────────────────────────────┤');
-            console.log('│ Batch size:             ', initialBatchSize.toString().padEnd(20), '│');
-            console.log('│ Items to render:        ', initialItems.length.toString().padEnd(20), '│');
-            console.log('│ Total available:        ', filteredItems.length.toString().padEnd(20), '│');
-            console.log('│ More on server?:        ', (hasMoreItemsOnServer ? 'YES' : 'NO').padEnd(20), '│');
-            console.log('└─────────────────────────────────────────────┘');
-            console.log('');
+            debugLog('');
+            debugLog('┌─────────────────────────────────────────────┐');
+            debugLog('│ 🎨 INITIAL RENDER                          │');
+            debugLog('├─────────────────────────────────────────────┤');
+            debugLog('│ Batch size:             ', initialBatchSize.toString().padEnd(20), '│');
+            debugLog('│ Items to render:        ', initialItems.length.toString().padEnd(20), '│');
+            debugLog('│ Total available:        ', filteredItems.length.toString().padEnd(20), '│');
+            debugLog('│ More on server?:        ', (hasMoreItemsOnServer ? 'YES' : 'NO').padEnd(20), '│');
+            debugLog('└─────────────────────────────────────────────┘');
+            debugLog('');
             
             // Render immediately with initial batch
             renderMediaGridWithOptimization(initialItems, initialOptimizationData, options, true);
@@ -2216,7 +2240,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
             // Initialize rendered count to actual rendered items, not total
             renderedItemsCount = initialItems.length;
             
-            console.log('✅ Initial render complete:', renderedItemsCount, 'items displayed');
+            debugLog('✅ Initial render complete:', renderedItemsCount, 'items displayed');
             
             // Show/hide "Load More" button based on whether there are more items
             updateLoadMoreButton(filteredItems.length, renderedItemsCount, hasMoreItemsOnServer);
@@ -2229,9 +2253,9 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
             
             // Trigger immediate check for infinite scroll (in case initial batch doesn't fill screen)
             setTimeout(function() {
-                console.log('🧪 Checking if more items need to load immediately...');
-                console.log('🧪 Total filtered items:', filteredItems.length);
-                console.log('🧪 Rendered items:', renderedItemsCount);
+                debugLog('🧪 Checking if more items need to load immediately...');
+                debugLog('🧪 Total filtered items:', filteredItems.length);
+                debugLog('🧪 Rendered items:', renderedItemsCount);
                 
                 // Check if modal content is not scrollable and we have more items
                 var $gridContainer = $('.tomatillo-grid-container');
@@ -2240,26 +2264,26 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                     var clientHeight = $gridContainer[0].clientHeight;
                     var hasScroll = scrollHeight > clientHeight;
                     
-                    console.log('🧪 Modal scrollable?', hasScroll, '(scrollHeight:', scrollHeight, 'clientHeight:', clientHeight, ')');
+                    debugLog('🧪 Modal scrollable?', hasScroll, '(scrollHeight:', scrollHeight, 'clientHeight:', clientHeight, ')');
                     
                     // If not scrollable and we have more items, enable load more button
                     if (!hasScroll && filteredItems.length > renderedItemsCount) {
-                        console.log('🧪 Modal not scrollable - Load More button visible for remaining items');
+                        debugLog('🧪 Modal not scrollable - Load More button visible for remaining items');
                     }
                 }
             }, 100);
             
             var preloadEndTime = performance.now();
-            console.log('🚀 Modal opened in', (preloadEndTime - preloadStartTime).toFixed(2), 'ms using preloaded data!');
-            console.log('🚀 Total media items available:', currentMediaItems.length);
-            console.log('🚀 Rendered items count:', renderedItemsCount);
+            debugLog('🚀 Modal opened in', (preloadEndTime - preloadStartTime).toFixed(2), 'ms using preloaded data!');
+            debugLog('🚀 Total media items available:', currentMediaItems.length);
+            debugLog('🚀 Rendered items count:', renderedItemsCount);
             return;
         }
         
-        console.log('🚀 No preloaded data available, falling back to server fetch');
-        console.log('🔍 Background loader status:', window.TomatilloBackgroundLoader ? 'exists' : 'missing');
+        debugLog('🚀 No preloaded data available, falling back to server fetch');
+        debugLog('🔍 Background loader status:', window.TomatilloBackgroundLoader ? 'exists' : 'missing');
         if (window.TomatilloBackgroundLoader) {
-            console.log('🔍 isMediaPreloaded():', window.TomatilloBackgroundLoader.isMediaPreloaded());
+            debugLog('🔍 isMediaPreloaded():', window.TomatilloBackgroundLoader.isMediaPreloaded());
         }
         
         // Fallback to regular loading
@@ -2283,14 +2307,14 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
             }
         };
         
-        console.log('Fetching media with data:', data);
+        debugLog('Fetching media with data:', data);
         
         // Make AJAX request to WordPress
         $.post(ajaxurl, data)
             .done(function(response) {
-                console.log('Raw WordPress response:', response);
-                console.log('Response type:', typeof response);
-                console.log('Response length:', response ? response.length : 'undefined');
+                debugLog('Raw WordPress response:', response);
+                debugLog('Response type:', typeof response);
+                debugLog('Response length:', response ? response.length : 'undefined');
                 
                 // Handle different response formats
                 var mediaItems = [];
@@ -2301,18 +2325,18 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                 } else if (response && response.attachments && Array.isArray(response.attachments)) {
                     mediaItems = response.attachments;
                 } else {
-                    console.error('Unexpected response format:', response);
+                    debugError('Unexpected response format:', response);
                     mediaItems = [];
                 }
                 
-                console.log('Media fetched successfully, count:', mediaItems.length);
+                debugLog('Media fetched successfully, count:', mediaItems.length);
                 
                 // Store media items globally immediately
                 currentMediaItems = mediaItems;
-                console.log('📦 Stored mediaItems globally:', currentMediaItems.length);
+                debugLog('📦 Stored mediaItems globally:', currentMediaItems.length);
                 
                 // Debug: Check what types we actually have
-                console.log('🔍 DEBUG: All media item types:', currentMediaItems.map(function(item) {
+                debugLog('🔍 DEBUG: All media item types:', currentMediaItems.map(function(item) {
                     return {id: item.id, type: item.type, mime: item.mime, filename: item.filename};
                 }));
                 
@@ -2320,12 +2344,12 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                 var allIds = currentMediaItems.map(function(item) { return item.id; });
                 var uniqueIds = [...new Set(allIds)];
                 if (allIds.length !== uniqueIds.length) {
-                    console.error('🚨 DUPLICATES IN SOURCE DATA!', allIds.length, 'items,', uniqueIds.length, 'unique');
+                    debugError('🚨 DUPLICATES IN SOURCE DATA!', allIds.length, 'items,', uniqueIds.length, 'unique');
                     var duplicates = allIds.filter(function(id, index) { return allIds.indexOf(id) !== index; });
-                    console.error('🚨 Duplicate IDs in source:', duplicates);
+                    debugError('🚨 Duplicate IDs in source:', duplicates);
                     
                     // Remove duplicates from source data
-                    console.log('🔧 Removing duplicates from source data...');
+                    debugLog('🔧 Removing duplicates from source data...');
                     var seenIds = new Set();
                     var deduplicatedItems = [];
                     
@@ -2336,20 +2360,20 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                         }
                     });
                     
-                    console.log('🔧 Deduplicated:', currentMediaItems.length, '→', deduplicatedItems.length);
+                    debugLog('🔧 Deduplicated:', currentMediaItems.length, '→', deduplicatedItems.length);
                     currentMediaItems = deduplicatedItems;
                 }
                 
                 // Apply current filter (defaults to "image" if not set)
                 var currentFilter = $('#tomatillo-filter').val() || 'image';
-                console.log('🔍 Applying initial filter:', currentFilter);
+                debugLog('🔍 Applying initial filter:', currentFilter);
                 
                 var filteredItems = currentMediaItems.filter(function(item) {
                     if (currentFilter === 'all') return true;
                     
                     if (currentFilter === 'image') {
                         var isImage = item.type === 'image' || item.mime && item.mime.startsWith('image/');
-                        console.log('🔍 DEBUG: Item', item.id, 'type:', item.type, 'mime:', item.mime, 'isImage:', isImage);
+                        debugLog('🔍 DEBUG: Item', item.id, 'type:', item.type, 'mime:', item.mime, 'isImage:', isImage);
                         return isImage;
                     } else if (currentFilter === 'video') {
                         return item.type === 'video' || item.mime && item.mime.startsWith('video/');
@@ -2362,13 +2386,13 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                     return item.type === currentFilter;
                 });
                 
-                console.log('🔍 Filtered to', currentFilter + ':', filteredItems.length, 'of', currentMediaItems.length);
+                debugLog('🔍 Filtered to', currentFilter + ':', filteredItems.length, 'of', currentMediaItems.length);
                 
                 renderMediaGrid(filteredItems, options);
             })
             .fail(function(xhr, status, error) {
-                console.error('Error fetching media:', error);
-                console.error('Response:', xhr.responseText);
+                debugError('Error fetching media:', error);
+                debugError('Response:', xhr.responseText);
                 // Fallback to empty grid
                 $('#tomatillo-media-grid').html(`
                     <div class="tomatillo-loading" style="color: #dc3545;">
@@ -2392,20 +2416,20 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                     nonce: tomatillo_nonce || 'test'
                 },
                 success: function(response) {
-                    console.log('📥 AJAX response for image', imageId, ':', response);
-                    console.log('📥 AJAX response.data keys:', response.data ? Object.keys(response.data) : 'no data');
-                    console.log('📥 AJAX response.data.avif_url:', response.data ? response.data.avif_url : 'no avif_url');
-                    console.log('📥 AJAX response.data.webp_url:', response.data ? response.data.webp_url : 'no webp_url');
+                    debugLog('📥 AJAX response for image', imageId, ':', response);
+                    debugLog('📥 AJAX response.data keys:', response.data ? Object.keys(response.data) : 'no data');
+                    debugLog('📥 AJAX response.data.avif_url:', response.data ? response.data.avif_url : 'no avif_url');
+                    debugLog('📥 AJAX response.data.webp_url:', response.data ? response.data.webp_url : 'no webp_url');
                     if (response.success) {
                         resolve(response.data);
                     } else {
-                        console.log('❌ AJAX failed for image', imageId, ':', response.data);
+                        debugLog('❌ AJAX failed for image', imageId, ':', response.data);
                         reject(response.data);
                     }
                 },
                 error: function(xhr, status, error) {
-                    console.log('💥 AJAX error for image', imageId, ':', error);
-                    console.log('💥 XHR response:', xhr.responseText);
+                    debugLog('💥 AJAX error for image', imageId, ':', error);
+                    debugLog('💥 XHR response:', xhr.responseText);
                     reject(error);
                 }
             });
@@ -2418,7 +2442,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
     function getHiResImageWithOptimization(item, optimizationData) {
         // Debug: Check optimization data availability
         if (!optimizationData) {
-            console.log('❌ No optimization data for item', item.id, '- using fallback');
+            debugLog('❌ No optimization data for item', item.id, '- using fallback');
             return getHiResImage(item);
         }
         
@@ -2465,17 +2489,17 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
      * Get HI-RES image using Media Studio logic (AVIF/WebP priority)
      */
     function getHiResImage(item) {
-        console.log('🚀 getHiResImage called for item:', item.id);
+        debugLog('🚀 getHiResImage called for item:', item.id);
         // Use Media Studio's get_best_optimized_image_url logic
         // For now, use WordPress scaled as fallback, but prioritize AVIF/WebP when available
         
-        console.log('=== getHiResImage DEBUG ===');
-        console.log('Item object keys:', Object.keys(item));
-        console.log('Item filesizeHumanReadable:', item.filesizeHumanReadable);
-        console.log('Item filesizeInBytes:', item.filesizeInBytes);
-        console.log('Sizes object:', item.sizes);
-        console.log('Sizes keys:', Object.keys(item.sizes || {}));
-        console.log('===========================');
+        debugLog('=== getHiResImage DEBUG ===');
+        debugLog('Item object keys:', Object.keys(item));
+        debugLog('Item filesizeHumanReadable:', item.filesizeHumanReadable);
+        debugLog('Item filesizeInBytes:', item.filesizeInBytes);
+        debugLog('Sizes object:', item.sizes);
+        debugLog('Sizes keys:', Object.keys(item.sizes || {}));
+        debugLog('===========================');
         
         var sizes = item.sizes || {};
         var originalUrl = item.url;
@@ -2486,31 +2510,31 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
         
         // Look for AVIF/WebP versions in sizes
         for (var sizeName in sizes) {
-            console.log('Checking size:', sizeName, sizes[sizeName]);
+            debugLog('Checking size:', sizeName, sizes[sizeName]);
             if (sizeName.includes('avif') && sizes[sizeName].url) {
                 avifUrl = sizes[sizeName].url;
-                console.log('Found AVIF in sizes:', sizeName, avifUrl);
+                debugLog('Found AVIF in sizes:', sizeName, avifUrl);
             }
             if (sizeName.includes('webp') && sizes[sizeName].url) {
                 webpUrl = sizes[sizeName].url;
-                console.log('Found WebP in sizes:', sizeName, webpUrl);
+                debugLog('Found WebP in sizes:', sizeName, webpUrl);
             }
         }
         
-        console.log('AVIF URL found:', avifUrl);
-        console.log('WebP URL found:', webpUrl);
+        debugLog('AVIF URL found:', avifUrl);
+        debugLog('WebP URL found:', webpUrl);
         
         // Priority: AVIF > WebP > Scaled > Original
         if (avifUrl) {
-            console.log('Using AVIF image:', avifUrl);
+            debugLog('Using AVIF image:', avifUrl);
             // Find the AVIF size object to get its dimensions
             var avifSize = null;
             for (var sizeName in sizes) {
                 if (sizeName.includes('avif') && sizes[sizeName].url === avifUrl) {
                     avifSize = sizes[sizeName];
-                    console.log('AVIF size object:', avifSize);
-            console.log('AVIF size object keys:', Object.keys(avifSize || {}));
-            console.log('AVIF filesizeHumanReadable:', avifSize ? avifSize.filesizeHumanReadable : 'not found');
+                    debugLog('AVIF size object:', avifSize);
+            debugLog('AVIF size object keys:', Object.keys(avifSize || {}));
+            debugLog('AVIF filesizeHumanReadable:', avifSize ? avifSize.filesizeHumanReadable : 'not found');
                     break;
                 }
             }
@@ -2525,15 +2549,15 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
         }
         
         if (webpUrl) {
-            console.log('Using WebP image:', webpUrl);
+            debugLog('Using WebP image:', webpUrl);
             // Find the WebP size object to get its dimensions
             var webpSize = null;
             for (var sizeName in sizes) {
                 if (sizeName.includes('webp') && sizes[sizeName].url === webpUrl) {
                     webpSize = sizes[sizeName];
-                    console.log('WebP size object:', webpSize);
-            console.log('WebP size object keys:', Object.keys(webpSize || {}));
-            console.log('WebP filesizeHumanReadable:', webpSize ? webpSize.filesizeHumanReadable : 'not found');
+                    debugLog('WebP size object:', webpSize);
+            debugLog('WebP size object keys:', Object.keys(webpSize || {}));
+            debugLog('WebP filesizeHumanReadable:', webpSize ? webpSize.filesizeHumanReadable : 'not found');
                     break;
                 }
             }
@@ -2549,7 +2573,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
         
         // Use scaled version if available
         if (sizes.scaled && sizes.scaled.url) {
-            console.log('Using scaled image:', sizes.scaled.url);
+            debugLog('Using scaled image:', sizes.scaled.url);
             return {
                 url: sizes.scaled.url,
                 width: sizes.scaled.width,
@@ -2561,8 +2585,8 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
         }
         
         // Fallback to original
-        console.log('Using original image:', originalUrl);
-        console.log('Full size object:', sizes.full);
+        debugLog('Using original image:', originalUrl);
+        debugLog('Full size object:', sizes.full);
         return {
             url: originalUrl,
             width: item.width,
@@ -2578,7 +2602,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
      */
     function cleanFilename(filename) {
         if (!filename) return 'Unknown';
-        console.log('cleanFilename input:', filename);
+        debugLog('cleanFilename input:', filename);
         
         // Remove WordPress suffixes: -scaled, -1024x683, etc.
         var cleaned = filename
@@ -2586,7 +2610,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
             .replace(/-\d+x\d+\.(jpg|jpeg|png|gif|webp|avif)$/i, '') // Remove -1024x683.ext
             .replace(/\.(jpg|jpeg|png|gif|webp|avif)$/i, '');        // Remove any remaining .ext
             
-        console.log('cleanFilename output:', cleaned);
+        debugLog('cleanFilename output:', cleaned);
         return cleaned;
     }
 
@@ -2596,11 +2620,11 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
     function renderMediaGrid(mediaItems, options) {
         // Store media items globally for access in event handlers
         currentMediaItems = mediaItems;
-        console.log('Rendering media grid with', mediaItems ? mediaItems.length : 'undefined', 'items');
+        debugLog('Rendering media grid with', mediaItems ? mediaItems.length : 'undefined', 'items');
         
         // Safety check
         if (!Array.isArray(mediaItems)) {
-            console.error('mediaItems is not an array:', mediaItems);
+            debugError('mediaItems is not an array:', mediaItems);
             $('#tomatillo-media-grid').html(`
                 <div class="tomatillo-loading" style="color: #dc3545;">
                     Error: Invalid media data format
@@ -2612,7 +2636,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
         var gridHtml = '';
         
         // Fetch optimization data for all images first
-        console.log('🔍 Fetching optimization data for', mediaItems.length, 'items');
+        debugLog('🔍 Fetching optimization data for', mediaItems.length, 'items');
         var optimizationPromises = mediaItems.map(function(item) {
             return getOptimizationData(item.id).then(function(data) {
                 return data;
@@ -2632,19 +2656,19 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
             
             mediaItems.forEach(function(item, index) {
                 var optimizationData = optimizationDataArray[index];
-                console.log('🖼️ Processing item', item.id, 'with optimization data:', optimizationData);
+                debugLog('🖼️ Processing item', item.id, 'with optimization data:', optimizationData);
                 var hiResImage = getHiResImageWithOptimization(item, optimizationData);
-                console.log('🖼️ Final hiResImage for item', item.id, ':', hiResImage);
+                debugLog('🖼️ Final hiResImage for item', item.id, ':', hiResImage);
             
             var originalFilename = item.filename || item.title || 'Unknown';
             var filename = cleanFilename(originalFilename);
-            console.log('=== FILENAME DEBUG ===');
-            console.log('Item object:', item);
-            console.log('item.filename:', item.filename);
-            console.log('item.title:', item.title);
-            console.log('Original filename:', originalFilename);
-            console.log('Cleaned filename:', filename);
-            console.log('========================');
+            debugLog('=== FILENAME DEBUG ===');
+            debugLog('Item object:', item);
+            debugLog('item.filename:', item.filename);
+            debugLog('item.title:', item.title);
+            debugLog('Original filename:', originalFilename);
+            debugLog('Cleaned filename:', filename);
+            debugLog('========================');
             var type = item.type || 'unknown';
             
             // Calculate aspect ratio for masonry
@@ -2705,12 +2729,12 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
             );
         }
         
-        console.log('Media grid rendered successfully');
+        debugLog('Media grid rendered successfully');
         
         // Setup infinite scroll if enabled
         setupInfiniteScroll(options);
         }).catch(function(error) {
-            console.error('Error fetching optimization data:', error);
+            debugError('Error fetching optimization data:', error);
             // Fallback to rendering without optimization data
             renderMediaGridFallback(mediaItems, options);
         });
@@ -2730,7 +2754,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
             
             var originalFilename = item.filename || item.title || 'Unknown';
             var filename = cleanFilename(originalFilename);
-            console.log('Original filename:', originalFilename, 'Cleaned:', filename);
+            debugLog('Original filename:', originalFilename, 'Cleaned:', filename);
             var type = item.type || 'unknown';
             
             // Calculate aspect ratio for masonry
@@ -2757,7 +2781,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
         });
         
         $('#tomatillo-media-grid').html(gridHtml);
-        console.log('Media grid rendered successfully (fallback)');
+        debugLog('Media grid rendered successfully (fallback)');
     }
 
     /**
@@ -2767,36 +2791,36 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
         
         // Handle close button
         $('#tomatillo-close-modal').off('click').on('click', function() {
-            console.log('Close button clicked');
+            debugLog('Close button clicked');
             cleanupModal();
         });
         
         // Handle cancel button
         $('#tomatillo-cancel').off('click').on('click', function() {
-            console.log('Cancel button clicked');
+            debugLog('Cancel button clicked');
             cleanupModal();
         });
         
         // Handle media item selection
         $(document).off('click.tomatillo-media').on('click.tomatillo-media', '.tomatillo-media-item', function() {
-            console.log('🎯 Media item clicked - checking if selection works');
+            debugLog('🎯 Media item clicked - checking if selection works');
             var itemId = $(this).data('id');
             var $item = $(this);
-            console.log('🎯 Item ID:', itemId, 'Item element:', $item);
-            console.log('🎯 Current selectedItems before:', selectedItems);
-            console.log('🎯 Options multiple:', options.multiple);
+            debugLog('🎯 Item ID:', itemId, 'Item element:', $item);
+            debugLog('🎯 Current selectedItems before:', selectedItems);
+            debugLog('🎯 Options multiple:', options.multiple);
             
             if (options.multiple) {
                 // Multiple selection
-                console.log('Multiple selection mode');
+                debugLog('Multiple selection mode');
                 $('#tomatillo-media-grid').removeClass('tomatillo-single-selection');
                 
                 if ($item.hasClass('selected')) {
-                    console.log('Deselecting item in multiple mode');
+                    debugLog('Deselecting item in multiple mode');
                     $item.removeClass('selected').css('border-color', 'transparent');
                     selectedItems = selectedItems.filter(id => id !== itemId);
                 } else {
-                    console.log('Selecting item in multiple mode');
+                    debugLog('Selecting item in multiple mode');
                     $item.addClass('selected');
                     selectedItems.push(itemId);
                 }
@@ -2804,13 +2828,13 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                 // Single selection - check if clicking the same item again
                 if ($item.hasClass('selected')) {
                     // Deselect - remove dimming and clear selection
-                    console.log('Deselecting item in single mode');
+                    debugLog('Deselecting item in single mode');
                     $('#tomatillo-media-grid').removeClass('tomatillo-single-selection');
                     $item.removeClass('selected').css('border-color', 'transparent');
                     selectedItems = [];
                 } else {
                     // Select - add dimming class and clear all other selections
-                    console.log('Selecting item in single mode');
+                    debugLog('Selecting item in single mode');
                     $('#tomatillo-media-grid').addClass('tomatillo-single-selection');
                     $('.tomatillo-media-item').removeClass('selected').css('border-color', 'transparent');
                     $item.addClass('selected');
@@ -2822,17 +2846,17 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
             updateSelectionUI(selectedItems.length, options);
             
             // Debug: Log current selection state
-            console.log('🎯 Selection state after click:');
-            console.log('🎯 selectedItems array:', selectedItems);
-            console.log('🎯 Items with selected class:', $('.tomatillo-media-item.selected').length);
-            console.log('🎯 Selected item IDs:', $('.tomatillo-media-item.selected').map(function() { return $(this).data('id'); }).get());
+            debugLog('🎯 Selection state after click:');
+            debugLog('🎯 selectedItems array:', selectedItems);
+            debugLog('🎯 Items with selected class:', $('.tomatillo-media-item.selected').length);
+            debugLog('🎯 Selected item IDs:', $('.tomatillo-media-item.selected').map(function() { return $(this).data('id'); }).get());
         });
         
         // Function to handle select action (used by both click and keyboard)
         function handleSelectAction() {
             if (selectedItems.length > 0) {
-                console.log('Select action triggered, selected items:', selectedItems);
-                console.log('Current media items available:', currentMediaItems.length);
+                debugLog('Select action triggered, selected items:', selectedItems);
+                debugLog('Current media items available:', currentMediaItems.length);
                 
                 // Create selection data from our media items
                 var selection = selectedItems.map(function(id) {
@@ -2864,7 +2888,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                     }
                 });
                 
-                console.log('Selection created:', selection);
+                debugLog('Selection created:', selection);
                 
                 // Call the onSelect callback
                 if (options.onSelect) {
@@ -2889,20 +2913,20 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
         
         // Handle Load More button click
         $('#tomatillo-load-more').off('click').on('click', function() {
-            console.log('');
-            console.log('═══════════════════════════════════════════════════════');
-            console.log('🖱️  LOAD MORE BUTTON CLICKED');
-            console.log('═══════════════════════════════════════════════════════');
+            debugLog('');
+            debugLog('═══════════════════════════════════════════════════════');
+            debugLog('🖱️  LOAD MORE BUTTON CLICKED');
+            debugLog('═══════════════════════════════════════════════════════');
             
             var $button = $(this);
             
             // Disable button while loading
             $button.prop('disabled', true).text('Loading...');
-            console.log('📦 Button disabled, fetching data...');
+            debugLog('📦 Button disabled, fetching data...');
             
             // Get current filter
             var currentFilter = $('#tomatillo-filter').val() || 'image';
-            console.log('📦 Current filter:', currentFilter);
+            debugLog('📦 Current filter:', currentFilter);
             
             // Filter all items based on current filter
             var filteredItems = currentMediaItems.filter(function(item) {
@@ -2921,27 +2945,27 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
             
             var remainingRendered = filteredItems.length - renderedItemsCount;
             
-            console.log('┌─────────────────────────────────────────────┐');
-            console.log('│ 📊 CURRENT STATE                           │');
-            console.log('├─────────────────────────────────────────────┤');
-            console.log('│ Items in memory:        ', currentMediaItems.length.toString().padEnd(20), '│');
-            console.log('│ Filtered items:         ', filteredItems.length.toString().padEnd(20), '│');
-            console.log('│ Already rendered:       ', renderedItemsCount.toString().padEnd(20), '│');
-            console.log('│ Remaining to render:    ', remainingRendered.toString().padEnd(20), '│');
-            console.log('│ More on server?:        ', (hasMoreItemsOnServer ? 'YES' : 'NO').padEnd(20), '│');
-            console.log('└─────────────────────────────────────────────┘');
+            debugLog('┌─────────────────────────────────────────────┐');
+            debugLog('│ 📊 CURRENT STATE                           │');
+            debugLog('├─────────────────────────────────────────────┤');
+            debugLog('│ Items in memory:        ', currentMediaItems.length.toString().padEnd(20), '│');
+            debugLog('│ Filtered items:         ', filteredItems.length.toString().padEnd(20), '│');
+            debugLog('│ Already rendered:       ', renderedItemsCount.toString().padEnd(20), '│');
+            debugLog('│ Remaining to render:    ', remainingRendered.toString().padEnd(20), '│');
+            debugLog('│ More on server?:        ', (hasMoreItemsOnServer ? 'YES' : 'NO').padEnd(20), '│');
+            debugLog('└─────────────────────────────────────────────┘');
             
             // Check if we need to fetch more from server first
             if (remainingRendered === 0 && hasMoreItemsOnServer) {
-                console.log('');
-                console.log('🌐 FETCHING ALL REMAINING FROM SERVER');
-                console.log('───────────────────────────────────────────────────────');
+                debugLog('');
+                debugLog('🌐 FETCHING ALL REMAINING FROM SERVER');
+                debugLog('───────────────────────────────────────────────────────');
                 
                 // Get array of already loaded IDs to exclude
                 var loadedIds = currentMediaItems.map(function(item) { return item.id; });
                 
-                console.log('📡 Requesting: ALL remaining items');
-                console.log('📡 Excluding IDs:', loadedIds.slice(0, 5).join(', '), loadedIds.length > 5 ? '... (' + loadedIds.length + ' total)' : '');
+                debugLog('📡 Requesting: ALL remaining items');
+                debugLog('📡 Excluding IDs:', loadedIds.slice(0, 5).join(', '), loadedIds.length > 5 ? '... (' + loadedIds.length + ' total)' : '');
                 
                 var data = {
                     action: 'query-attachments',
@@ -2954,7 +2978,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                 
                 $.post(ajaxurl, data)
                     .done(function(response) {
-                        console.log('✅ Server response received');
+                        debugLog('✅ Server response received');
                         
                         var newItems = [];
                         if (Array.isArray(response)) {
@@ -2965,10 +2989,10 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                             newItems = response.attachments;
                         }
                         
-                        console.log('📦 Server returned:', newItems.length, 'items');
+                        debugLog('📦 Server returned:', newItems.length, 'items');
                         
                         if (newItems.length > 0) {
-                            console.log('📦 Item IDs:', newItems.map(function(item) { return item.id; }).slice(0, 10).join(', '), newItems.length > 10 ? '...' : '');
+                            debugLog('📦 Item IDs:', newItems.map(function(item) { return item.id; }).slice(0, 10).join(', '), newItems.length > 10 ? '...' : '');
                             
                             // Check for duplicates
                             var existingIds = new Set(currentMediaItems.map(function(item) { return item.id; }));
@@ -2976,13 +3000,13 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                                 return !existingIds.has(item.id);
                             });
                             
-                            console.log('🔍 Deduplication: found', uniqueNewItems.length, 'unique items (', (newItems.length - uniqueNewItems.length), 'duplicates removed)');
+                            debugLog('🔍 Deduplication: found', uniqueNewItems.length, 'unique items (', (newItems.length - uniqueNewItems.length), 'duplicates removed)');
                             
                             if (uniqueNewItems.length > 0) {
                                 // Add to current media items
                                 var beforeCount = currentMediaItems.length;
                                 currentMediaItems = currentMediaItems.concat(uniqueNewItems);
-                                console.log('✅ Added to memory: before =', beforeCount, ', after =', currentMediaItems.length);
+                                debugLog('✅ Added to memory: before =', beforeCount, ', after =', currentMediaItems.length);
                                 
                                 // Load optimization data
                                 loadOptimizationDataForNewItems(uniqueNewItems);
@@ -3003,30 +3027,30 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                                 });
                                 
                                 var newRemainingCount = updatedFilteredItems.length - renderedItemsCount;
-                                console.log('🎨 Ready to render:', newRemainingCount, 'items');
+                                debugLog('🎨 Ready to render:', newRemainingCount, 'items');
                                 
                                 if (newRemainingCount > 0) {
-                                    console.log('🎨 Calling loadMoreImages() to render...');
+                                    debugLog('🎨 Calling loadMoreImages() to render...');
                                     loadMoreImages(renderedItemsCount, newRemainingCount, options);
                                 } else {
-                                    console.log('⚠️  No new items match current filter');
+                                    debugLog('⚠️  No new items match current filter');
                                 }
                                 
                                 // Since we requested ALL (-1), we've now loaded everything from server
                                 hasMoreItemsOnServer = false;
-                                console.log('🏁 ALL ITEMS LOADED FROM SERVER');
+                                debugLog('🏁 ALL ITEMS LOADED FROM SERVER');
                             } else {
-                                console.log('⚠️  All fetched items were duplicates');
+                                debugLog('⚠️  All fetched items were duplicates');
                                 hasMoreItemsOnServer = false;
                             }
                         } else {
                             hasMoreItemsOnServer = false;
-                            console.log('🏁 NO MORE ITEMS ON SERVER');
+                            debugLog('🏁 NO MORE ITEMS ON SERVER');
                         }
                         
                         // Re-enable button
                         $button.prop('disabled', false);
-                        console.log('📦 Button re-enabled');
+                        debugLog('📦 Button re-enabled');
                         
                         // Update button state
                         var finalFilteredItems = currentMediaItems.filter(function(item) {
@@ -3043,50 +3067,50 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                             return item.type === currentFilter;
                         });
                         updateLoadMoreButton(finalFilteredItems.length, renderedItemsCount, hasMoreItemsOnServer);
-                        console.log('═══════════════════════════════════════════════════════');
-                        console.log('');
+                        debugLog('═══════════════════════════════════════════════════════');
+                        debugLog('');
                     })
                     .fail(function(xhr, status, error) {
-                        console.error('❌ AJAX FAILED:', error);
-                        console.error('   Status:', status);
-                        console.error('   XHR:', xhr);
+                        debugError('❌ AJAX FAILED:', error);
+                        debugError('   Status:', status);
+                        debugError('   XHR:', xhr);
                         $button.prop('disabled', false).text('Load More Images');
-                        console.log('═══════════════════════════════════════════════════════');
-                        console.log('');
+                        debugLog('═══════════════════════════════════════════════════════');
+                        debugLog('');
                     });
             } else if (remainingRendered > 0) {
                 // We have items in memory, just render them ALL
-                console.log('');
-                console.log('🎨 RENDERING ALL FROM MEMORY');
-                console.log('───────────────────────────────────────────────────────');
-                console.log('📦 Rendering ALL', remainingRendered, 'items already in memory');
+                debugLog('');
+                debugLog('🎨 RENDERING ALL FROM MEMORY');
+                debugLog('───────────────────────────────────────────────────────');
+                debugLog('📦 Rendering ALL', remainingRendered, 'items already in memory');
                 
                 loadMoreImages(renderedItemsCount, remainingRendered, options);
                 
                 // Re-enable button after a short delay
                 setTimeout(function() {
                     $button.prop('disabled', false);
-                    console.log('📦 Button re-enabled');
+                    debugLog('📦 Button re-enabled');
                     updateLoadMoreButton(filteredItems.length, renderedItemsCount, hasMoreItemsOnServer);
-                    console.log('═══════════════════════════════════════════════════════');
-                    console.log('');
+                    debugLog('═══════════════════════════════════════════════════════');
+                    debugLog('');
                 }, 500);
             } else {
                 // Nothing left to load
-                console.log('');
-                console.log('🏁 NOTHING TO LOAD');
-                console.log('───────────────────────────────────────────────────────');
-                console.log('⚠️  No items in memory and no more on server');
+                debugLog('');
+                debugLog('🏁 NOTHING TO LOAD');
+                debugLog('───────────────────────────────────────────────────────');
+                debugLog('⚠️  No items in memory and no more on server');
                 $button.prop('disabled', false).hide();
-                console.log('═══════════════════════════════════════════════════════');
-                console.log('');
+                debugLog('═══════════════════════════════════════════════════════');
+                debugLog('');
             }
         });
         
         // Handle clicking outside modal
         $('#tomatillo-custom-modal').off('click').on('click', function(e) {
             if (e.target.id === 'tomatillo-custom-modal') {
-                console.log('Clicked outside modal');
+                debugLog('Clicked outside modal');
                 cleanupModal();
             }
         });
@@ -3094,7 +3118,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
         // Handle ESC key to close modal
         $(document).off('keydown.tomatillo-modal').on('keydown.tomatillo-modal', function(e) {
             if (e.key === 'Escape' && $('#tomatillo-custom-modal').length > 0) {
-                console.log('ESC key pressed - closing modal');
+                debugLog('ESC key pressed - closing modal');
                 cleanupModal();
             }
         });
@@ -3102,19 +3126,19 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
         // Handle filter dropdown
         $('#tomatillo-filter').off('change').on('change', function() {
             var filterValue = $(this).val();
-            console.log('🔍 Filter changed to:', filterValue);
-            console.log('🔍 Current media items:', currentMediaItems);
-            console.log('🔍 Current media items types:', currentMediaItems.map(function(item) { return item.type; }));
+            debugLog('🔍 Filter changed to:', filterValue);
+            debugLog('🔍 Current media items:', currentMediaItems);
+            debugLog('🔍 Current media items types:', currentMediaItems.map(function(item) { return item.type; }));
             
             // Filter items based on type
             var filteredItems = currentMediaItems.filter(function(item) {
-                console.log('🔍 Checking item:', item.id, 'filename:', item.filename, 'type:', item.type, 'mime:', item.mime, 'matches filter:', filterValue);
+                debugLog('🔍 Checking item:', item.id, 'filename:', item.filename, 'type:', item.type, 'mime:', item.mime, 'matches filter:', filterValue);
                 if (filterValue === 'all') return true;
                 
                 // More robust type checking
                 if (filterValue === 'image') {
                     var isImage = item.type === 'image' || (item.mime && item.mime.startsWith('image/'));
-                    console.log('🔍 Image check for', item.filename, ':', item.type === 'image', '||', (item.mime && item.mime.startsWith('image/')), '=', isImage);
+                    debugLog('🔍 Image check for', item.filename, ':', item.type === 'image', '||', (item.mime && item.mime.startsWith('image/')), '=', isImage);
                     return isImage;
                 } else if (filterValue === 'video') {
                     return item.type === 'video' || (item.mime && item.mime.startsWith('video/'));
@@ -3146,16 +3170,16 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                 return item.type === filterValue;
             });
             
-            console.log('🔍 Filtered items:', filteredItems.length, 'of', currentMediaItems.length);
-            console.log('🔍 Filtered optimization data:', filteredOptimizationData.length);
-            console.log('🔍 Filtered items details:', filteredItems);
+            debugLog('🔍 Filtered items:', filteredItems.length, 'of', currentMediaItems.length);
+            debugLog('🔍 Filtered optimization data:', filteredOptimizationData.length);
+            debugLog('🔍 Filtered items details:', filteredItems);
             
             // Debug: Check for duplicates in filtered items
             var itemIds = filteredItems.map(function(item) { return item.id; });
             var uniqueIds = [...new Set(itemIds)];
             if (itemIds.length !== uniqueIds.length) {
-                console.error('🚨 DUPLICATE ITEMS DETECTED!', itemIds.length, 'items,', uniqueIds.length, 'unique');
-                console.error('🚨 Duplicate IDs:', itemIds.filter(function(id, index) { return itemIds.indexOf(id) !== index; }));
+                debugError('🚨 DUPLICATE ITEMS DETECTED!', itemIds.length, 'items,', uniqueIds.length, 'unique');
+                debugError('🚨 Duplicate IDs:', itemIds.filter(function(id, index) { return itemIds.indexOf(id) !== index; }));
             }
             
             // Clear search when filter changes
@@ -3180,7 +3204,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
         // Handle search input
         $('#tomatillo-search').off('input').on('input', function() {
             var searchQuery = $(this).val().toLowerCase().trim();
-            console.log('Search query:', searchQuery);
+            debugLog('Search query:', searchQuery);
             
             // Show/hide clear button based on search content
             if (searchQuery === '') {
@@ -3203,7 +3227,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
             } else {
                 // Filter items based on search query AND current filter
                 var currentFilter = $('#tomatillo-filter').val();
-                console.log('🔍 DEBUG: Current filter:', currentFilter);
+                debugLog('🔍 DEBUG: Current filter:', currentFilter);
                 
                 var filteredItems = currentMediaItems.filter(function(item) {
                     // First apply type filter with robust checking
@@ -3263,7 +3287,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                     return searchableText.includes(searchQuery);
                 });
                 
-                console.log('Search results:', filteredItems.length, 'of', currentMediaItems.length);
+                debugLog('Search results:', filteredItems.length, 'of', currentMediaItems.length);
                 
                 // Re-render with filtered items
                 renderMediaGridWithOptimization(filteredItems, filteredOptimizationData, options, false);
@@ -3272,13 +3296,13 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
         
         // Handle clear search button
         $('#tomatillo-clear-search').off('click').on('click', function() {
-            console.log('Clear search clicked');
+            debugLog('Clear search clicked');
             $('#tomatillo-search').val('').trigger('input'); // Trigger input event to update UI
         });
         
         // Handle upload button click
         $('#tomatillo-upload-btn').off('click').on('click', function() {
-            console.log('Upload button clicked');
+            debugLog('Upload button clicked');
             $('#tomatillo-file-input').click();
         });
         
@@ -3286,7 +3310,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
         $('#tomatillo-file-input').off('change').on('change', function() {
             var files = this.files;
             if (files && files.length > 0) {
-                console.log('Files selected for upload:', files.length);
+                debugLog('Files selected for upload:', files.length);
                 uploadFiles(Array.from(files), options);
             }
         });
@@ -3342,12 +3366,12 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
             var files = e.dataTransfer.files;
             $('#tomatillo-file-count').text(files.length);
             if (files && files.length > 0) {
-                console.log('Files dropped for upload:', files.length);
+                debugLog('Files dropped for upload:', files.length);
                 
                 // Debounce: Prevent duplicate uploads within 500ms
                 var now = Date.now();
                 if (now - lastUploadTime < uploadDebounceDelay) {
-                    console.log('⚠️ Upload blocked: Too soon after last upload (debounced)');
+                    debugLog('⚠️ Upload blocked: Too soon after last upload (debounced)');
                     return;
                 }
                 lastUploadTime = now;
@@ -3370,7 +3394,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
             drop: dropHandler
         };
         
-        console.log('✅ Drag-drop handlers attached with debouncing');
+        debugLog('✅ Drag-drop handlers attached with debouncing');
     }
     
     /**
@@ -3378,7 +3402,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
      */
     function cleanupDragDropHandlers() {
         if (dragDropHandlers) {
-            console.log('🧹 Removing drag-drop event handlers');
+            debugLog('🧹 Removing drag-drop event handlers');
             document.removeEventListener('dragenter', dragDropHandlers.dragenter, false);
             document.removeEventListener('dragover', dragDropHandlers.dragover, false);
             document.removeEventListener('dragleave', dragDropHandlers.dragleave, false);
@@ -3391,7 +3415,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
      * Upload files with progress tracking
      */
     function uploadFiles(files, options) {
-        console.log('Starting upload of', files.length, 'files');
+        debugLog('Starting upload of', files.length, 'files');
         
         var $progressOverlay = $('#tomatillo-upload-progress-overlay');
         var $progressFill = $('#tomatillo-upload-progress-fill');
@@ -3525,14 +3549,14 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                         statusElement.removeClass('uploading').addClass('error');
                         progressBar.css('width', '100%');
                         failedCount++;
-                        console.error('Invalid response:', currentXhr.responseText);
+                        debugError('Invalid response:', currentXhr.responseText);
                     }
                 } else {
                     statusElement.text('Failed: HTTP ' + currentXhr.status);
                     statusElement.removeClass('uploading').addClass('error');
                     progressBar.css('width', '100%');
                     failedCount++;
-                    console.error('Upload failed with status:', currentXhr.status);
+                    debugError('Upload failed with status:', currentXhr.status);
                 }
                 
                 uploadedCount++;
@@ -3550,7 +3574,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                 progressBar.css('width', '100%');
                 failedCount++;
                 uploadedCount++;
-                console.error('Upload error for file:', file.name);
+                debugError('Upload error for file:', file.name);
                 
                 // Upload next file
                 setTimeout(function() {
@@ -3568,7 +3592,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
      * Add newly uploaded items to the beginning of the grid in real-time
      */
     function addNewItemsToGrid(newlyUploadedIds, options) {
-        console.log('Adding', newlyUploadedIds.length, 'newly uploaded items to grid');
+        debugLog('Adding', newlyUploadedIds.length, 'newly uploaded items to grid');
         
         if (!newlyUploadedIds || newlyUploadedIds.length === 0) {
             return;
@@ -3587,7 +3611,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
         $.post(ajaxurl, data)
             .done(function(response) {
                 var newItems = Array.isArray(response) ? response : (response.data || []);
-                console.log('Fetched', newItems.length, 'new items:', newItems);
+                debugLog('Fetched', newItems.length, 'new items:', newItems);
                 
                 if (newItems.length > 0) {
                     // Add new items to the beginning of currentMediaItems
@@ -3647,7 +3671,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                     
                     // Force complete masonry re-layout
                     setTimeout(function() {
-                        console.log('🔄 Forcing complete masonry re-layout after adding new items');
+                        debugLog('🔄 Forcing complete masonry re-layout after adding new items');
                         // Clear any existing positioning to force recalculation
                         $grid.find('.tomatillo-media-item').css({
                             'position': '',
@@ -3659,7 +3683,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                         // Wait for new images to load, then trigger layout
                         var newImages = $grid.find('.tomatillo-media-item:not([style*="position"]) img');
                         if (newImages.length > 0) {
-                            console.log('🔄 Waiting for', newImages.length, 'new images to load');
+                            debugLog('🔄 Waiting for', newImages.length, 'new images to load');
                             var loadedCount = 0;
                             newImages.each(function() {
                                 var img = this;
@@ -3669,7 +3693,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                                     img.onload = function() {
                                         loadedCount++;
                                         if (loadedCount === newImages.length) {
-                                            console.log('🔄 All new images loaded, triggering masonry layout');
+                                            debugLog('🔄 All new images loaded, triggering masonry layout');
                                             setTimeout(layoutMasonry, 50);
                                         }
                                     };
@@ -3678,12 +3702,12 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                             
                             // If all images are already loaded
                             if (loadedCount === newImages.length) {
-                                console.log('🔄 All images already loaded, triggering masonry layout');
+                                debugLog('🔄 All images already loaded, triggering masonry layout');
                                 setTimeout(layoutMasonry, 50);
                             }
                         } else {
                             // No new images, trigger layout immediately
-                            console.log('🔄 No new images, triggering masonry layout immediately');
+                            debugLog('🔄 No new images, triggering masonry layout immediately');
                             setTimeout(layoutMasonry, 50);
                         }
                     }, 150);
@@ -3695,7 +3719,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                 }
             })
             .fail(function(xhr, status, error) {
-                console.error('Error fetching new items:', error);
+                debugError('Error fetching new items:', error);
             });
     }
 
@@ -3703,7 +3727,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
      * Auto-select newly uploaded items
      */
     function autoSelectNewlyUploadedItems(newlyUploadedIds, options) {
-        console.log('Auto-selecting newly uploaded items:', newlyUploadedIds);
+        debugLog('Auto-selecting newly uploaded items:', newlyUploadedIds);
         
         newlyUploadedIds.forEach(function(attachmentId) {
             var $item = $('.tomatillo-media-item[data-id="' + attachmentId + '"]');
@@ -3721,7 +3745,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
         // Update selection count and button state
         updateSelectionUI(selectedItems.length, options);
         
-        console.log('Auto-selection complete. Selected items:', selectedItems);
+        debugLog('Auto-selection complete. Selected items:', selectedItems);
     }
 
     /**
@@ -3731,13 +3755,13 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
         // Get array of already loaded IDs to exclude
         var loadedIds = currentMediaItems.map(function(item) { return item.id; });
         
-        console.log('');
-        console.log('═══════════════════════════════════════════════════════');
-        console.log('🔄 BACKGROUND LOADER STARTED');
-        console.log('═══════════════════════════════════════════════════════');
-        console.log('📡 Fetching: ALL remaining items');
-        console.log('📡 Items already in memory:', currentMediaItems.length);
-        console.log('📡 Excluding IDs:', loadedIds.slice(0, 5).join(', '), loadedIds.length > 5 ? '... (' + loadedIds.length + ' total)' : '');
+        debugLog('');
+        debugLog('═══════════════════════════════════════════════════════');
+        debugLog('🔄 BACKGROUND LOADER STARTED');
+        debugLog('═══════════════════════════════════════════════════════');
+        debugLog('📡 Fetching: ALL remaining items');
+        debugLog('📡 Items already in memory:', currentMediaItems.length);
+        debugLog('📡 Excluding IDs:', loadedIds.slice(0, 5).join(', '), loadedIds.length > 5 ? '... (' + loadedIds.length + ' total)' : '');
         
         var data = {
             action: 'query-attachments',
@@ -3751,7 +3775,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
 
         $.post(ajaxurl, data)
             .done(function(response) {
-                console.log('✅ Background loader: Server response received');
+                debugLog('✅ Background loader: Server response received');
                 
                 var newItems = [];
                 if (Array.isArray(response)) {
@@ -3762,10 +3786,10 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                     newItems = response.attachments;
                 }
 
-                console.log('📦 Background loader: Server returned', newItems.length, 'items');
+                debugLog('📦 Background loader: Server returned', newItems.length, 'items');
 
                 if (newItems.length > 0) {
-                    console.log('📦 Item IDs:', newItems.map(function(item) { return item.id; }).slice(0, 10).join(', '), newItems.length > 10 ? '...' : '');
+                    debugLog('📦 Item IDs:', newItems.map(function(item) { return item.id; }).slice(0, 10).join(', '), newItems.length > 10 ? '...' : '');
                     
                     // Check for duplicates before adding
                     var existingIds = new Set(currentMediaItems.map(function(item) { return item.id; }));
@@ -3773,7 +3797,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                         return !existingIds.has(item.id);
                     });
                     
-                    console.log('🔍 Deduplication: found', uniqueNewItems.length, 'unique items (', (newItems.length - uniqueNewItems.length), 'duplicates removed)');
+                    debugLog('🔍 Deduplication: found', uniqueNewItems.length, 'unique items (', (newItems.length - uniqueNewItems.length), 'duplicates removed)');
                     
                     if (uniqueNewItems.length > 0) {
                         var beforeCount = currentMediaItems.length;
@@ -3781,20 +3805,20 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                         // Add to current media items
                         currentMediaItems = currentMediaItems.concat(uniqueNewItems);
                         
-                        console.log('✅ Added to memory: before =', beforeCount, ', after =', currentMediaItems.length);
+                        debugLog('✅ Added to memory: before =', beforeCount, ', after =', currentMediaItems.length);
                         
                         // Load optimization data for new items
                         loadOptimizationDataForNewItems(uniqueNewItems);
                         
                         // Since we requested ALL (-1), we've now loaded everything
                         hasMoreItemsOnServer = false;
-                        console.log('🏁 ALL ITEMS LOADED FROM SERVER');
+                        debugLog('🏁 ALL ITEMS LOADED FROM SERVER');
                     } else {
-                        console.log('⚠️  All new items were duplicates, skipping');
+                        debugLog('⚠️  All new items were duplicates, skipping');
                         hasMoreItemsOnServer = false;
                     }
                 } else {
-                    console.log('🏁 NO MORE ITEMS available for background loading');
+                    debugLog('🏁 NO MORE ITEMS available for background loading');
                     hasMoreItemsOnServer = false;
                 }
                 
@@ -3814,14 +3838,14 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                     return item.type === currentFilter;
                 });
                 updateLoadMoreButton(filteredItems.length, renderedItemsCount, hasMoreItemsOnServer);
-                console.log('═══════════════════════════════════════════════════════');
-                console.log('');
+                debugLog('═══════════════════════════════════════════════════════');
+                debugLog('');
             })
             .fail(function(xhr, status, error) {
-                console.error('❌ Background loading FAILED:', error);
-                console.error('   Status:', status);
-                console.log('═══════════════════════════════════════════════════════');
-                console.log('');
+                debugError('❌ Background loading FAILED:', error);
+                debugError('   Status:', status);
+                debugLog('═══════════════════════════════════════════════════════');
+                debugLog('');
             });
     }
 
@@ -3840,7 +3864,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
         Promise.all(optimizationPromises).then(function(newOptimizationData) {
             // Add to current optimization data
             currentOptimizationData = currentOptimizationData.concat(newOptimizationData);
-            console.log('🔄 Background loaded optimization data for', newOptimizationData.length, 'new items');
+            debugLog('🔄 Background loaded optimization data for', newOptimizationData.length, 'new items');
         });
     }
 
@@ -3855,7 +3879,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
 
         var batchSize = window.tomatilloSettings.infinite_scroll_batch;
 
-        console.log('🔄 Setting up infinite scroll with batch size:', batchSize, 'rendered items:', renderedItemsCount);
+        debugLog('🔄 Setting up infinite scroll with batch size:', batchSize, 'rendered items:', renderedItemsCount);
 
         // Add scroll listener to modal content
         $('#tomatillo-modal-content').off('scroll.infinite').on('scroll.infinite', function() {
@@ -3866,7 +3890,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
 
             // Check if scrolled to bottom (with some buffer)
             if (scrollTop + clientHeight >= scrollHeight - 100 && !isLoading) {
-                console.log('🔄 Scrolled to bottom, loading more images...');
+                debugLog('🔄 Scrolled to bottom, loading more images...');
                 loadMoreImages(renderedItemsCount, batchSize, options);
             }
         });
@@ -3879,12 +3903,12 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
         if (isLoading) return;
         
         isLoading = true;
-        console.log('🔄 Infinite scroll triggered - rendering preloaded images from offset:', offset);
-        console.log('🔄 Options multiple:', options.multiple);
+        debugLog('🔄 Infinite scroll triggered - rendering preloaded images from offset:', offset);
+        debugLog('🔄 Options multiple:', options.multiple);
 
         // IMPORTANT: Apply current filter before loading more items
         var currentFilter = $('#tomatillo-filter').val() || 'image';
-        console.log('🔍 Current filter for infinite scroll:', currentFilter);
+        debugLog('🔍 Current filter for infinite scroll:', currentFilter);
         
         // Filter currentMediaItems based on current filter
         var filteredItems = currentMediaItems.filter(function(item) {
@@ -3916,7 +3940,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
             }
         });
         
-        console.log('🔍 Filtered items:', filteredItems.length, 'of', currentMediaItems.length);
+        debugLog('🔍 Filtered items:', filteredItems.length, 'of', currentMediaItems.length);
 
         // Calculate how many items to render from FILTERED items
         var itemsToRender = Math.min(batchSize, filteredItems.length - offset);
@@ -3925,19 +3949,19 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
             var newItems = filteredItems.slice(offset, offset + itemsToRender);
             var newOptimizationData = filteredOptimizationData.slice(offset, offset + itemsToRender);
             
-            console.log('🔄 Rendering', newItems.length, 'filtered preloaded images');
+            debugLog('🔄 Rendering', newItems.length, 'filtered preloaded images');
             
             // Render additional items using preloaded optimization data
             renderAdditionalItemsWithOptimization(newItems, newOptimizationData, options);
             
             // Update rendered count
             renderedItemsCount += newItems.length;
-            console.log('🔄 Total rendered items:', renderedItemsCount);
+            debugLog('🔄 Total rendered items:', renderedItemsCount);
             
             // Update Load More button
             updateLoadMoreButton(filteredItems.length, renderedItemsCount, hasMoreItemsOnServer);
         } else {
-            console.log('🔄 No more filtered images to render');
+            debugLog('🔄 No more filtered images to render');
         }
         
         isLoading = false;
@@ -3947,7 +3971,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
      * Render additional items for infinite scroll using preloaded optimization data
      */
     function renderAdditionalItemsWithOptimization(newItems, newOptimizationData, options) {
-        console.log('🔍 DEBUG: renderAdditionalItemsWithOptimization called with', newItems.length, 'new items');
+        debugLog('🔍 DEBUG: renderAdditionalItemsWithOptimization called with', newItems.length, 'new items');
         
         // Get current column heights from existing DOM elements
         var containerWidth = 1200; // fallback
@@ -3989,7 +4013,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
             var hiResImage = getHiResImageWithOptimization(item, optimizationData);
             var position = newPositions[index];
             
-            console.log('🔍 DEBUG: Additional item', index, 'ID:', item.id, 'Position:', position);
+            debugLog('🔍 DEBUG: Additional item', index, 'ID:', item.id, 'Position:', position);
             
             var originalFilename = item.filename || item.title || 'Unknown';
             var filename = cleanFilename(originalFilename);
@@ -4023,8 +4047,8 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
         var newHeight = Math.max(currentHeight, maxHeight);
         $('#tomatillo-media-grid').css('height', newHeight + 'px');
         
-        console.log('🔍 DEBUG: Updated container height from', currentHeight, 'to', newHeight);
-        console.log('🎨 Additional items rendered with pre-calculated positions - NO LAYOUT SHIFT!');
+        debugLog('🔍 DEBUG: Updated container height from', currentHeight, 'to', newHeight);
+        debugLog('🎨 Additional items rendered with pre-calculated positions - NO LAYOUT SHIFT!');
         
         // Re-setup hover effects for new items
         $('.tomatillo-media-item').off('mouseenter mouseleave').hover(
@@ -4054,7 +4078,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
             }
         );
         
-        console.log('🔄 Rendered', newItems.length, 'additional items with preloaded optimization data');
+        debugLog('🔄 Rendered', newItems.length, 'additional items with preloaded optimization data');
     }
 
     /**
@@ -4119,16 +4143,16 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
             }
         );
         
-        console.log('🔄 Rendered', newItems.length, 'additional items');
+        debugLog('🔄 Rendered', newItems.length, 'additional items');
     }
 
     /**
      * Clean up modal and reset state
      */
     function cleanupModal() {
-        console.log('🧹 Cleaning up modal');
-        console.log('🧹 Current selectedItems:', selectedItems);
-        console.log('🧹 Current mediaItems length:', currentMediaItems.length);
+        debugLog('🧹 Cleaning up modal');
+        debugLog('🧹 Current selectedItems:', selectedItems);
+        debugLog('🧹 Current mediaItems length:', currentMediaItems.length);
         
         // Remove modal from DOM
         $('#tomatillo-custom-modal').remove();
@@ -4151,16 +4175,16 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
             // Remove drag-drop handlers
             cleanupDragDropHandlers();
         
-        console.log('🧹 Modal cleanup complete');
-        console.log('🧹 Reset selectedItems:', selectedItems);
-        console.log('🧹 Reset mediaItems length:', currentMediaItems.length);
+        debugLog('🧹 Modal cleanup complete');
+        debugLog('🧹 Reset selectedItems:', selectedItems);
+        debugLog('🧹 Reset mediaItems length:', currentMediaItems.length);
     }
 
     /**
      * Render media grid with pre-filtered optimization data (for search)
      */
     function renderMediaGridWithOptimization(mediaItems, optimizationDataArray, options, skipImageWait) {
-        console.log('Rendering filtered media grid with', mediaItems.length, 'items');
+        debugLog('Rendering filtered media grid with', mediaItems.length, 'items');
         
         // Determine layout type based on content
         var hasImages = mediaItems.some(function(item) { return item.type === 'image'; });
@@ -4168,7 +4192,7 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
         
         // Use grid layout if there are any non-image files (mixed content)
         var layoutType = (hasImages && hasNonImages) ? 'grid' : (hasImages ? 'masonry' : 'grid');
-        console.log('🔍 DEBUG: Layout type:', layoutType, '(hasImages:', hasImages, ', hasNonImages:', hasNonImages, ')');
+        debugLog('🔍 DEBUG: Layout type:', layoutType, '(hasImages:', hasImages, ', hasNonImages:', hasNonImages, ')');
         
         // Update grid container class
         var $grid = $('#tomatillo-media-grid');
@@ -4185,9 +4209,9 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
             var hiResImage = getHiResImageWithOptimization(item, optimizationData);
             var position = preCalculatedPositions[index];
             
-            console.log('🔍 DEBUG: Rendering item', index, 'ID:', item.id);
-            console.log('🔍 DEBUG: Position:', position);
-            console.log('🔍 DEBUG: HiRes image:', hiResImage);
+            debugLog('🔍 DEBUG: Rendering item', index, 'ID:', item.id);
+            debugLog('🔍 DEBUG: Position:', position);
+            debugLog('🔍 DEBUG: HiRes image:', hiResImage);
             
             var originalFilename = item.filename || item.title || 'Unknown';
             var filename = cleanFilename(originalFilename);
@@ -4247,31 +4271,31 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                 </div>
             `;
             
-            console.log('🔍 DEBUG: Generated HTML for item', index, ':', itemHtml);
+            debugLog('🔍 DEBUG: Generated HTML for item', index, ':', itemHtml);
             gridHtml += itemHtml;
         });
         
-        console.log('🔍 DEBUG: About to insert HTML into grid');
-        console.log('🔍 DEBUG: Grid element:', $('#tomatillo-media-grid'));
-        console.log('🔍 DEBUG: HTML length:', gridHtml.length);
+        debugLog('🔍 DEBUG: About to insert HTML into grid');
+        debugLog('🔍 DEBUG: Grid element:', $('#tomatillo-media-grid'));
+        debugLog('🔍 DEBUG: HTML length:', gridHtml.length);
         
         $('#tomatillo-media-grid').html(gridHtml);
         
-        console.log('🔍 DEBUG: HTML inserted, checking DOM elements');
+        debugLog('🔍 DEBUG: HTML inserted, checking DOM elements');
         var insertedItems = $('.tomatillo-media-item');
-        console.log('🔍 DEBUG: Inserted items count:', insertedItems.length);
+        debugLog('🔍 DEBUG: Inserted items count:', insertedItems.length);
         
         insertedItems.each(function(index) {
             var $item = $(this);
             var computedStyle = window.getComputedStyle(this);
             var rect = this.getBoundingClientRect();
-            console.log('🔍 DEBUG: Item', index, 'ID:', $item.data('id'));
-            console.log('🔍 DEBUG: Computed position:', computedStyle.position);
-            console.log('🔍 DEBUG: Computed left:', computedStyle.left);
-            console.log('🔍 DEBUG: Computed top:', computedStyle.top);
-            console.log('🔍 DEBUG: Computed width:', computedStyle.width);
-            console.log('🔍 DEBUG: Computed height:', computedStyle.height);
-            console.log('🔍 DEBUG: Bounding rect:', rect.left, rect.top, rect.width, rect.height);
+            debugLog('🔍 DEBUG: Item', index, 'ID:', $item.data('id'));
+            debugLog('🔍 DEBUG: Computed position:', computedStyle.position);
+            debugLog('🔍 DEBUG: Computed left:', computedStyle.left);
+            debugLog('🔍 DEBUG: Computed top:', computedStyle.top);
+            debugLog('🔍 DEBUG: Computed width:', computedStyle.width);
+            debugLog('🔍 DEBUG: Computed height:', computedStyle.height);
+            debugLog('🔍 DEBUG: Bounding rect:', rect.left, rect.top, rect.width, rect.height);
             
             // Check for overlapping
             if (index > 0) {
@@ -4286,9 +4310,9 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
                                  currentRect.bottom <= prevRect.top);
                 
                 if (overlapping) {
-                    console.error('🚨 OVERLAPPING DETECTED! Item', index, 'overlaps with item', index - 1);
-                    console.error('🚨 Current rect:', currentRect);
-                    console.error('🚨 Previous rect:', prevRect);
+                    debugError('🚨 OVERLAPPING DETECTED! Item', index, 'overlaps with item', index - 1);
+                    debugError('🚨 Current rect:', currentRect);
+                    debugError('🚨 Previous rect:', prevRect);
                 }
             }
         });
@@ -4332,17 +4356,17 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
             var maxHeight = Math.max.apply(Math, preCalculatedPositions.map(function(pos) {
                 return pos.top + pos.height;
             }));
-            console.log('🔍 DEBUG: Setting masonry container height to:', maxHeight + 'px');
+            debugLog('🔍 DEBUG: Setting masonry container height to:', maxHeight + 'px');
             $('#tomatillo-media-grid').css('height', maxHeight + 'px');
         } else {
             // For grid layout, let it size naturally
-            console.log('🔍 DEBUG: Grid layout - letting container size naturally');
+            debugLog('🔍 DEBUG: Grid layout - letting container size naturally');
             $('#tomatillo-media-grid').css('height', 'auto');
         }
         
-        console.log('🎨 Pre-calculated masonry layout applied - NO LAYOUT SHIFT!');
-        console.log('🔍 DEBUG: Final container height:', $('#tomatillo-media-grid').css('height'));
-        console.log('Filtered media grid rendered successfully');
+        debugLog('🎨 Pre-calculated masonry layout applied - NO LAYOUT SHIFT!');
+        debugLog('🔍 DEBUG: Final container height:', $('#tomatillo-media-grid').css('height'));
+        debugLog('Filtered media grid rendered successfully');
     }
 
     /**
@@ -4403,37 +4427,37 @@ var hasMoreItemsOnServer = true; // Track if there are more items available on s
         // Show button if there are unrendered items OR if there might be more on server
         var shouldShow = remainingRendered > 0 || (moreOnServer !== false && hasMoreItemsOnServer);
         
-        console.log('┌─────────────────────────────────────────────┐');
-        console.log('│ 📦 LOAD MORE BUTTON UPDATE                 │');
-        console.log('├─────────────────────────────────────────────┤');
-        console.log('│ Total in memory:        ', currentMediaItems.length.toString().padEnd(20), '│');
-        console.log('│ Total filtered:         ', totalFiltered.toString().padEnd(20), '│');
-        console.log('│ Currently rendered:     ', currentRendered.toString().padEnd(20), '│');
-        console.log('│ Remaining to render:    ', remainingRendered.toString().padEnd(20), '│');
-        console.log('│ More on server?:        ', (hasMoreItemsOnServer ? 'YES' : 'NO').padEnd(20), '│');
-        console.log('│ Should show button?:    ', (shouldShow ? 'YES' : 'NO').padEnd(20), '│');
-        console.log('└─────────────────────────────────────────────┘');
+        debugLog('┌─────────────────────────────────────────────┐');
+        debugLog('│ 📦 LOAD MORE BUTTON UPDATE                 │');
+        debugLog('├─────────────────────────────────────────────┤');
+        debugLog('│ Total in memory:        ', currentMediaItems.length.toString().padEnd(20), '│');
+        debugLog('│ Total filtered:         ', totalFiltered.toString().padEnd(20), '│');
+        debugLog('│ Currently rendered:     ', currentRendered.toString().padEnd(20), '│');
+        debugLog('│ Remaining to render:    ', remainingRendered.toString().padEnd(20), '│');
+        debugLog('│ More on server?:        ', (hasMoreItemsOnServer ? 'YES' : 'NO').padEnd(20), '│');
+        debugLog('│ Should show button?:    ', (shouldShow ? 'YES' : 'NO').padEnd(20), '│');
+        debugLog('└─────────────────────────────────────────────┘');
         
         if (shouldShow) {
             if (remainingRendered > 0) {
                 var buttonText = 'Load All ' + remainingRendered + ' Remaining Image' + (remainingRendered > 1 ? 's' : '');
-                console.log('📦 ✅ Button VISIBLE: "' + buttonText + '"');
+                debugLog('📦 ✅ Button VISIBLE: "' + buttonText + '"');
                 $button.text(buttonText).show();
             } else {
                 // We have more on server but haven't loaded them yet
-                console.log('📦 ✅ Button VISIBLE: "Load All Remaining Images" (need to fetch from server)');
+                debugLog('📦 ✅ Button VISIBLE: "Load All Remaining Images" (need to fetch from server)');
                 $button.text('Load All Remaining Images').show();
             }
         } else {
-            console.log('📦 ❌ Button HIDDEN (all items loaded)');
+            debugLog('📦 ❌ Button HIDDEN (all items loaded)');
             $button.hide();
         }
     }
 
     // Initialize when DOM is ready
     $(document).ready(function() {
-        console.log('DOM ready, initializing CLEAN TomatilloMediaFrame');
-        console.log('✅ Tomatillo Media Frame: ACF Gallery Handler should be available as ACFGalleryHandler');
+        debugLog('DOM ready, initializing CLEAN TomatilloMediaFrame');
+        debugLog('✅ Tomatillo Media Frame: ACF Gallery Handler should be available as ACFGalleryHandler');
         TomatilloMediaFrame.init();
     });
 

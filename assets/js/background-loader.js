@@ -6,6 +6,30 @@
 (function($) {
     'use strict';
 
+    // Debug mode: Check if debugging is enabled via settings
+    var tomatilloDebugMode = (window.tomatilloSettings && window.tomatilloSettings.debug_mode) || false;
+
+    // Conditional logging helper
+    function debugLog() {
+        if (tomatilloDebugMode && console && console.log) {
+            console.log.apply(console, arguments);
+        }
+    }
+
+    // Conditional error logging helper
+    function debugError() {
+        if (tomatilloDebugMode && console && console.error) {
+            console.error.apply(console, arguments);
+        }
+    }
+
+    // Conditional warning logging helper
+    function debugWarn() {
+        if (tomatilloDebugMode && console && console.warn) {
+            console.warn.apply(console, arguments);
+        }
+    }
+
     // Global cache for preloaded media
     var preloadedMedia = {
         items: [],
@@ -19,11 +43,11 @@
      * Initialize background loading
      */
     function initBackgroundLoader() {
-        console.log('🚀 Initializing background media loader');
+        debugLog('🚀 Initializing background media loader');
         
         // Check if background loading is enabled
         if (!window.tomatilloSettings || !window.tomatilloSettings.background_load_enabled) {
-            console.log('🚀 Background loading disabled in settings');
+            debugLog('🚀 Background loading disabled in settings');
             return;
         }
 
@@ -33,7 +57,7 @@
             $(window).on('load', function() {
                 // Additional delay to ensure all admin scripts are done
                 setTimeout(function() {
-                    console.log('🚀 WordPress admin fully loaded, starting background media loading...');
+                    debugLog('🚀 WordPress admin fully loaded, starting background media loading...');
                     loadMediaInBackground();
                 }, 500);
             });
@@ -45,17 +69,17 @@
      */
     function loadMediaInBackground() {
         if (preloadedMedia.loading || preloadedMedia.loaded) {
-            console.log('🚀 Background loading already in progress or completed');
+            debugLog('🚀 Background loading already in progress or completed');
             return;
         }
 
         var startTime = performance.now();
-        console.log('🚀 Starting background media loading...');
+        debugLog('🚀 Starting background media loading...');
         preloadedMedia.loading = true;
 
         // Use infinite_scroll_batch as the default preload count for consistency
         var preloadCount = window.tomatilloSettings ? (window.tomatilloSettings.preload_count || window.tomatilloSettings.infinite_scroll_batch || 100) : 100;
-        console.log('🚀 Preloading', preloadCount, 'media items in background');
+        debugLog('🚀 Preloading', preloadCount, 'media items in background');
         
         // Use WordPress AJAX to fetch media
         var data = {
@@ -69,7 +93,7 @@
 
         $.post(ajaxurl, data)
             .done(function(response) {
-                console.log('🚀 Background media loaded successfully:', response);
+                debugLog('🚀 Background media loaded successfully:', response);
                 
                 var mediaItems = [];
                 if (response && Array.isArray(response)) {
@@ -85,7 +109,7 @@
                     var allIds = mediaItems.map(function(item) { return item.id; });
                     var uniqueIds = [...new Set(allIds)];
                     if (allIds.length !== uniqueIds.length) {
-                        console.warn('🚨 Duplicates detected in preloaded data:', allIds.length, '→', uniqueIds.length);
+                        debugWarn('🚨 Duplicates detected in preloaded data:', allIds.length, '→', uniqueIds.length);
                         
                         // Remove duplicates
                         var seenIds = new Set();
@@ -96,7 +120,7 @@
                             }
                             return false;
                         });
-                        console.log('🔧 Deduplicated preloaded data:', allIds.length, '→', mediaItems.length);
+                        debugLog('🔧 Deduplicated preloaded data:', allIds.length, '→', mediaItems.length);
                     }
                     
                     var loadTime = performance.now() - startTime;
@@ -104,18 +128,18 @@
                     preloadedMedia.loaded = true;
                     preloadedMedia.loading = false;
                     
-                    console.log('🚀 Preloaded', mediaItems.length, 'media items in', loadTime.toFixed(2), 'ms');
-                    console.log('🚀 Media inserter will now open INSTANTLY!');
+                    debugLog('🚀 Preloaded', mediaItems.length, 'media items in', loadTime.toFixed(2), 'ms');
+                    debugLog('🚀 Media inserter will now open INSTANTLY!');
                     
                     // Load optimization data in background
                     loadOptimizationDataInBackground(mediaItems);
                 } else {
-                    console.log('🚀 No media items found for preloading');
+                    debugLog('🚀 No media items found for preloading');
                     preloadedMedia.loading = false;
                 }
             })
             .fail(function(xhr, status, error) {
-                console.error('🚀 Background media loading failed:', error);
+                debugError('🚀 Background media loading failed:', error);
                 preloadedMedia.error = true;
                 preloadedMedia.loading = false;
             });
@@ -125,7 +149,7 @@
      * Load optimization data in background
      */
     function loadOptimizationDataInBackground(mediaItems) {
-        console.log('🚀 Loading optimization data for', mediaItems.length, 'items');
+        debugLog('🚀 Loading optimization data for', mediaItems.length, 'items');
         
         var optimizationPromises = mediaItems.map(function(item) {
             return new Promise(function(resolve, reject) {
@@ -153,9 +177,9 @@
 
         Promise.all(optimizationPromises).then(function(optimizationDataArray) {
             preloadedMedia.optimizationData = optimizationDataArray;
-            console.log('🚀 Preloaded optimization data for', optimizationDataArray.length, 'items');
+            debugLog('🚀 Preloaded optimization data for', optimizationDataArray.length, 'items');
         }).catch(function(error) {
-            console.error('🚀 Optimization data loading failed:', error);
+            debugError('🚀 Optimization data loading failed:', error);
         });
     }
 
@@ -184,7 +208,7 @@
             loading: false,
             error: false
         };
-        console.log('🚀 Cleared preloaded media data');
+        debugLog('🚀 Cleared preloaded media data');
     }
 
     // Expose functions globally
