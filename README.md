@@ -70,6 +70,9 @@ Navigate to **Media Studio > Settings** to configure the plugin.
 ### Debug & Monitoring
 - **Debug Mode**: Enable detailed logging (stores last 1000 entries)
 - **Performance Stats**: View total library size, optimization savings, and bandwidth reduction
+- **Console Logging Control**: All JavaScript console output is controlled by debug mode setting
+
+**Note**: When debug mode is disabled, all plugin console logging is suppressed for a cleaner browser console in production.
 
 ## 🎯 Usage
 
@@ -171,10 +174,11 @@ tomatillo-media-studio/
 4. **Test Single Image**: Upload one small image and check logs
 
 ### Media Library Not Loading
-1. **Check Browser Console**: Look for JavaScript errors
+1. **Check Browser Console**: Look for JavaScript errors (enable debug mode in plugin settings)
 2. **Disable Other Plugins**: Test for conflicts
 3. **Check WordPress Version**: Requires 6.4+
 4. **Clear Browser Cache**: Hard refresh (Cmd/Ctrl + Shift + R)
+5. **Verify Settings Passed**: Open browser console and run `console.log(window.tomatilloSettings)` to verify plugin settings are loaded
 
 ### Performance Issues
 1. **Reduce Batch Size**: Lower the number of images processed at once
@@ -188,6 +192,9 @@ Navigate to **Media Studio > Tools > Logs & Debug** to:
 - View the last 1000 log entries
 - Copy logs for support requests
 - Monitor optimization processes in real-time
+- Control JavaScript console output (debug mode OFF = no console logs)
+
+**Important**: Disable debug mode in production to suppress all console logging and improve performance.
 
 ## 📄 License
 
@@ -197,8 +204,23 @@ GPL v2 or later. See [LICENSE](LICENSE) for details.
 
 **Developed by**: Chris Liu-Beers  
 **Company**: [Tomatillo Design](https://tomatillodesign.com)  
-**Version**: 1.0.3  
+**Version**: 1.0.4  
 **Last Updated**: January 2025
+
+## 🔄 Recent Updates (v1.0.4)
+
+### Bug Fixes
+- **Fixed: Modal Z-Index Issue** - Custom media modal now properly appears above WordPress Block Editor interface panels
+- **Fixed: Debug Mode Communication** - Plugin settings (including debug mode) now properly passed to all JavaScript contexts
+- **Fixed: Console Logging** - All console output now respects debug mode setting for cleaner production environments
+- **Fixed: Duplicate Uploads** - Resolved intermittent issue where drag-drop would upload multiple copies of the same file
+- **Fixed: 30-Image Limit** - Removed artificial limit in modals; now loads all images with "Load More" button functionality
+
+### Improvements
+- **Conditional Console Logging** - Added `debugLog()`, `debugError()`, and `debugWarn()` helper functions that respect debug mode
+- **Enhanced Debugging** - Comprehensive logging for media loading, infinite scroll, and "Load More" functionality
+- **Settings Localization** - `tomatilloSettings` now properly passed to custom media frame in all admin contexts
+- **Better UX** - "Load All Remaining Images" button for explicit control over media loading in modals
 
 ---
 
