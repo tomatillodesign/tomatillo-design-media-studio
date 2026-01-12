@@ -42,7 +42,7 @@ class Tomatillo_Media_Settings {
         // Advanced Settings
         'debug_mode' => true,
         'background_load_enabled' => true,
-        'preload_count' => 30,
+        'preload_count' => 100,  // Match infinite_scroll_batch for consistency
         'infinite_scroll_batch' => 100,
     );
     
@@ -278,7 +278,7 @@ class Tomatillo_Media_Settings {
         // Advanced Settings
         $sanitized['debug_mode'] = isset($input['debug_mode']) ? (bool) $input['debug_mode'] : false;
         $sanitized['background_load_enabled'] = isset($input['background_load_enabled']) ? (bool) $input['background_load_enabled'] : true;
-        $sanitized['preload_count'] = isset($input['preload_count']) ? max(10, min(100, (int) $input['preload_count'])) : 30;
+        $sanitized['preload_count'] = isset($input['preload_count']) ? max(10, min(200, (int) $input['preload_count'])) : 100;
         $sanitized['infinite_scroll_batch'] = isset($input['infinite_scroll_batch']) ? max(20, min(200, (int) $input['infinite_scroll_batch'])) : 100;
         
         return $sanitized;

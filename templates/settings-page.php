@@ -252,8 +252,8 @@ $stats = tomatillo_media_studio()->core->get_media_stats();
                     <tr>
                         <th scope="row"><?php _e('Preload Count', 'tomatillo-media-studio'); ?></th>
                         <td>
-                            <input type="number" name="tomatillo_media_studio_settings[preload_count]" min="10" max="100" value="<?php echo esc_attr($settings->get_preload_count()); ?>" />
-                            <p class="description"><?php _e('Number of images to preload in background (10-100). Higher numbers = faster inserter but more memory usage.', 'tomatillo-media-studio'); ?></p>
+                            <input type="number" name="tomatillo_media_studio_settings[preload_count]" min="10" max="200" value="<?php echo esc_attr($settings->get_preload_count()); ?>" />
+                            <p class="description"><?php _e('Number of images to preload in background (10-200, default 100). Higher numbers = faster modal opening but more memory usage.', 'tomatillo-media-studio'); ?></p>
                         </td>
                     </tr>
                 </table>

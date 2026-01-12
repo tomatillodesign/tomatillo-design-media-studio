@@ -53,7 +53,8 @@
         console.log('🚀 Starting background media loading...');
         preloadedMedia.loading = true;
 
-        var preloadCount = window.tomatilloSettings ? window.tomatilloSettings.preload_count : 30;
+        // Use infinite_scroll_batch as the default preload count for consistency
+        var preloadCount = window.tomatilloSettings ? (window.tomatilloSettings.preload_count || window.tomatilloSettings.infinite_scroll_batch || 100) : 100;
         console.log('🚀 Preloading', preloadCount, 'media items in background');
         
         // Use WordPress AJAX to fetch media

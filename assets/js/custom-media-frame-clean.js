@@ -12,6 +12,10 @@ var currentMediaItems = [];
 var currentOptimizationData = [];
 var renderedItemsCount = 0; // Track how many items have been rendered
 var isLoading = false; // Track if infinite scroll is currently loading
+var dragDropHandlers = null; // Store drag-drop handlers for cleanup
+var lastUploadTime = 0; // Track last upload to prevent duplicates
+var uploadDebounceDelay = 500; // Milliseconds to wait between uploads
+var hasMoreItemsOnServer = true; // Track if there are more items available on server
 
     // Wait for wp.media to be available
     function waitForWpMedia(callback) {
@@ -1131,7 +1135,12 @@ var isLoading = false; // Track if infinite scroll is currently loading
                     
                     <!-- Footer -->
                     <div class="tomatillo-footer">
-                        <div id="tomatillo-selection-count" class="tomatillo-selection-count">No items selected</div>
+                        <div class="tomatillo-footer-left">
+                            <div id="tomatillo-selection-count" class="tomatillo-selection-count">No items selected</div>
+                            <button id="tomatillo-load-more" class="tomatillo-btn tomatillo-btn-load-more" style="display: none; margin-left: 16px;">
+                                Load More Images
+                            </button>
+                        </div>
                         <div class="tomatillo-actions">
                             <button id="tomatillo-cancel" class="tomatillo-btn tomatillo-btn-cancel">Cancel</button>
                             <button id="tomatillo-select" class="tomatillo-btn tomatillo-btn-select" disabled>Select</button>
@@ -1402,9 +1411,36 @@ var isLoading = false; // Track if infinite scroll is currently loading
                     border-radius: 0 0 8px 8px;
                 }
                 
+                .tomatillo-footer-left {
+                    display: flex;
+                    align-items: center;
+                }
+                
                 .tomatillo-selection-count {
                     color: #666;
                     font-size: 14px;
+                }
+                
+                .tomatillo-btn-load-more {
+                    background: #0073aa;
+                    color: white;
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 13px;
+                    font-weight: 500;
+                    transition: background 0.2s;
+                }
+                
+                .tomatillo-btn-load-more:hover {
+                    background: #005177;
+                }
+                
+                .tomatillo-btn-load-more:disabled {
+                    background: #ccc;
+                    cursor: not-allowed;
+                    opacity: 0.6;
                 }
                 
                 .tomatillo-no-results {
@@ -2068,6 +2104,9 @@ var isLoading = false; // Track if infinite scroll is currently loading
         $('.tomatillo-media-item').removeClass('selected');
         $('#tomatillo-media-grid').removeClass('tomatillo-single-selection');
         
+        // Reset the server flag to true (assume there might be more until proven otherwise)
+        hasMoreItemsOnServer = true;
+        
         // Check if we have preloaded media
         console.log('🔍 Checking for preloaded media...');
         console.log('🔍 window.TomatilloBackgroundLoader exists:', !!window.TomatilloBackgroundLoader);
@@ -2155,11 +2194,32 @@ var isLoading = false; // Track if infinite scroll is currently loading
             
             console.log('🔍 Filtered to', currentFilter + ':', filteredItems.length, 'of', currentMediaItems.length);
             
-            // Render immediately with filtered data
-            renderMediaGridWithOptimization(filteredItems, filteredOptimizationData, options, true);
+            // Render only initial batch for better performance and to enable infinite scroll
+            var initialBatchSize = window.tomatilloSettings ? (window.tomatilloSettings.infinite_scroll_batch || 100) : 100;
+            var initialItems = filteredItems.slice(0, initialBatchSize);
+            var initialOptimizationData = filteredOptimizationData.slice(0, initialBatchSize);
             
-            // Initialize rendered count
-            renderedItemsCount = filteredItems.length;
+            console.log('');
+            console.log('┌─────────────────────────────────────────────┐');
+            console.log('│ 🎨 INITIAL RENDER                          │');
+            console.log('├─────────────────────────────────────────────┤');
+            console.log('│ Batch size:             ', initialBatchSize.toString().padEnd(20), '│');
+            console.log('│ Items to render:        ', initialItems.length.toString().padEnd(20), '│');
+            console.log('│ Total available:        ', filteredItems.length.toString().padEnd(20), '│');
+            console.log('│ More on server?:        ', (hasMoreItemsOnServer ? 'YES' : 'NO').padEnd(20), '│');
+            console.log('└─────────────────────────────────────────────┘');
+            console.log('');
+            
+            // Render immediately with initial batch
+            renderMediaGridWithOptimization(initialItems, initialOptimizationData, options, true);
+            
+            // Initialize rendered count to actual rendered items, not total
+            renderedItemsCount = initialItems.length;
+            
+            console.log('✅ Initial render complete:', renderedItemsCount, 'items displayed');
+            
+            // Show/hide "Load More" button based on whether there are more items
+            updateLoadMoreButton(filteredItems.length, renderedItemsCount, hasMoreItemsOnServer);
             
             // Setup infinite scroll after rendering
             setupInfiniteScroll(options);
@@ -2167,16 +2227,27 @@ var isLoading = false; // Track if infinite scroll is currently loading
             // Start loading more images in background for infinite scroll
             loadMoreImagesInBackground(options);
             
-            // Test: Auto-trigger infinite scroll after 2 seconds to see if it works
+            // Trigger immediate check for infinite scroll (in case initial batch doesn't fill screen)
             setTimeout(function() {
-                console.log('🧪 TEST: Auto-triggering infinite scroll after 2 seconds');
+                console.log('🧪 Checking if more items need to load immediately...');
                 console.log('🧪 Total filtered items:', filteredItems.length);
                 console.log('🧪 Rendered items:', renderedItemsCount);
-                if (filteredItems.length > renderedItemsCount) {
-                    console.log('🧪 Triggering loadMoreImages...');
-                    loadMoreImages(renderedItemsCount, 100, options);
+                
+                // Check if modal content is not scrollable and we have more items
+                var $gridContainer = $('.tomatillo-grid-container');
+                if ($gridContainer.length > 0 && $gridContainer[0]) {
+                    var scrollHeight = $gridContainer[0].scrollHeight;
+                    var clientHeight = $gridContainer[0].clientHeight;
+                    var hasScroll = scrollHeight > clientHeight;
+                    
+                    console.log('🧪 Modal scrollable?', hasScroll, '(scrollHeight:', scrollHeight, 'clientHeight:', clientHeight, ')');
+                    
+                    // If not scrollable and we have more items, enable load more button
+                    if (!hasScroll && filteredItems.length > renderedItemsCount) {
+                        console.log('🧪 Modal not scrollable - Load More button visible for remaining items');
+                    }
                 }
-            }, 2000);
+            }, 100);
             
             var preloadEndTime = performance.now();
             console.log('🚀 Modal opened in', (preloadEndTime - preloadStartTime).toFixed(2), 'ms using preloaded data!');
@@ -2200,10 +2271,13 @@ var isLoading = false; // Track if infinite scroll is currently loading
      */
     function loadMediaFromServer(options) {
         // Use WordPress AJAX to fetch media directly
+        // Match the preload count to ensure consistency
+        var initialBatchSize = window.tomatilloSettings ? (window.tomatilloSettings.infinite_scroll_batch || 100) : 100;
+        
         var data = {
             action: 'query-attachments',
             query: {
-                posts_per_page: 50,
+                posts_per_page: initialBatchSize,
                 post_status: 'inherit'
                 // Remove post_mime_type restriction to load all file types
             }
@@ -2813,6 +2887,202 @@ var isLoading = false; // Track if infinite scroll is currently loading
             }
         });
         
+        // Handle Load More button click
+        $('#tomatillo-load-more').off('click').on('click', function() {
+            console.log('');
+            console.log('═══════════════════════════════════════════════════════');
+            console.log('🖱️  LOAD MORE BUTTON CLICKED');
+            console.log('═══════════════════════════════════════════════════════');
+            
+            var $button = $(this);
+            
+            // Disable button while loading
+            $button.prop('disabled', true).text('Loading...');
+            console.log('📦 Button disabled, fetching data...');
+            
+            // Get current filter
+            var currentFilter = $('#tomatillo-filter').val() || 'image';
+            console.log('📦 Current filter:', currentFilter);
+            
+            // Filter all items based on current filter
+            var filteredItems = currentMediaItems.filter(function(item) {
+                if (currentFilter === 'all') return true;
+                if (currentFilter === 'image') {
+                    return item.type === 'image' || (item.mime && item.mime.startsWith('image/'));
+                } else if (currentFilter === 'video') {
+                    return item.type === 'video' || (item.mime && item.mime.startsWith('video/'));
+                } else if (currentFilter === 'audio') {
+                    return item.type === 'audio' || (item.mime && item.mime.startsWith('audio/'));
+                } else if (currentFilter === 'application') {
+                    return item.type === 'application' || (item.mime && item.mime.startsWith('application/'));
+                }
+                return item.type === currentFilter;
+            });
+            
+            var remainingRendered = filteredItems.length - renderedItemsCount;
+            
+            console.log('┌─────────────────────────────────────────────┐');
+            console.log('│ 📊 CURRENT STATE                           │');
+            console.log('├─────────────────────────────────────────────┤');
+            console.log('│ Items in memory:        ', currentMediaItems.length.toString().padEnd(20), '│');
+            console.log('│ Filtered items:         ', filteredItems.length.toString().padEnd(20), '│');
+            console.log('│ Already rendered:       ', renderedItemsCount.toString().padEnd(20), '│');
+            console.log('│ Remaining to render:    ', remainingRendered.toString().padEnd(20), '│');
+            console.log('│ More on server?:        ', (hasMoreItemsOnServer ? 'YES' : 'NO').padEnd(20), '│');
+            console.log('└─────────────────────────────────────────────┘');
+            
+            // Check if we need to fetch more from server first
+            if (remainingRendered === 0 && hasMoreItemsOnServer) {
+                console.log('');
+                console.log('🌐 FETCHING ALL REMAINING FROM SERVER');
+                console.log('───────────────────────────────────────────────────────');
+                
+                // Get array of already loaded IDs to exclude
+                var loadedIds = currentMediaItems.map(function(item) { return item.id; });
+                
+                console.log('📡 Requesting: ALL remaining items');
+                console.log('📡 Excluding IDs:', loadedIds.slice(0, 5).join(', '), loadedIds.length > 5 ? '... (' + loadedIds.length + ' total)' : '');
+                
+                var data = {
+                    action: 'query-attachments',
+                    query: {
+                        posts_per_page: -1, // -1 means ALL items
+                        post_status: 'inherit',
+                        post__not_in: loadedIds // Exclude already loaded items
+                    }
+                };
+                
+                $.post(ajaxurl, data)
+                    .done(function(response) {
+                        console.log('✅ Server response received');
+                        
+                        var newItems = [];
+                        if (Array.isArray(response)) {
+                            newItems = response;
+                        } else if (response && response.data && Array.isArray(response.data)) {
+                            newItems = response.data;
+                        } else if (response && response.attachments && Array.isArray(response.attachments)) {
+                            newItems = response.attachments;
+                        }
+                        
+                        console.log('📦 Server returned:', newItems.length, 'items');
+                        
+                        if (newItems.length > 0) {
+                            console.log('📦 Item IDs:', newItems.map(function(item) { return item.id; }).slice(0, 10).join(', '), newItems.length > 10 ? '...' : '');
+                            
+                            // Check for duplicates
+                            var existingIds = new Set(currentMediaItems.map(function(item) { return item.id; }));
+                            var uniqueNewItems = newItems.filter(function(item) {
+                                return !existingIds.has(item.id);
+                            });
+                            
+                            console.log('🔍 Deduplication: found', uniqueNewItems.length, 'unique items (', (newItems.length - uniqueNewItems.length), 'duplicates removed)');
+                            
+                            if (uniqueNewItems.length > 0) {
+                                // Add to current media items
+                                var beforeCount = currentMediaItems.length;
+                                currentMediaItems = currentMediaItems.concat(uniqueNewItems);
+                                console.log('✅ Added to memory: before =', beforeCount, ', after =', currentMediaItems.length);
+                                
+                                // Load optimization data
+                                loadOptimizationDataForNewItems(uniqueNewItems);
+                                
+                                // Now render the newly fetched items
+                                var updatedFilteredItems = currentMediaItems.filter(function(item) {
+                                    if (currentFilter === 'all') return true;
+                                    if (currentFilter === 'image') {
+                                        return item.type === 'image' || (item.mime && item.mime.startsWith('image/'));
+                                    } else if (currentFilter === 'video') {
+                                        return item.type === 'video' || (item.mime && item.mime.startsWith('video/'));
+                                    } else if (currentFilter === 'audio') {
+                                        return item.type === 'audio' || (item.mime && item.mime.startsWith('audio/'));
+                                    } else if (currentFilter === 'application') {
+                                        return item.type === 'application' || (item.mime && item.mime.startsWith('application/'));
+                                    }
+                                    return item.type === currentFilter;
+                                });
+                                
+                                var newRemainingCount = updatedFilteredItems.length - renderedItemsCount;
+                                console.log('🎨 Ready to render:', newRemainingCount, 'items');
+                                
+                                if (newRemainingCount > 0) {
+                                    console.log('🎨 Calling loadMoreImages() to render...');
+                                    loadMoreImages(renderedItemsCount, newRemainingCount, options);
+                                } else {
+                                    console.log('⚠️  No new items match current filter');
+                                }
+                                
+                                // Since we requested ALL (-1), we've now loaded everything from server
+                                hasMoreItemsOnServer = false;
+                                console.log('🏁 ALL ITEMS LOADED FROM SERVER');
+                            } else {
+                                console.log('⚠️  All fetched items were duplicates');
+                                hasMoreItemsOnServer = false;
+                            }
+                        } else {
+                            hasMoreItemsOnServer = false;
+                            console.log('🏁 NO MORE ITEMS ON SERVER');
+                        }
+                        
+                        // Re-enable button
+                        $button.prop('disabled', false);
+                        console.log('📦 Button re-enabled');
+                        
+                        // Update button state
+                        var finalFilteredItems = currentMediaItems.filter(function(item) {
+                            if (currentFilter === 'all') return true;
+                            if (currentFilter === 'image') {
+                                return item.type === 'image' || (item.mime && item.mime.startsWith('image/'));
+                            } else if (currentFilter === 'video') {
+                                return item.type === 'video' || (item.mime && item.mime.startsWith('video/'));
+                            } else if (currentFilter === 'audio') {
+                                return item.type === 'audio' || (item.mime && item.mime.startsWith('audio/'));
+                            } else if (currentFilter === 'application') {
+                                return item.type === 'application' || (item.mime && item.mime.startsWith('application/'));
+                            }
+                            return item.type === currentFilter;
+                        });
+                        updateLoadMoreButton(finalFilteredItems.length, renderedItemsCount, hasMoreItemsOnServer);
+                        console.log('═══════════════════════════════════════════════════════');
+                        console.log('');
+                    })
+                    .fail(function(xhr, status, error) {
+                        console.error('❌ AJAX FAILED:', error);
+                        console.error('   Status:', status);
+                        console.error('   XHR:', xhr);
+                        $button.prop('disabled', false).text('Load More Images');
+                        console.log('═══════════════════════════════════════════════════════');
+                        console.log('');
+                    });
+            } else if (remainingRendered > 0) {
+                // We have items in memory, just render them ALL
+                console.log('');
+                console.log('🎨 RENDERING ALL FROM MEMORY');
+                console.log('───────────────────────────────────────────────────────');
+                console.log('📦 Rendering ALL', remainingRendered, 'items already in memory');
+                
+                loadMoreImages(renderedItemsCount, remainingRendered, options);
+                
+                // Re-enable button after a short delay
+                setTimeout(function() {
+                    $button.prop('disabled', false);
+                    console.log('📦 Button re-enabled');
+                    updateLoadMoreButton(filteredItems.length, renderedItemsCount, hasMoreItemsOnServer);
+                    console.log('═══════════════════════════════════════════════════════');
+                    console.log('');
+                }, 500);
+            } else {
+                // Nothing left to load
+                console.log('');
+                console.log('🏁 NOTHING TO LOAD');
+                console.log('───────────────────────────────────────────────────────');
+                console.log('⚠️  No items in memory and no more on server');
+                $button.prop('disabled', false).hide();
+                console.log('═══════════════════════════════════════════════════════');
+                console.log('');
+            }
+        });
+        
         // Handle clicking outside modal
         $('#tomatillo-custom-modal').off('click').on('click', function(e) {
             if (e.target.id === 'tomatillo-custom-modal') {
@@ -2892,11 +3162,19 @@ var isLoading = false; // Track if infinite scroll is currently loading
             $('#tomatillo-search').val('');
             $('#tomatillo-clear-search').hide();
             
-            // Re-render with filtered items
-            renderMediaGridWithOptimization(filteredItems, filteredOptimizationData, options, true);
+            // Render only initial batch, not all items
+            var initialBatchSize = window.tomatilloSettings ? (window.tomatilloSettings.infinite_scroll_batch || 100) : 100;
+            var initialItems = filteredItems.slice(0, initialBatchSize);
+            var initialOptimizationData = filteredOptimizationData.slice(0, initialBatchSize);
             
-            // Reset rendered count for infinite scroll
-            renderedItemsCount = filteredItems.length;
+            // Re-render with initial batch of filtered items
+            renderMediaGridWithOptimization(initialItems, initialOptimizationData, options, true);
+            
+            // Reset rendered count to actual rendered items
+            renderedItemsCount = initialItems.length;
+            
+            // Update Load More button
+            updateLoadMoreButton(filteredItems.length, renderedItemsCount, hasMoreItemsOnServer);
         });
         
         // Handle search input
@@ -3013,43 +3291,51 @@ var isLoading = false; // Track if infinite scroll is currently loading
             }
         });
         
-        // Handle drag and drop
+        // Handle drag and drop with proper cleanup support
+        setupDragDropHandlers(options);
+    }
+    
+    /**
+     * Setup drag and drop handlers with proper cleanup support
+     */
+    function setupDragDropHandlers(options) {
+        // Clean up any existing handlers first
+        cleanupDragDropHandlers();
+        
         var $gridContainer = $('.tomatillo-grid-container');
         var $dragOverlay = $('#tomatillo-drag-drop-overlay');
         var dragCounter = 0;
         
-        // Prevent default drag behaviors
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function(eventName) {
-            document.addEventListener(eventName, function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-            }, false);
-        });
+        // Create named handler functions so they can be removed later
+        var preventDefaultHandler = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        };
         
-        // Handle drag enter - only show overlay once
-        document.addEventListener('dragenter', function(e) {
+        var dragEnterHandler = function(e) {
+            preventDefaultHandler(e);
             dragCounter++;
             if (dragCounter === 1) {
                 $dragOverlay.addClass('active');
                 $('#tomatillo-file-count').text('0');
             }
-        });
+        };
         
-        // Handle drag over - keep overlay visible
-        document.addEventListener('dragover', function(e) {
+        var dragOverHandler = function(e) {
+            preventDefaultHandler(e);
             // Keep overlay visible, don't toggle
-        });
+        };
         
-        // Handle drag leave - only hide overlay when completely leaving
-        document.addEventListener('dragleave', function(e) {
+        var dragLeaveHandler = function(e) {
+            preventDefaultHandler(e);
             dragCounter--;
             if (dragCounter === 0) {
                 $dragOverlay.removeClass('active');
             }
-        });
+        };
         
-        // Handle drop - hide overlay and process files
-        document.addEventListener('drop', function(e) {
+        var dropHandler = function(e) {
+            preventDefaultHandler(e);
             dragCounter = 0;
             $dragOverlay.removeClass('active');
             
@@ -3057,9 +3343,48 @@ var isLoading = false; // Track if infinite scroll is currently loading
             $('#tomatillo-file-count').text(files.length);
             if (files && files.length > 0) {
                 console.log('Files dropped for upload:', files.length);
+                
+                // Debounce: Prevent duplicate uploads within 500ms
+                var now = Date.now();
+                if (now - lastUploadTime < uploadDebounceDelay) {
+                    console.log('⚠️ Upload blocked: Too soon after last upload (debounced)');
+                    return;
+                }
+                lastUploadTime = now;
+                
                 uploadFiles(Array.from(files), options);
             }
-        });
+        };
+        
+        // Attach handlers to document
+        document.addEventListener('dragenter', dragEnterHandler, false);
+        document.addEventListener('dragover', dragOverHandler, false);
+        document.addEventListener('dragleave', dragLeaveHandler, false);
+        document.addEventListener('drop', dropHandler, false);
+        
+        // Store handlers for cleanup
+        dragDropHandlers = {
+            dragenter: dragEnterHandler,
+            dragover: dragOverHandler,
+            dragleave: dragLeaveHandler,
+            drop: dropHandler
+        };
+        
+        console.log('✅ Drag-drop handlers attached with debouncing');
+    }
+    
+    /**
+     * Clean up drag and drop handlers
+     */
+    function cleanupDragDropHandlers() {
+        if (dragDropHandlers) {
+            console.log('🧹 Removing drag-drop event handlers');
+            document.removeEventListener('dragenter', dragDropHandlers.dragenter, false);
+            document.removeEventListener('dragover', dragDropHandlers.dragover, false);
+            document.removeEventListener('dragleave', dragDropHandlers.dragleave, false);
+            document.removeEventListener('drop', dragDropHandlers.drop, false);
+            dragDropHandlers = null;
+        }
     }
 
     /**
@@ -3403,25 +3728,31 @@ var isLoading = false; // Track if infinite scroll is currently loading
      * Load more images in background after modal opens
      */
     function loadMoreImagesInBackground(options) {
-        var batchSize = window.tomatilloSettings ? window.tomatilloSettings.infinite_scroll_batch : 100;
-        var currentOffset = currentMediaItems.length;
+        // Get array of already loaded IDs to exclude
+        var loadedIds = currentMediaItems.map(function(item) { return item.id; });
         
-        console.log('🔄 Starting background loading of more media items from offset:', currentOffset);
-        console.log('🔄 Current media items length:', currentMediaItems.length);
-        console.log('🔄 Batch size:', batchSize);
+        console.log('');
+        console.log('═══════════════════════════════════════════════════════');
+        console.log('🔄 BACKGROUND LOADER STARTED');
+        console.log('═══════════════════════════════════════════════════════');
+        console.log('📡 Fetching: ALL remaining items');
+        console.log('📡 Items already in memory:', currentMediaItems.length);
+        console.log('📡 Excluding IDs:', loadedIds.slice(0, 5).join(', '), loadedIds.length > 5 ? '... (' + loadedIds.length + ' total)' : '');
         
         var data = {
             action: 'query-attachments',
             query: {
-                posts_per_page: batchSize,
+                posts_per_page: -1, // -1 = ALL remaining items
                 post_status: 'inherit',
-                offset: currentOffset
+                post__not_in: loadedIds // Exclude already loaded items
                 // Remove post_mime_type restriction to load all file types
             }
         };
 
         $.post(ajaxurl, data)
             .done(function(response) {
+                console.log('✅ Background loader: Server response received');
+                
                 var newItems = [];
                 if (Array.isArray(response)) {
                     newItems = response;
@@ -3431,9 +3762,10 @@ var isLoading = false; // Track if infinite scroll is currently loading
                     newItems = response.attachments;
                 }
 
+                console.log('📦 Background loader: Server returned', newItems.length, 'items');
+
                 if (newItems.length > 0) {
-                    console.log('🔄 Background loaded', newItems.length, 'more images');
-                    console.log('🔄 New items IDs:', newItems.map(function(item) { return item.id; }));
+                    console.log('📦 Item IDs:', newItems.map(function(item) { return item.id; }).slice(0, 10).join(', '), newItems.length > 10 ? '...' : '');
                     
                     // Check for duplicates before adding
                     var existingIds = new Set(currentMediaItems.map(function(item) { return item.id; }));
@@ -3441,23 +3773,55 @@ var isLoading = false; // Track if infinite scroll is currently loading
                         return !existingIds.has(item.id);
                     });
                     
+                    console.log('🔍 Deduplication: found', uniqueNewItems.length, 'unique items (', (newItems.length - uniqueNewItems.length), 'duplicates removed)');
+                    
                     if (uniqueNewItems.length > 0) {
-                        console.log('🔄 Adding', uniqueNewItems.length, 'unique new items (filtered out', newItems.length - uniqueNewItems.length, 'duplicates)');
+                        var beforeCount = currentMediaItems.length;
                         
                         // Add to current media items
                         currentMediaItems = currentMediaItems.concat(uniqueNewItems);
                         
+                        console.log('✅ Added to memory: before =', beforeCount, ', after =', currentMediaItems.length);
+                        
                         // Load optimization data for new items
                         loadOptimizationDataForNewItems(uniqueNewItems);
+                        
+                        // Since we requested ALL (-1), we've now loaded everything
+                        hasMoreItemsOnServer = false;
+                        console.log('🏁 ALL ITEMS LOADED FROM SERVER');
                     } else {
-                        console.log('🔄 All new items were duplicates, skipping');
+                        console.log('⚠️  All new items were duplicates, skipping');
+                        hasMoreItemsOnServer = false;
                     }
                 } else {
-                    console.log('🔄 No more images available for background loading');
+                    console.log('🏁 NO MORE ITEMS available for background loading');
+                    hasMoreItemsOnServer = false;
                 }
+                
+                // Update Load More button visibility based on new total
+                var currentFilter = $('#tomatillo-filter').val() || 'image';
+                var filteredItems = currentMediaItems.filter(function(item) {
+                    if (currentFilter === 'all') return true;
+                    if (currentFilter === 'image') {
+                        return item.type === 'image' || (item.mime && item.mime.startsWith('image/'));
+                    } else if (currentFilter === 'video') {
+                        return item.type === 'video' || (item.mime && item.mime.startsWith('video/'));
+                    } else if (currentFilter === 'audio') {
+                        return item.type === 'audio' || (item.mime && item.mime.startsWith('audio/'));
+                    } else if (currentFilter === 'application') {
+                        return item.type === 'application' || (item.mime && item.mime.startsWith('application/'));
+                    }
+                    return item.type === currentFilter;
+                });
+                updateLoadMoreButton(filteredItems.length, renderedItemsCount, hasMoreItemsOnServer);
+                console.log('═══════════════════════════════════════════════════════');
+                console.log('');
             })
             .fail(function(xhr, status, error) {
-                console.error('🔄 Background loading failed:', error);
+                console.error('❌ Background loading FAILED:', error);
+                console.error('   Status:', status);
+                console.log('═══════════════════════════════════════════════════════');
+                console.log('');
             });
     }
 
@@ -3569,6 +3933,9 @@ var isLoading = false; // Track if infinite scroll is currently loading
             // Update rendered count
             renderedItemsCount += newItems.length;
             console.log('🔄 Total rendered items:', renderedItemsCount);
+            
+            // Update Load More button
+            updateLoadMoreButton(filteredItems.length, renderedItemsCount, hasMoreItemsOnServer);
         } else {
             console.log('🔄 No more filtered images to render');
         }
@@ -3780,6 +4147,9 @@ var isLoading = false; // Track if infinite scroll is currently loading
             
             // Remove infinite scroll event handler
             $('#tomatillo-modal-content').off('scroll.infinite');
+            
+            // Remove drag-drop handlers
+            cleanupDragDropHandlers();
         
         console.log('🧹 Modal cleanup complete');
         console.log('🧹 Reset selectedItems:', selectedItems);
@@ -4020,6 +4390,43 @@ var isLoading = false; // Track if infinite scroll is currently loading
             setTimeout(function() {
                 $button.focus();
             }, 100);
+        }
+    }
+    
+    /**
+     * Update Load More button visibility and text
+     */
+    function updateLoadMoreButton(totalFiltered, currentRendered, moreOnServer) {
+        var $button = $('#tomatillo-load-more');
+        var remainingRendered = totalFiltered - currentRendered;
+        
+        // Show button if there are unrendered items OR if there might be more on server
+        var shouldShow = remainingRendered > 0 || (moreOnServer !== false && hasMoreItemsOnServer);
+        
+        console.log('┌─────────────────────────────────────────────┐');
+        console.log('│ 📦 LOAD MORE BUTTON UPDATE                 │');
+        console.log('├─────────────────────────────────────────────┤');
+        console.log('│ Total in memory:        ', currentMediaItems.length.toString().padEnd(20), '│');
+        console.log('│ Total filtered:         ', totalFiltered.toString().padEnd(20), '│');
+        console.log('│ Currently rendered:     ', currentRendered.toString().padEnd(20), '│');
+        console.log('│ Remaining to render:    ', remainingRendered.toString().padEnd(20), '│');
+        console.log('│ More on server?:        ', (hasMoreItemsOnServer ? 'YES' : 'NO').padEnd(20), '│');
+        console.log('│ Should show button?:    ', (shouldShow ? 'YES' : 'NO').padEnd(20), '│');
+        console.log('└─────────────────────────────────────────────┘');
+        
+        if (shouldShow) {
+            if (remainingRendered > 0) {
+                var buttonText = 'Load All ' + remainingRendered + ' Remaining Image' + (remainingRendered > 1 ? 's' : '');
+                console.log('📦 ✅ Button VISIBLE: "' + buttonText + '"');
+                $button.text(buttonText).show();
+            } else {
+                // We have more on server but haven't loaded them yet
+                console.log('📦 ✅ Button VISIBLE: "Load All Remaining Images" (need to fetch from server)');
+                $button.text('Load All Remaining Images').show();
+            }
+        } else {
+            console.log('📦 ❌ Button HIDDEN (all items loaded)');
+            $button.hide();
         }
     }
 
