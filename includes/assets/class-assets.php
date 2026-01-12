@@ -113,7 +113,10 @@ class Tomatillo_Media_Assets {
         // Include our template
         $this->include_media_frame_template();
         
-        // Localize script
+        // Localize script with settings (including debug mode)
+        wp_localize_script('jquery', 'tomatilloSettings', tomatillo_media_studio()->settings->get_js_settings());
+        
+        // Also localize media frame strings
         wp_localize_script('jquery', 'tomatilloMediaFrame', array(
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('tomatillo_media_frame'),

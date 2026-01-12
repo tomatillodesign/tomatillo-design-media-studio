@@ -233,8 +233,14 @@ class Tomatillo_Media_Admin {
             // Include the template
             include TOMATILLO_MEDIA_STUDIO_DIR . 'templates/custom-media-frame-template.php';
             
+            // Get plugin settings instance
+            $settings = tomatillo_media_studio()->settings;
+            
             // Localize script with AJAX URL for uploads
             wp_localize_script('tomatillo-custom-media-frame', 'ajaxurl', admin_url('admin-ajax.php'));
+            
+            // Localize script with plugin settings (including debug mode)
+            wp_localize_script('tomatillo-custom-media-frame', 'tomatilloSettings', $settings->get_js_settings());
         }
         
         // Localize script with AJAX URL and nonce
@@ -313,8 +319,14 @@ class Tomatillo_Media_Admin {
         // Include the template for our custom media frame
         include TOMATILLO_MEDIA_STUDIO_DIR . 'templates/custom-media-frame-template.php';
 
+        // Get plugin settings instance
+        $settings = tomatillo_media_studio()->settings;
+
         // Localize script with AJAX URL for uploads
         wp_localize_script('tomatillo-react-media-upload', 'ajaxurl', admin_url('admin-ajax.php'));
+        
+        // Localize script with plugin settings (including debug mode)
+        wp_localize_script('tomatillo-custom-media-frame', 'tomatilloSettings', $settings->get_js_settings());
     }
     
     /**
