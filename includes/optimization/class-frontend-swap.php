@@ -133,11 +133,13 @@ class Tomatillo_Frontend_Swap {
             $class = $this->extract_attribute($full_tag, 'class');
             $width = $this->extract_attribute($full_tag, 'width');
             $height= $this->extract_attribute($full_tag, 'height');
+            $style = $this->extract_attribute($full_tag, 'style');
             $img_attr = array();
             if ($alt !== null) $img_attr['alt'] = $alt;
             if ($class !== null) $img_attr['class'] = $class;
             if ($width !== null) $img_attr['width'] = $width;
             if ($height !== null) $img_attr['height'] = $height;
+            if ($style !== null) $img_attr['style'] = $style;
             if ($sizes !== null) $img_attr['sizes'] = $sizes;
             if ($srcset !== null) $img_attr['srcset'] = $srcset;
             $picture = $this->generate_picture_element($attachment_id, 'full', $img_attr, $srcset, $sizes);
@@ -249,6 +251,7 @@ class Tomatillo_Frontend_Swap {
         $class = $this->extract_attribute($full_tag, 'class');
         $width = $this->extract_attribute($full_tag, 'width');
         $height= $this->extract_attribute($full_tag, 'height');
+        $style = $this->extract_attribute($full_tag, 'style');
         
         // Build attributes array for fallback <img>
         $img_attr = array();
@@ -256,6 +259,7 @@ class Tomatillo_Frontend_Swap {
         if ($class !== null) $img_attr['class'] = $class;
         if ($width !== null) $img_attr['width'] = $width;
         if ($height !== null) $img_attr['height'] = $height;
+        if ($style !== null) $img_attr['style'] = $style;
         if ($sizes !== null) $img_attr['sizes'] = $sizes;
         if ($srcset !== null) $img_attr['srcset'] = $srcset; // keep original as fallback
         
